@@ -1,0 +1,16 @@
+body {
+  font-family: 'Helvetica Neue', sans-serif;
+}
+
+.hero h1 {
+  letter-spacing: 1px;
+}
+
+.btn-primary {
+  background-color: #1d3557;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #16324f;
+}
