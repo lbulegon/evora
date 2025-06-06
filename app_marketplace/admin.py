@@ -11,10 +11,11 @@ from .models import (
     ItemPedido,
     PersonalShopper, 
     Evento, 
-    RelacionamentoClienteShopper
+    RelacionamentoClienteShopper, 
+    Estabelecimento,
+    CupomDesconto  
+   
 )
-
-#from .forms import EventoAdminForm  # seu form personalizado
 
 # Ação para importar produtos de um evento para outro
 def importar_produtos_de_evento(modeladmin, request, queryset):
@@ -50,15 +51,6 @@ def importar_produtos_de_evento(modeladmin, request, queryset):
 
     messages.success(request, f"{importados} produto(s) importado(s) com sucesso de '{evento_origem.nome}' para '{evento_destino.nome}'.")
 
-# Registro do Evento no admin
-@admin.register(Evento)
-class EventoAdmin(admin.ModelAdmin):
-    form = EventoAdminForm
-    list_display = ['nome', 'personal_shopper', 'data_inicio', 'data_fim', 'status']
-    filter_horizontal = ['clientes']
-    list_filter = ['status', 'data_inicio']
-    search_fields = ['nome', 'personal_shopper__user__username']
-    actions = [importar_produtos_de_evento]
 
 @admin.register(Empresa)
 class EmpresaAdmin(admin.ModelAdmin):
@@ -96,18 +88,12 @@ class ItemPedidoInline(admin.TabularInline):
     model = ItemPedido
     extra = 1
 
-@admin.register(Pedido)
-class PedidoAdmin(admin.ModelAdmin):
-    list_display = ['id', 'cliente', 'status', 'criado_em']
-    list_filter = ['status']
-    inlines = [ItemPedidoInline]
-    search_fields = ['cliente__user__username']
+
 
 @admin.register(ItemPedido)
 class ItemPedidoAdmin(admin.ModelAdmin):
     list_display = ['pedido', 'produto', 'quantidade', 'preco_unitario']
     search_fields = ['produto__nome', 'pedido__id']
-
 
 class EventoAdminForm(forms.ModelForm):
     class Meta:
@@ -120,15 +106,85 @@ class EventoAdminForm(forms.ModelForm):
         self.fields['produtos'].required = False
         self.fields['clientes'].required = False
 
-
 @admin.register(RelacionamentoClienteShopper)
 class RelacionamentoClienteShopperAdmin(admin.ModelAdmin):
     list_display = ['cliente', 'personal_shopper', 'status', 'data_criacao']
     list_filter = ['status', 'data_criacao']
     search_fields = ['cliente__user__username', 'personal_shopper__user__username']    
 
-
 @admin.register(ProdutoEvento)
 class ProdutoEventoAdmin(admin.ModelAdmin):
     list_display = ['evento', 'produto', 'importado_de']
     list_filter = ['evento']    
+
+@admin.register(Estabelecimento)
+class EstabelecimentoAdmin(admin.ModelAdmin):
+    search_fields = ['nome']
+    list_display = ['nome', 'endereco', 'telefone']
+    ordering = ['nome']
+
+
+class ProdutoEventoInline(admin.TabularInline):
+    model = ProdutoEvento
+    extra = 1
+    autocomplete_fields = ['produto']
+
+
+class EventoForm(forms.ModelForm):
+    class Meta:
+        model = Evento
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Permitir filtragem e múltiplos selecionados nos campos ManyToMany
+        if 'clientes' in self.fields:
+            self.fields['clientes'].queryset = Cliente.objects.all()
+            self.fields['clientes'].help_text = ''
+        if 'estabelecimentos' in self.fields:
+            self.fields['estabelecimentos'].queryset = Estabelecimento.objects.all()
+            self.fields['estabelecimentos'].help_text = ''
+
+
+@admin.register(Evento)
+class EventoAdmin(admin.ModelAdmin):
+    form = EventoForm
+    list_display = ['nome', 'personal_shopper', 'data_inicio', 'data_fim', 'status']
+    list_filter = ['status', 'data_inicio', 'data_fim']
+    search_fields = ['nome', 'personal_shopper__user__username']
+    autocomplete_fields = ['personal_shopper']
+    filter_horizontal = ['clientes', 'estabelecimentos']
+    inlines = [ProdutoEventoInline]
+
+
+
+@admin.register(Pedido)
+class PedidoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'cliente', 'status', 'valor_total', 'criado_em')
+    list_filter = ('status', 'metodo_pagamento', 'criado_em')
+    search_fields = ('cliente__user__username', 'codigo_rastreamento')
+    readonly_fields = ('criado_em', 'atualizado_em', 'valor_total')
+    autocomplete_fields = ['cliente']
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            try:
+                old_obj = Pedido.objects.get(pk=obj.pk)
+                if old_obj.status != obj.status:
+                    HistoricoStatusPedido.objects.create(
+                        pedido=obj,
+                        status_anterior=old_obj.status,
+                        novo_status=obj.status,
+                        alterado_por=request.user
+                    )
+            except Pedido.DoesNotExist:
+                pass
+        obj.salvar_com_total()
+        super().save_model(request, obj, form, change)
+
+@admin.register(CupomDesconto)
+class CupomDescontoAdmin(admin.ModelAdmin):
+    list_display = ('codigo', 'desconto_percentual', 'ativo', 'valido_ate')
+    list_filter = ('ativo',)
+    search_fields = ('codigo',)

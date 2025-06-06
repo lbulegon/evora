@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
+
 
 class Empresa(models.Model):
     nome      = models.CharField(max_length=100)
@@ -116,44 +118,96 @@ class EnderecoEntrega(models.Model):
     def __str__(self):
         return f"{self.apelido or 'Endereço'} - {self.rua}, {self.numero}, {self.cidade}/{self.estado}"
 
+
 class Pedido(models.Model):
-    cliente          = models.ForeignKey(Cliente, on_delete=models.CASCADE)
-    endereco_entrega = models.ForeignKey(EnderecoEntrega, on_delete=models.CASCADE)
-    criado_em        = models.DateTimeField(auto_now_add=True)
-    status           = models.CharField(
-        max_length=20,
-        choices=[
-            ('pendente', 'Pendente'),
-            ('pago', 'Pago'),
-            ('enviado', 'Enviado'),
-            ('entregue', 'Entregue'),
-            ('cancelado', 'Cancelado'),
-        ],
-        default='pendente'
-    )
+    STATUS_CHOICES = [
+        ('pendente', 'Pendente'),
+        ('pago', 'Pago'),
+        ('em_preparacao', 'Em preparação'),
+        ('enviado', 'Enviado'),
+        ('entregue', 'Entregue'),
+        ('cancelado', 'Cancelado'),
+    ]
+
+    METODO_PAGAMENTO_CHOICES = [
+        ('pix', 'PIX'),
+        ('cartao_credito', 'Cartão de Crédito'),
+        ('cartao_debito', 'Cartão de Débito'),
+        ('boleto', 'Boleto'),
+        ('dinheiro', 'Dinheiro'),
+    ]
+
+    cliente             = models.ForeignKey(Cliente, on_delete=models.CASCADE)
+    endereco_entrega    = models.ForeignKey(EnderecoEntrega, on_delete=models.CASCADE)
+    criado_em           = models.DateTimeField(auto_now_add=True)
+    atualizado_em       = models.DateTimeField(auto_now=True)
+    status              = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendente')
+    metodo_pagamento    = models.CharField(max_length=20, choices=METODO_PAGAMENTO_CHOICES, blank=True, null=True)
+    valor_total         = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    observacoes         = models.TextField(blank=True)
+    codigo_rastreamento = models.CharField(max_length=100, blank=True, null=True)
+    is_revisado         = models.BooleanField(default=False)
+    is_prioritario      = models.BooleanField(default=False)
+
+
+    def calcular_total(self):
+        total = sum(item.subtotal() for item in self.itens.all())
+        if self.cupom and self.cupom.ativo:
+            total -= total * (self.cupom.desconto_percentual / 100)
+        self.valor_total = total
+        return total
+ 
+
+    def salvar_com_total(self):
+        self.valor_total = self.calcular_total()
+        self.save()
+
+
 
     def __str__(self):
-        return f"Pedido #{self.id} - {self.cliente.user.username}"
+        return f"Pedido #{self.id} - {self.cliente.user.username} - {self.get_status_display()}"
+class CupomDesconto(models.Model):
+    codigo = models.CharField(max_length=20, unique=True)
+    descricao = models.TextField(blank=True)
+    desconto_percentual = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)  # Ex: 10.00 = 10%
+    ativo = models.BooleanField(default=True)
+    valido_ate = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.codigo} - {self.desconto_percentual}%"
+
 
 class ItemPedido(models.Model):
     pedido         = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='itens')
     produto        = models.ForeignKey(Produto, on_delete=models.CASCADE)
     quantidade     = models.PositiveIntegerField()
     preco_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    cupom          = models.ForeignKey(CupomDesconto, null=True, blank=True, on_delete=models.SET_NULL)
+
 
     def subtotal(self):
         return self.quantidade * self.preco_unitario
 
     def __str__(self):
         return f"{self.quantidade}x {self.produto.nome}"
+class Estabelecimento(models.Model):
+    nome        = models.CharField(max_length=150)
+    endereco    = models.CharField(max_length=300, blank=True)
+    telefone    = models.CharField(max_length=20, blank=True)
+    email       = models.EmailField(blank=True)
+    descricao   = models.TextField(blank=True)
+    criado_em   = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return self.nome
 class Evento(models.Model):
     personal_shopper = models.ForeignKey(PersonalShopper, on_delete=models.CASCADE, related_name='eventos')
     nome             = models.CharField(max_length=100)
     descricao        = models.TextField(blank=True)
     data_inicio      = models.DateTimeField()
     data_fim         = models.DateTimeField()
-    clientes         = models.ManyToManyField('Cliente', related_name='eventos')
+    clientes         = models.ManyToManyField(Cliente, related_name='eventos')
+    estabelecimentos = models.ManyToManyField(Estabelecimento, related_name='eventos', blank=True)
     status = models.CharField(
         max_length=20,
         choices=[
@@ -165,9 +219,7 @@ class Evento(models.Model):
     )
     criado_em = models.DateTimeField(auto_now_add=True)
 
-    @property
-    def produtos(self):
-        return Produto.objects.filter(produto_eventos__evento=self)
-
     def __str__(self):
         return f"{self.nome} - {self.personal_shopper.user.get_full_name()}"
+
+
