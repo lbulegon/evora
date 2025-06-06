@@ -1,0 +1,9 @@
+{% extends 'app_marketplace/base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<h1>Bem-vindo à Home!</h1>
+<p>Você está logado como {{ user.username }}.</p>
+<a class="btn btn-danger" href="{% url 'logout' %}">Logout</a>
+{% endblock %}

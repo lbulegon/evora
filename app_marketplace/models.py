@@ -10,8 +10,6 @@ class Empresa(models.Model):
 
     def __str__(self):
         return self.nome
-
-
 class Categoria(models.Model):
     nome = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
@@ -32,10 +30,9 @@ class Produto(models.Model):
     def __str__(self):
         return self.nome
 
-
 class ProdutoEvento(models.Model):
-    evento  = models.ForeignKey('Evento', on_delete=models.CASCADE, related_name='produto_eventos')
-    produto = models.ForeignKey(Produto, on_delete=models.CASCADE, related_name='produto_eventos')
+    evento       = models.ForeignKey('Evento', on_delete=models.CASCADE, related_name='produto_eventos')
+    produto      = models.ForeignKey(Produto, on_delete=models.CASCADE, related_name='produto_eventos')
     importado_de = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='importacoes')
 
     class Meta:
@@ -43,8 +40,6 @@ class ProdutoEvento(models.Model):
 
     def __str__(self):
         return f"{self.produto.nome} no evento {self.evento.nome}"
-
-
 
 class PersonalShopper(models.Model):
     user         = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -74,15 +69,7 @@ class PersonalShopper(models.Model):
 class Cliente(models.Model):
     user             = models.OneToOneField(User, on_delete=models.CASCADE)
     telefone         = models.CharField(max_length=20, blank=True)
-    personal_shopper = models.ForeignKey(
-        PersonalShopper,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='clientes'
-    )
-    criado_em     = models.DateTimeField(auto_now_add=True)
-
+    criado_em        = models.DateTimeField(auto_now_add=True)
 
     def personal_shoppers(self):
         return PersonalShopper.objects.filter(
@@ -90,25 +77,21 @@ class Cliente(models.Model):
             relacionamento_clienteshopper__status='seguindo'
         )
 
-
     def __str__(self):
         return self.user.get_full_name()
 
-
 class RelacionamentoClienteShopper(models.Model):
-    cliente = models.ForeignKey('Cliente', on_delete=models.CASCADE)
-    personal_shopper = models.ForeignKey('PersonalShopper', on_delete=models.CASCADE)
-
     STATUS_CHOICES = [
         ('solicitado', 'Solicitado'),
         ('seguindo', 'Seguindo'),
         ('recusado', 'Recusado'),
         ('bloqueado', 'Bloqueado'),
     ]
+
+    cliente          = models.ForeignKey('Cliente', on_delete=models.CASCADE)
+    personal_shopper = models.ForeignKey('PersonalShopper', on_delete=models.CASCADE)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='solicitado')
-
     data_criacao = models.DateTimeField(auto_now_add=True)
-
     class Meta:
         unique_together = ('cliente', 'personal_shopper')
 
@@ -126,14 +109,12 @@ class EnderecoEntrega(models.Model):
     estado      = models.CharField(max_length=2)
     cep         = models.CharField(max_length=9)
     padrao      = models.BooleanField(default=False)
-
     class Meta:
-        verbose_name = 'Endereço de Entrega'
+        verbose_name        = 'Endereço de Entrega'
         verbose_name_plural = 'Endereços de Entrega'
 
     def __str__(self):
         return f"{self.apelido or 'Endereço'} - {self.rua}, {self.numero}, {self.cidade}/{self.estado}"
-
 
 class Pedido(models.Model):
     cliente          = models.ForeignKey(Cliente, on_delete=models.CASCADE)
@@ -166,7 +147,6 @@ class ItemPedido(models.Model):
     def __str__(self):
         return f"{self.quantidade}x {self.produto.nome}"
 
-
 class Evento(models.Model):
     personal_shopper = models.ForeignKey(PersonalShopper, on_delete=models.CASCADE, related_name='eventos')
     nome             = models.CharField(max_length=100)
@@ -188,7 +168,6 @@ class Evento(models.Model):
     @property
     def produtos(self):
         return Produto.objects.filter(produto_eventos__evento=self)
-
 
     def __str__(self):
         return f"{self.nome} - {self.personal_shopper.user.get_full_name()}"

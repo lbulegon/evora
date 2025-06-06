@@ -1,0 +1,9 @@
+{% extends 'app_marketplace/base.html' %}
+
+{% block title %}Erro{% endblock %}
+
+{% block content %}
+<h2>Algo deu errado!</h2>
+<p>Desculpe, ocorreu um erro inesperado.</p>
+<a class="btn btn-primary" href="{% url 'home' %}">Voltar para Home</a>
+{% endblock %}

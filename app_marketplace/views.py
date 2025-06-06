@@ -4,6 +4,11 @@ from .forms import CadastroClienteForm
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.contrib.auth import logout
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def home_view(request):
+    return render(request, 'app_marketplace/home.html')
 
 
 def index(request):
@@ -30,7 +35,7 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return redirect('/')  # Redireciona para home
+            return redirect('home')  # Redireciona para home
         else:
             messages.error(request, 'Usuário ou senha inválidos.')
 

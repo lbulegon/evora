@@ -124,12 +124,12 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-
-
 # Templates
 TEMPLATES[0]['DIRS'] = [BASE_DIR / "app_marketplace" / "templates"]
 
 # Static
 STATICFILES_DIRS = [BASE_DIR / "app_marketplace" / "static"]
 STATIC_URL = '/static/'
+
+LOGIN_REDIRECT_URL = '/home/'
+

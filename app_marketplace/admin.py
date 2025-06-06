@@ -60,7 +60,6 @@ class EventoAdmin(admin.ModelAdmin):
     search_fields = ['nome', 'personal_shopper__user__username']
     actions = [importar_produtos_de_evento]
 
-
 @admin.register(Empresa)
 class EmpresaAdmin(admin.ModelAdmin):
     list_display = ['nome', 'cnpj', 'email', 'telefone', 'criada_em']
@@ -68,8 +67,7 @@ class EmpresaAdmin(admin.ModelAdmin):
 
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ['user', 'telefone', 'personal_shopper', 'criado_em']
-    list_filter = ['personal_shopper']
+    list_display = ['user', 'telefone', 'criado_em']
     search_fields = ['user__username', 'user__first_name', 'user__last_name']
 
 @admin.register(PersonalShopper)
