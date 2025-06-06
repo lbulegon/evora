@@ -156,13 +156,11 @@ class Pedido(models.Model):
             total -= total * (self.cupom.desconto_percentual / 100)
         self.valor_total = total
         return total
- 
+
 
     def salvar_com_total(self):
         self.valor_total = self.calcular_total()
         self.save()
-
-
 
     def __str__(self):
         return f"Pedido #{self.id} - {self.cliente.user.username} - {self.get_status_display()}"
@@ -184,12 +182,12 @@ class ItemPedido(models.Model):
     preco_unitario = models.DecimalField(max_digits=10, decimal_places=2)
     cupom          = models.ForeignKey(CupomDesconto, null=True, blank=True, on_delete=models.SET_NULL)
 
-
     def subtotal(self):
         return self.quantidade * self.preco_unitario
 
     def __str__(self):
         return f"{self.quantidade}x {self.produto.nome}"
+
 class Estabelecimento(models.Model):
     nome        = models.CharField(max_length=150)
     endereco    = models.CharField(max_length=300, blank=True)
@@ -200,9 +198,10 @@ class Estabelecimento(models.Model):
 
     def __str__(self):
         return self.nome
+
 class Evento(models.Model):
     personal_shopper = models.ForeignKey(PersonalShopper, on_delete=models.CASCADE, related_name='eventos')
-    nome             = models.CharField(max_length=100)
+    titulo           = models.CharField(max_length=100)
     descricao        = models.TextField(blank=True)
     data_inicio      = models.DateTimeField()
     data_fim         = models.DateTimeField()
@@ -220,6 +219,4 @@ class Evento(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.nome} - {self.personal_shopper.user.get_full_name()}"
-
-
+        return f"{self.titulo} - {self.personal_shopper.user.get_full_name()}"

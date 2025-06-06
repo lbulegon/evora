@@ -1,15 +1,18 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect,get_object_or_404
 from django.contrib.auth.models import User
 from .forms import CadastroClienteForm
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
+from .models import Evento
+
+
 
 @login_required
 def home_view(request):
-    return render(request, 'app_marketplace/home.html')
-
+    eventos = Evento.objects.all().order_by('-criado_em') # ordena por mais recente
+    return render(request, 'app_marketplace/home.html', {'eventos': eventos})
 
 def index(request):
     return render(request, 'app_marketplace/index.html')
@@ -44,6 +47,14 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect('/')
+
+
+def solicitar_evento(request, evento_id):
+    evento = get_object_or_404(Evento, id=evento_id)
+    # lógica para adicionar o usuário como solicitante
+    # ...
+    return redirect('home')  # ou onde quiser redirecionar
+
 
 
 def clientes(request):

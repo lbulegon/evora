@@ -75,8 +75,8 @@ class CategoriaAdmin(admin.ModelAdmin):
 
 @admin.register(Produto)
 class ProdutoAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'empresa', 'preco', 'categoria', 'ativo', 'criado_em']
-    list_filter = ['empresa', 'categoria', 'ativo']
+    list_display  = ['nome', 'empresa', 'preco', 'categoria', 'ativo', 'criado_em']
+    list_filter   = ['empresa', 'categoria', 'ativo']
     search_fields = ['nome', 'descricao']
 
 @admin.register(EnderecoEntrega)
@@ -87,8 +87,6 @@ class EnderecoAdmin(admin.ModelAdmin):
 class ItemPedidoInline(admin.TabularInline):
     model = ItemPedido
     extra = 1
-
-
 
 @admin.register(ItemPedido)
 class ItemPedidoAdmin(admin.ModelAdmin):
@@ -150,9 +148,9 @@ class EventoForm(forms.ModelForm):
 @admin.register(Evento)
 class EventoAdmin(admin.ModelAdmin):
     form = EventoForm
-    list_display = ['nome', 'personal_shopper', 'data_inicio', 'data_fim', 'status']
+    list_display = ['titulo', 'personal_shopper', 'data_inicio', 'data_fim', 'status']
     list_filter = ['status', 'data_inicio', 'data_fim']
-    search_fields = ['nome', 'personal_shopper__user__username']
+    search_fields = ['titulo', 'personal_shopper__user__username']
     autocomplete_fields = ['personal_shopper']
     filter_horizontal = ['clientes', 'estabelecimentos']
     inlines = [ProdutoEventoInline]
