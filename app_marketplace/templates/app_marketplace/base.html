@@ -14,7 +14,7 @@
                     <span class="text-white me-3">Olá, {{ user.username }}!</span>
                     <a class="btn btn-outline-light" href="{% url 'logout' %}">Logout</a>
                 {% else %}
-                    <a class="btn btn-outline-light" href="{% url 'login' %}">Login</a>
+                    <a class="btn btn-outline-light" href="{% url 'home' %}">Home</a>
                     <a class="btn btn-outline-light" href="{% url 'cadastro' %}">Cadastro</a>
                 {% endif %}
             </div>

@@ -44,3 +44,13 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect('/')
+
+
+def clientes(request):
+    return render(request, 'app_marketplace/clientes.html')
+
+def personal_shoppers(request):
+    return render(request, 'app_marketplace/personal_shoppers.html')
+
+def pedidos(request):
+    return render(request, 'app_marketplace/pedidos.html')

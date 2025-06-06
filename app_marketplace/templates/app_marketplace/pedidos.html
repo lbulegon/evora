@@ -1,0 +1,37 @@
+{% extends 'app_marketplace/base.html' %}
+
+{% block title %}Pedidos{% endblock %}
+
+{% block content %}
+<h1>Pedidos</h1>
+<p>Visualize e gerencie seus pedidos.</p>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Cliente</th>
+      <th>Personal Shopper</th>
+      <th>Status</th>
+      <th>Data</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- Substituir por loop real -->
+    <tr>
+      <td>1</td>
+      <td>João Silva</td>
+      <td>Lucas Oliveira</td>
+      <td>Em andamento</td>
+      <td>2025-06-06</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Maria Santos</td>
+      <td>Ana Costa</td>
+      <td>Concluído</td>
+      <td>2025-06-05</td>
+    </tr>
+  </tbody>
+</table>
+{% endblock %}

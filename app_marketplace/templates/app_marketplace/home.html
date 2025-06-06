@@ -3,7 +3,39 @@
 {% block title %}Home{% endblock %}
 
 {% block content %}
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">Menu</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMenu"
+      aria-controls="navbarMenu" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarMenu">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'home' %}">🏠 Início</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'clientes' %}">👥 Clientes</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'personal_shoppers' %}">🛍 Personal Shoppers</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'pedidos' %}">📦 Pedidos</a>
+        </li>
+      </ul>
+      <span class="navbar-text">
+        Logado como <strong>{{ user.username }}</strong> |
+        <a class="btn btn-sm btn-outline-danger" href="{% url 'logout' %}">Logout</a>
+      </span>
+    </div>
+  </div>
+</nav>
+
+
 <h1>Bem-vindo à Home!</h1>
-<p>Você está logado como {{ user.username }}.</p>
-<a class="btn btn-danger" href="{% url 'logout' %}">Logout</a>
+<p>Escolha uma opção no menu acima.</p>
+
 {% endblock %}

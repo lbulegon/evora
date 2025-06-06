@@ -1,0 +1,35 @@
+{% extends 'app_marketplace/base.html' %}
+
+{% block title %}Clientes{% endblock %}
+
+{% block content %}
+<h1>Lista de Clientes</h1>
+<p>Aqui você pode gerenciar seus clientes.</p>
+
+<!-- Exemplo de tabela simples -->
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Nome</th>
+      <th>Email</th>
+      <th>Telefone</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- Substituir por loop real do queryset -->
+    <tr>
+      <td>1</td>
+      <td>João Silva</td>
+      <td>joao@email.com</td>
+      <td>(11) 99999-9999</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Maria Santos</td>
+      <td>maria@email.com</td>
+      <td>(21) 98888-8888</td>
+    </tr>
+  </tbody>
+</table>
+{% endblock %}
