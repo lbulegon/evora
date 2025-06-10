@@ -29,7 +29,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']  # Ou ['seu-domínio.railway.app'] para produção
 
-+# Application definition
+# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',
