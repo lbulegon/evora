@@ -77,12 +77,14 @@ WSGI_APPLICATION = 'setup.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE'  : 'django.db.backends.postgresql',
-        'NAME'    : 'evora',                                  # Nome do banco de dados
+        'NAME'    : 'railway',                                  # Nome do banco de dados
         'USER'    : 'postgres',                               # Nome de usuário
-        'PASSWORD': 'MaHppemIkAJjTyCADpUGOIBqqOKtsVfS',       # Senha
+        'PASSWORD': 'dtzlYwfACCJRCJcZPQpnlKEZgnxKqzMM',       # Senha
         'HOST'    : 'trolley.proxy.rlwy.net',                 # Host do banco de dados (use o IP ou hostname se for remoto)
         'PORT'    : '23534',                                  # Porta padrão do PostgreSQL
     }
+
+
  }
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
