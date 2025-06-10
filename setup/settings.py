@@ -26,15 +26,10 @@ SECRET_KEY = 'django-insecure-8j^$b4kv512@8mlg=koq)5iu8#fpqz#=ot8ost*)g^eyexvq!b
 DEBUG = True
 
 #ALLOWED_HOSTS = ['192.168.0.18','localhost', '127.0.0.1', '192.168.0.30']
-ALLOWED_HOSTS = [
-    'https://evora.up.railway.app/',
-    'autentica-desenvolvimento.up.railway.app',
-    '127.0.0.1',  # Opcional: Para testes locais
-    'localhost',  # Opcional: Para testes locais  
-    '192.168.0.30', 
-]
 
-# Application definition
+ALLOWED_HOSTS = ['*']  # Ou ['seu-domínio.railway.app'] para produção
+
++# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',
