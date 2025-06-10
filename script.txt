@@ -1,0 +1,246 @@
+INSERT INTO motopro_estado (id, nome, sigla) VALUES
+(1, 'Acre', 'AC'),
+(2, 'Alagoas', 'AL'),
+(3, 'Amapá', 'AP'),
+(4, 'Amazonas', 'AM'),
+(5, 'Bahia', 'BA'),
+(6, 'Ceará', 'CE'),
+(7, 'Distrito Federal', 'DF'),
+(8, 'Espírito Santo', 'ES'),
+(9, 'Goiás', 'GO'),
+(10, 'Maranhão', 'MA'),
+(11, 'Mato Grosso', 'MT'),
+(12, 'Mato Grosso do Sul', 'MS'),
+(13, 'Minas Gerais', 'MG'),
+(14, 'Pará', 'PA'),
+(15, 'Paraíba', 'PB'),
+(16, 'Paraná', 'PR'),
+(17, 'Pernambuco', 'PE'),
+(18, 'Piauí', 'PI'),
+(19, 'Rio de Janeiro', 'RJ'),
+(20, 'Rio Grande do Norte', 'RN'),
+(21, 'Rio Grande do Sul', 'RS'),
+(22, 'Rondônia', 'RO'),
+(23, 'Roraima', 'RR'),
+(24, 'Santa Catarina', 'SC'),
+(25, 'São Paulo', 'SP'),
+(26, 'Sergipe', 'SE'),
+(27, 'Tocantins', 'TO');
+
+
+
+
+
+INSERT INTO motopro_cidade (id, nome, estado_id, codigo_ibge) VALUES
+(1, 'Porto Alegre', 21, '4314902'),
+(2, 'Caxias do Sul', 21, '4305108'),
+(3, 'Pelotas', 21, '4314408'),
+(4, 'Canoas', 21, '4304606'),
+(5, 'Santa Maria', 21, '4316908'),
+(6, 'Gravataí', 21, '4309208'),
+(7, 'Viamão', 21, '4323002'),
+(8, 'Novo Hamburgo', 21, '4313400'),
+(9, 'São Leopoldo', 21, '4318706'),
+(10, 'Rio Grande', 21, '4315602'),
+(11, 'Alvorada', 21, '4300604'),
+(12, 'Passo Fundo', 21, '4314101'),
+(13, 'Sapucaia do Sul', 21, '4320008'),
+(14, 'Uruguaiana', 21, '4322400'),
+(15, 'Santa Cruz do Sul', 21, '4316809'),
+(16, 'Bagé', 21, '4301602'),
+(17, 'Bento Gonçalves', 21, '4302105'),
+(18, 'Erechim', 21, '4307005'),
+(19, 'Guaíba', 21, '4309406'),
+(20, 'Santana do Livramento', 21, '4317104'),
+(21, 'Cachoeirinha', 21, '4303103'),
+(22, 'Esteio', 21, '4307708'),
+(23, 'Ijuí', 21, '4310206'),
+(24, 'Farroupilha', 21, '4307906'),
+(25, 'Santo Ângelo', 21, '4318003'),
+(26, 'Vacaria', 21, '4322509'),
+(27, 'Camaquã', 21, '4303608'),
+(28, 'Lajeado', 21, '4311404'),
+(29, 'Venâncio Aires', 21, '4322608'),
+(30, 'São Borja', 21, '4318000');
+
+
+
+
+
+
+
+
+INSERT INTO motopro_bairro (id, nome, cidade_id) VALUES
+(1, 'Centro Histórico', 1),
+(2, 'Cidade Baixa', 1),
+(3, 'Menino Deus', 1),
+(4, 'Azenha', 1),
+(5, 'Santana', 1),
+(6, 'Bom Fim', 1),
+(7, 'Moinhos de Vento', 1),
+(8, 'Independência', 1),
+(9, 'Mont\'Serrat', 1),
+(10, 'Petrópolis', 1),
+(11, 'Jardim Botânico', 1),
+(12, 'Partenon', 1),
+(13, 'Glória', 1),
+(14, 'Cavalhada', 1),
+(15, 'Tristeza', 1),
+(16, 'Ipanema', 1),
+(17, 'Cristal', 1),
+(18, 'Belém Novo', 1),
+(19, 'Restinga', 1),
+(20, 'Sarandi', 1),
+(21, 'Rubem Berta', 1),
+(22, 'Passo das Pedras', 1),
+(23, 'Protásio Alves', 1),
+(24, 'Santa Cecília', 1),
+(25, 'Auxiliadora', 1),
+(26, 'Boa Vista', 1),
+(27, 'São João', 1),
+(28, 'Floresta', 1),
+(29, 'Humaitá', 1),
+(30, 'Navegantes', 1),
+(31, 'São Geraldo', 1),
+(32, 'Anchieta', 1),
+(33, 'Farrapos', 1),
+(34, 'Higienópolis', 1),
+(35, 'Chácara das Pedras', 1),
+(36, 'Vila Assunção', 1),
+(37, 'Vila Nova', 1),
+(38, 'Vila Ipiranga', 1),
+(39, 'Jardim do Salso', 1),
+(40, 'Hípica', 1);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+INSERT INTO motopro_vaga (estabelecimento_id, motoboy_id, observacoes, data_da_vaga, valor, created_at, status)
+VALUES 
+(1, NULL, 'Vaga para entregas rápidas na região central', '2025-01-23 10:00:00', 100.00, NOW(), 'aberta'),
+(1, NULL, 'Entrega de documentos urgentes', '2025-01-24 11:30:00', 120.00, NOW(), 'aberta'),
+(2, NULL, 'Entrega de refeições na zona sul', '2025-01-25 09:00:00', 80.00, NOW(), 'aberta'),
+(2, NULL, 'Transporte de encomendas leves', '2025-01-26 14:45:00', 95.00, NOW(), 'aberta'),
+(3, NULL, 'Entrega de produtos farmacêuticos', '2025-01-27 13:00:00', 110.00, NOW(), 'aberta'),
+(3, NULL, 'Entrega de pacotes na zona norte', '2025-01-28 08:00:00', 90.00, NOW(), 'aberta'),
+(4, NULL, 'Entrega expressa para área comercial', '2025-01-29 15:00:00', 105.00, NOW(), 'aberta'),
+(4, NULL, 'Transporte de eletrônicos', '2025-01-30 17:30:00', 130.00, NOW(), 'aberta'),
+(5, NULL, 'Entrega em domicílio de compras online', '2025-02-01 12:00:00', 85.00, NOW(), 'aberta'),
+(5, NULL, 'Entrega noturna de pacotes pequenos', '2025-02-02 20:00:00', 120.00, NOW(), 'aberta'),
+(6, NULL, 'Entrega para eventos corporativos', '2025-02-03 10:00:00', 150.00, NOW(), 'aberta'),
+(6, NULL, 'Entrega rápida de flores e presentes', '2025-02-04 09:30:00', 95.00, NOW(), 'aberta'),
+(7, NULL, 'Entrega de documentos para escritório', '2025-02-05 14:00:00', 100.00, NOW(), 'aberta'),
+(7, NULL, 'Entrega de encomendas frágeis', '2025-02-06 16:00:00', 140.00, NOW(), 'aberta'),
+(8, NULL, 'Entrega de alimentos congelados', '2025-02-07 11:00:00', 110.00, NOW(), 'aberta'),
+(8, NULL, 'Entrega de pacotes volumosos', '2025-02-08 18:30:00', 125.00, NOW(), 'aberta'),
+(9, NULL, 'Entrega de mercadorias em shopping', '2025-02-09 13:30:00', 115.00, NOW(), 'aberta'),
+(9, NULL, 'Entrega especial para clientes VIP', '2025-02-10 15:30:00', 150.00, NOW(), 'aberta'),
+(10, NULL, 'Entrega de peças automotivas', '2025-02-11 10:00:00', 105.00, NOW(), 'aberta'),
+(10, NULL, 'Entrega para feiras e exposições', '2025-02-12 09:00:00', 200.00, NOW(), 'aberta');
+
+
+
+
+
+
+
+
+
+
+INSERT INTO motopro_motoboy (
+    nome, cpf, cnh, telefone, email, placa_moto, modelo_moto, ano_moto, 
+    cep, estado_id_id, cidade_id_id, logradouro, numero, complemento, 
+    status, created_at, updated_at
+) 
+VALUES 
+('João da Silva', '12345678901', 'CNH12345678', '(11) 91234-5678', 'joao.silva@example.com', 'ABC1D23', 'Honda CG 160', 2020, 
+ '01001-000', 1, 1, 'Rua Principal', '123', 'Apto 1', 'livre', NOW(), NOW()),
+('Maria Oliveira', '23456789012', 'CNH23456789', '(21) 98765-4321', 'maria.oliveira@example.com', 'DEF4G56', 'Yamaha Fazer 250', 2021, 
+ '22041-001', 1, 2, 'Avenida Central', '456', 'Casa', 'livre', NOW(), NOW()),
+('Carlos Santos', '34567890123', 'CNH34567890', '(31) 99876-5432', 'carlos.santos@example.com', 'GHI7J89', 'Suzuki Burgman', 2018, 
+ '30140-000', 2, 3, 'Rua Secundária', '789', '', 'alocado', NOW(), NOW()),
+('Ana Paula', '45678901234', 'CNH45678901', '(41) 91234-8888', 'ana.paula@example.com', 'JKL8M10', 'Dafra Citycom 300i', 2022, 
+ '80010-000', 3, 4, 'Rua das Flores', '321', 'Apto 2', 'livre', NOW(), NOW()),
+('Pedro Lima', '56789012345', 'CNH56789012', '(51) 91234-7777', 'pedro.lima@example.com', 'NOP1Q23', 'Kawasaki Ninja 400', 2019, 
+ '90020-001', 3, 5, 'Rua do Sol', '654', 'Casa', 'inativo', NOW(), NOW()),
+('Lucas Ferreira', '67890123456', 'CNH67890123', '(61) 98765-1111', 'lucas.ferreira@example.com', 'RST4U56', 'Honda Biz 125', 2020, 
+ '70040-010', 4, 6, 'Rua da Paz', '987', '', 'livre', NOW(), NOW()),
+('Juliana Costa', '78901234567', 'CNH78901234', '(71) 91234-9999', 'juliana.costa@example.com', 'UVW7X89', 'Yamaha NMax 160', 2021, 
+ '40010-020', 5, 7, 'Avenida Brasil', '741', 'Apto 101', 'alocado', NOW(), NOW()),
+('Rafael Souza', '89012345678', 'CNH89012345', '(81) 99876-3333', 'rafael.souza@example.com', 'YZA2B34', 'Honda PCX 150', 2018, 
+ '50030-040', 6, 8, 'Rua das Palmeiras', '852', '', 'inativo', NOW(), NOW()),
+('Fernanda Mendes', '90123456789', 'CNH90123456', '(91) 91234-6666', 'fernanda.mendes@example.com', 'CDE5F67', 'Suzuki Yes 125', 2022, 
+ '66040-050', 7, 9, 'Avenida das Américas', '963', 'Casa', 'livre', NOW(), NOW()),
+('Thiago Ramos', '01234567890', 'CNH01234567', '(31) 91234-5555', 'thiago.ramos@example.com', 'GHI8J10', 'Yamaha XTZ 150', 2023, 
+ '30060-060', 8, 10, 'Rua do Horizonte', '159', '', 'livre', NOW(), NOW())
+-- Adicione mais 40 registros seguindo o padrão acima.
+;
+
+
+
+
+INSERT INTO candidatura (
+    motoboy_id, vaga_id, status, data_candidatura
+) 
+VALUES
+(1, 1, 'pendente', NOW()),
+(2, 2, 'aprovada', NOW()),
+(3, 3, 'recusada', NOW()),
+(4, 4, 'pendente', NOW()),
+(5, 5, 'pendente', NOW()),
+(6, 6, 'aprovada', NOW()),
+(7, 7, 'recusada', NOW()),
+(8, 8, 'pendente', NOW()),
+(1, 3, 'aprovada', NOW()),
+(2, 4, 'pendente', NOW()),
+(3, 5, 'pendente', NOW()),
+(4, 6, 'recusada', NOW()),
+(5, 7, 'aprovada', NOW()),
+(6, 8, 'pendente', NOW()),
+(7, 1, 'pendente', NOW()),
+(8, 2, 'recusada', NOW()),
+(1, 4, 'pendente', NOW()),
+(2, 5, 'pendente', NOW()),
+(3, 6, 'aprovada', NOW()),
+(4, 7, 'pendente', NOW()),
+(5, 8, 'recusada', NOW()),
+(6, 1, 'aprovada', NOW()),
+(7, 2, 'pendente', NOW()),
+(8, 3, 'recusada', NOW()),
+(1, 5, 'pendente', NOW()),
+(2, 6, 'pendente', NOW()),
+(3, 7, 'aprovada', NOW()),
+(4, 8, 'pendente', NOW()),
+(5, 1, 'recusada', NOW()),
+(6, 2, 'pendente', NOW()),
+(7, 3, 'aprovada', NOW()),
+(8, 4, 'pendente', NOW()),
+(1, 6, 'pendente', NOW()),
+(2, 7, 'recusada', NOW()),
+(3, 8, 'aprovada', NOW()),
+(4, 1, 'pendente', NOW()),
+(5, 2, 'pendente', NOW()),
+(6, 3, 'aprovada', NOW()),
+(7, 4, 'pendente', NOW()),
+(8, 5, 'recusada', NOW()),
+(1, 7, 'pendente', NOW()),
+(2, 8, 'pendente', NOW()),
+(3, 1, 'aprovada', NOW()),
+(4, 2, 'pendente', NOW()),
+(5, 3, 'recusada', NOW());
