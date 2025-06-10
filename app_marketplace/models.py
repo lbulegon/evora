@@ -220,3 +220,14 @@ class Evento(models.Model):
 
     def __str__(self):
         return f"{self.titulo} - {self.personal_shopper.user.get_full_name()}"
+
+class OpenAIKey(models.Model):
+    nome              = models.CharField(max_length=100)
+    chave_secreta     = models.CharField(max_length=255)
+    criado            = models.DateTimeField(auto_now_add=True)
+    usado_ultima_vez  = models.DateTimeField(null=True, blank=True)
+    criado_por        = models.CharField(max_length=100)
+    permissoes        = models.TextField(blank=True)  # Pode ser um campo JSONField dependendo do banco de dados
+
+    def __str__(self):
+        return self.nome
