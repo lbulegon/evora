@@ -79,6 +79,7 @@ WSGI_APPLICATION = 'setup.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+'''
 DATABASES = {
     'default': {
         'ENGINE'  : 'django.db.backends.postgresql',
@@ -91,6 +92,24 @@ DATABASES = {
 
 
  }
+'''
+
+
+DATABASES = {
+    'default': {
+        'ENGINE'  : 'django.db.backends.postgresql',
+        'NAME'    : 'railway',                                  # Nome do banco de dados
+        'USER'    : 'postgres',                               # Nome de usuário
+        'PASSWORD': 'dtzlYwfACCJRCJcZPQpnlKEZgnxKqzMM',       # Senha
+        'HOST'    : 'yamanote.proxy.rlwy.net',                 # Host do banco de dados (use o IP ou hostname se for remoto)
+        'PORT'    : '47941',                                  # Porta padrão do PostgreSQL
+    }
+
+
+ }
+
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
