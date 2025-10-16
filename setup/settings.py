@@ -11,6 +11,11 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
+
+
+OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,10 +28,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-8j^$b4kv512@8mlg=koq)5iu8#fpqz#=ot8ost*)g^eyexvq!b'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+CSRF_TRUSTED_ORIGINS = ['https://evora-product.up.railway.app']
 
+
+
+#ALLOWED_HOSTS = ['192.168.0.18','localhost', '127.0.0.1', '192.168.0.30']
+
+ALLOWED_HOSTS = ['*']  # Ou ['seu-domínio.railway.app'] para produção
 
 # Application definition
 
@@ -73,16 +83,37 @@ WSGI_APPLICATION = 'setup.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+'''
 DATABASES = {
     'default': {
         'ENGINE'  : 'django.db.backends.postgresql',
-        'NAME'    : 'evora',                                  # Nome do banco de dados
+        'NAME'    : 'railway',                                  # Nome do banco de dados
         'USER'    : 'postgres',                               # Nome de usuário
-        'PASSWORD': 'MaHppemIkAJjTyCADpUGOIBqqOKtsVfS',       # Senha
+        'PASSWORD': 'dtzlYwfACCJRCJcZPQpnlKEZgnxKqzMM',       # Senha
         'HOST'    : 'trolley.proxy.rlwy.net',                 # Host do banco de dados (use o IP ou hostname se for remoto)
         'PORT'    : '23534',                                  # Porta padrão do PostgreSQL
     }
+
+
  }
+'''
+
+
+DATABASES = {
+    'default': {
+        'ENGINE'  : 'django.db.backends.postgresql',
+        'NAME'    : 'railway',                                  # Nome do banco de dados
+        'USER'    : 'postgres',                               # Nome de usuário
+        'PASSWORD': 'dtzlYwfACCJRCJcZPQpnlKEZgnxKqzMM',       # Senha
+        'HOST'    : 'yamanote.proxy.rlwy.net',                 # Host do banco de dados (use o IP ou hostname se for remoto)
+        'PORT'    : '47941',                                  # Porta padrão do PostgreSQL
+    }
+
+
+ }
+
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
