@@ -13,8 +13,17 @@ from .models import (
     Evento, 
     RelacionamentoClienteShopper, 
     Estabelecimento,
-    CupomDesconto  
-   
+    CupomDesconto,
+    # Novos modelos
+    Keeper,
+    Pacote,
+    MovimentoPacote,
+    FotoPacote,
+    OpcaoEnvio,
+    PagamentoIntent,
+    PagamentoSplit,
+    IntentCompra,
+    PedidoPacote
 )
 
 # Ação para importar produtos de um evento para outro
@@ -186,3 +195,183 @@ class CupomDescontoAdmin(admin.ModelAdmin):
     list_display = ('codigo', 'desconto_percentual', 'ativo', 'valido_ate')
     list_filter = ('ativo',)
     search_fields = ('codigo',)
+
+
+# ============================================================================
+# NOVOS MODELOS - KEEPER, PACOTE, PAGAMENTOS
+# ============================================================================
+
+@admin.register(Keeper)
+class KeeperAdmin(admin.ModelAdmin):
+    list_display = ['user', 'cidade', 'pais', 'capacidade_itens', 'verificado', 'ativo']
+    list_filter = ['verificado', 'ativo', 'pais', 'aceita_retirada', 'aceita_envio']
+    search_fields = ['user__username', 'user__first_name', 'user__last_name', 'cidade', 'apelido_local']
+    readonly_fields = ['criado_em', 'ocupacao_percent']
+    
+    fieldsets = (
+        ('Usuário', {
+            'fields': ('user',)
+        }),
+        ('Localização', {
+            'fields': ('apelido_local', 'rua', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'cep', 'pais')
+        }),
+        ('Capacidade e Taxas', {
+            'fields': ('capacidade_itens', 'ocupacao_percent', 'taxa_guarda_dia', 'taxa_motoboy')
+        }),
+        ('Opções', {
+            'fields': ('aceita_retirada', 'aceita_envio', 'verificado', 'ativo')
+        }),
+        ('Informações', {
+            'fields': ('criado_em',)
+        }),
+    )
+
+
+class FotoPacoteInline(admin.TabularInline):
+    model = FotoPacote
+    extra = 1
+    fields = ['imagem', 'legenda']
+
+
+class MovimentoPacoteInline(admin.TabularInline):
+    model = MovimentoPacote
+    extra = 0
+    readonly_fields = ['status', 'mensagem', 'criado_em', 'autor']
+    can_delete = False
+    
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Pacote)
+class PacoteAdmin(admin.ModelAdmin):
+    list_display = ['codigo_publico', 'cliente', 'keeper', 'status', 'confirmacao_visual', 'valor_declarado', 'criado_em']
+    list_filter = ['status', 'confirmacao_visual', 'keeper', 'criado_em']
+    search_fields = ['codigo_publico', 'descricao', 'cliente__user__username']
+    readonly_fields = ['criado_em', 'atualizado_em', 'dias_em_guarda', 'custo_guarda_estimado']
+    autocomplete_fields = ['cliente', 'personal_shopper', 'keeper']
+    inlines = [FotoPacoteInline, MovimentoPacoteInline]
+    
+    fieldsets = (
+        ('Identificação', {
+            'fields': ('codigo_publico', 'descricao')
+        }),
+        ('Pessoas Envolvidas', {
+            'fields': ('cliente', 'personal_shopper', 'keeper')
+        }),
+        ('Detalhes do Pacote', {
+            'fields': ('valor_declarado', 'peso_kg', 'dimensoes_cm', 'foto_recebimento')
+        }),
+        ('Status', {
+            'fields': ('status', 'confirmacao_visual')
+        }),
+        ('Guarda', {
+            'fields': ('recebido_em', 'guarda_inicio', 'guarda_fim', 'dias_em_guarda', 'custo_guarda_estimado')
+        }),
+        ('Observações', {
+            'fields': ('observacoes',)
+        }),
+        ('Informações', {
+            'fields': ('criado_em', 'atualizado_em')
+        }),
+    )
+
+
+@admin.register(MovimentoPacote)
+class MovimentoPacoteAdmin(admin.ModelAdmin):
+    list_display = ['pacote', 'status', 'mensagem', 'autor', 'criado_em']
+    list_filter = ['status', 'criado_em']
+    search_fields = ['pacote__codigo_publico', 'mensagem']
+    readonly_fields = ['criado_em']
+
+
+@admin.register(FotoPacote)
+class FotoPacoteAdmin(admin.ModelAdmin):
+    list_display = ['pacote', 'legenda', 'criado_em']
+    search_fields = ['pacote__codigo_publico', 'legenda']
+    readonly_fields = ['criado_em']
+
+
+@admin.register(OpcaoEnvio)
+class OpcaoEnvioAdmin(admin.ModelAdmin):
+    list_display = ['keeper', 'tipo', 'cidade', 'valor_base', 'ativo']
+    list_filter = ['tipo', 'ativo', 'keeper']
+    search_fields = ['keeper__user__username', 'cidade']
+    
+    fieldsets = (
+        ('Keeper', {
+            'fields': ('keeper',)
+        }),
+        ('Tipo de Envio', {
+            'fields': ('tipo', 'cidade', 'valor_base')
+        }),
+        ('Detalhes', {
+            'fields': ('observacoes', 'ativo')
+        }),
+    )
+
+
+class PagamentoSplitInline(admin.TabularInline):
+    model = PagamentoSplit
+    extra = 1
+    fields = ['favorecido', 'percentual', 'valor']
+    autocomplete_fields = ['favorecido']
+
+
+@admin.register(PagamentoIntent)
+class PagamentoIntentAdmin(admin.ModelAdmin):
+    list_display = ['id', 'pedido', 'metodo', 'status', 'valor_total', 'entrada_percent', 'criado_em']
+    list_filter = ['metodo', 'status', 'criado_em']
+    search_fields = ['pedido__id', 'gateway_ref']
+    readonly_fields = ['criado_em', 'atualizado_em']
+    inlines = [PagamentoSplitInline]
+    
+    fieldsets = (
+        ('Pedido', {
+            'fields': ('pedido',)
+        }),
+        ('Pagamento', {
+            'fields': ('metodo', 'status', 'valor_total', 'entrada_percent')
+        }),
+        ('Gateway', {
+            'fields': ('gateway_ref',)
+        }),
+        ('Informações', {
+            'fields': ('criado_em', 'atualizado_em')
+        }),
+    )
+
+
+@admin.register(PagamentoSplit)
+class PagamentoSplitAdmin(admin.ModelAdmin):
+    list_display = ['intent', 'favorecido', 'percentual', 'valor']
+    search_fields = ['favorecido__username', 'intent__id']
+    autocomplete_fields = ['favorecido']
+
+
+@admin.register(IntentCompra)
+class IntentCompraAdmin(admin.ModelAdmin):
+    list_display = ['id', 'cliente', 'personal_shopper', 'status', 'criado_em']
+    list_filter = ['status', 'criado_em']
+    search_fields = ['cliente__user__username', 'texto_bruto', 'origem_mid']
+    readonly_fields = ['criado_em']
+    autocomplete_fields = ['cliente', 'personal_shopper']
+    
+    fieldsets = (
+        ('Origem', {
+            'fields': ('cliente', 'personal_shopper', 'origem_mid')
+        }),
+        ('Conteúdo', {
+            'fields': ('texto_bruto', 'interpretado')
+        }),
+        ('Status', {
+            'fields': ('status', 'criado_em')
+        }),
+    )
+
+
+@admin.register(PedidoPacote)
+class PedidoPacoteAdmin(admin.ModelAdmin):
+    list_display = ['pedido', 'pacote', 'finalidade']
+    search_fields = ['pedido__id', 'pacote__codigo_publico']
+    autocomplete_fields = ['pedido', 'pacote']
