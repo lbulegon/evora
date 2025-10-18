@@ -1,0 +1,67 @@
+# =============================================================================
+# ÉVORA Connect - Variáveis de Ambiente
+# =============================================================================
+# Configure estas variáveis no Railway ou em seu .env local
+
+# =============================================================================
+# DJANGO
+# =============================================================================
+DJANGO_SECRET_KEY=cole-aqui-uma-chave-secreta-gerada
+DJANGO_DEBUG=0
+ALLOWED_HOSTS=*
+
+# =============================================================================
+# BANCO DE DADOS
+# =============================================================================
+# Local (desenvolvimento)
+DATABASE_URL=postgresql://evora:evora_secret_2024@localhost:5432/evora
+
+# Railway (produção - Railway preenche automaticamente)
+# DATABASE_URL=${DATABASE_URL}
+
+# =============================================================================
+# REDIS / CELERY
+# =============================================================================
+# Local
+REDIS_URL=redis://localhost:6379/0
+
+# Railway (produção)
+# REDIS_URL=${REDIS_URL}
+
+# =============================================================================
+# WHATSAPP / WPPCONNECT
+# =============================================================================
+# URL base do WPPConnect
+WPP_BASE=http://localhost:21465
+# WPP_BASE=https://seu-wppconnect.railway.app
+
+# Nome da sessão (pode manter este)
+WPP_SESSION=session-evora
+
+# URL do webhook (onde o WPPConnect envia as mensagens)
+WEBHOOK_URL=http://localhost:8000/webhooks/whatsapp/
+# WEBHOOK_URL=https://seu-django.railway.app/webhooks/whatsapp/
+
+# =============================================================================
+# OPENAI (Opcional)
+# =============================================================================
+OPENAI_API_KEY=sk-sua-chave-aqui
+
+# =============================================================================
+# CÂMBIO (Opcional - para conversão USD → BRL)
+# =============================================================================
+USD_BRL=5.0
+
+# =============================================================================
+# EMAIL (Opcional - para notificações)
+# =============================================================================
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=seu-email@gmail.com
+EMAIL_HOST_PASSWORD=sua-senha-app
+
+
+
+
+

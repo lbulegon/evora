@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import whatsapp_views
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -12,5 +13,8 @@ urlpatterns = [
     path('clientes/', views.clientes, name='clientes'),
     path('personal_shoppers/', views.personal_shoppers, name='personal_shoppers'),
     path('pedidos/', views.pedidos, name='pedidos'),
-  
+    
+    # WhatsApp Integration
+    path('webhooks/whatsapp/', whatsapp_views.whatsapp_webhook, name='whatsapp_webhook'),
+    path('api/whatsapp/reply/', whatsapp_views.reply_to_group, name='whatsapp_reply'),
 ]

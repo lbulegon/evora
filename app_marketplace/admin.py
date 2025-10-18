@@ -23,7 +23,12 @@ from .models import (
     PagamentoIntent,
     PagamentoSplit,
     IntentCompra,
-    PedidoPacote
+    PedidoPacote,
+    # Integração WhatsApp
+    WhatsappGroup,
+    GroupLinkRequest,
+    ShopperOnboardingToken,
+    KeeperOnboardingToken
 )
 
 # Ação para importar produtos de um evento para outro
@@ -375,3 +380,89 @@ class PedidoPacoteAdmin(admin.ModelAdmin):
     list_display = ['pedido', 'pacote', 'finalidade']
     search_fields = ['pedido__id', 'pacote__codigo_publico']
     autocomplete_fields = ['pedido', 'pacote']
+
+
+# ============================================================================
+# INTEGRAÇÃO WHATSAPP
+# ============================================================================
+
+@admin.register(WhatsappGroup)
+class WhatsappGroupAdmin(admin.ModelAdmin):
+    list_display = ['name', 'shopper', 'chat_id', 'active', 'created_at']
+    list_filter = ['active', 'created_at']
+    search_fields = ['name', 'chat_id', 'shopper__user__username']
+    readonly_fields = ['chat_id', 'created_at']
+    autocomplete_fields = ['shopper']
+    
+    fieldsets = (
+        ('Grupo', {
+            'fields': ('chat_id', 'name', 'active')
+        }),
+        ('Vinculação', {
+            'fields': ('shopper',)
+        }),
+        ('Informações', {
+            'fields': ('created_at', 'meta')
+        }),
+    )
+
+
+@admin.register(GroupLinkRequest)
+class GroupLinkRequestAdmin(admin.ModelAdmin):
+    list_display = ['token', 'shopper', 'created_at', 'expires_at', 'is_valid', 'used_at']
+    list_filter = ['created_at', 'expires_at']
+    search_fields = ['token', 'shopper__user__username']
+    readonly_fields = ['token', 'created_at', 'is_valid']
+    autocomplete_fields = ['shopper']
+    
+    def is_valid(self, obj):
+        return "✅" if obj.is_valid else "❌"
+    is_valid.short_description = 'Válido'
+
+
+@admin.register(ShopperOnboardingToken)
+class ShopperOnboardingTokenAdmin(admin.ModelAdmin):
+    list_display = ['__str__', 'phone', 'created_by', 'is_valid', 'created_at', 'used_at']
+    list_filter = ['created_at', 'expires_at']
+    search_fields = ['token', 'phone']
+    readonly_fields = ['token', 'created_at', 'is_valid']
+    
+    fieldsets = (
+        ('Token', {
+            'fields': ('token', 'phone')
+        }),
+        ('Criação', {
+            'fields': ('created_by', 'created_at', 'expires_at', 'is_valid')
+        }),
+        ('Uso', {
+            'fields': ('used_at', 'used_by')
+        }),
+    )
+    
+    def is_valid(self, obj):
+        return "✅" if obj.is_valid else "❌"
+    is_valid.short_description = 'Válido'
+
+
+@admin.register(KeeperOnboardingToken)
+class KeeperOnboardingTokenAdmin(admin.ModelAdmin):
+    list_display = ['__str__', 'phone', 'created_by', 'is_valid', 'created_at', 'used_at']
+    list_filter = ['created_at', 'expires_at']
+    search_fields = ['token', 'phone']
+    readonly_fields = ['token', 'created_at', 'is_valid']
+    
+    fieldsets = (
+        ('Token', {
+            'fields': ('token', 'phone')
+        }),
+        ('Criação', {
+            'fields': ('created_by', 'created_at', 'expires_at', 'is_valid')
+        }),
+        ('Uso', {
+            'fields': ('used_at', 'used_by')
+        }),
+    )
+    
+    def is_valid(self, obj):
+        return "✅" if obj.is_valid else "❌"
+    is_valid.short_description = 'Válido'

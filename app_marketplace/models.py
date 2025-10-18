@@ -588,6 +588,111 @@ class OpenAIKey(models.Model):
 
 
 # ============================================================================
+# INTEGRAÇÃO WHATSAPP - VINCULAÇÃO E TOKENS
+# ============================================================================
+
+class WhatsappGroup(models.Model):
+    """Grupo do WhatsApp vinculado a um PersonalShopper"""
+    chat_id      = models.CharField(max_length=120, unique=True, help_text="JID do grupo (ex: 12036...@g.us)")
+    name         = models.CharField(max_length=160, blank=True)
+    shopper      = models.ForeignKey(PersonalShopper, on_delete=models.CASCADE, related_name='whatsapp_groups')
+    created_at   = models.DateTimeField(default=timezone.now)
+    active       = models.BooleanField(default=True)
+    meta         = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = 'Grupo WhatsApp'
+        verbose_name_plural = 'Grupos WhatsApp'
+
+    def __str__(self):
+        return f"{self.name or self.chat_id} → {self.shopper.user.username}"
+
+
+class GroupLinkRequest(models.Model):
+    """Token temporário para vincular grupo WhatsApp a um Shopper"""
+    shopper    = models.ForeignKey(PersonalShopper, on_delete=models.CASCADE, related_name='link_tokens')
+    token      = models.CharField(max_length=16, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    used_at    = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Token de Vinculação'
+        verbose_name_plural = 'Tokens de Vinculação'
+
+    @property
+    def is_valid(self):
+        """Verifica se o token ainda é válido"""
+        return self.used_at is None and timezone.now() <= self.expires_at
+
+    @staticmethod
+    def generate_token(shopper: 'PersonalShopper', ttl_minutes: int = 30):
+        """Gera um novo token de vinculação"""
+        import secrets
+        import string
+        from datetime import timedelta
+        
+        alphabet = string.ascii_uppercase + string.digits
+        token = ''.join(secrets.choice(alphabet) for _ in range(6))
+        
+        return GroupLinkRequest.objects.create(
+            shopper=shopper,
+            token=token,
+            expires_at=timezone.now() + timedelta(minutes=ttl_minutes)
+        )
+
+    def __str__(self):
+        status = "Usado" if self.used_at else ("Válido" if self.is_valid else "Expirado")
+        return f"{self.token} [{status}] - {self.shopper.user.username}"
+
+
+class ShopperOnboardingToken(models.Model):
+    """Token para cadastro de novo Shopper via WhatsApp"""
+    token      = models.CharField(max_length=16, unique=True)
+    phone      = models.CharField(max_length=32, blank=True, help_text="Telefone que vai usar (opcional)")
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='shopper_tokens_created')
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    used_at    = models.DateTimeField(null=True, blank=True)
+    used_by    = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='shopper_token_used')
+
+    class Meta:
+        verbose_name = 'Token de Cadastro Shopper'
+        verbose_name_plural = 'Tokens de Cadastro Shopper'
+
+    @property
+    def is_valid(self):
+        return self.used_at is None and timezone.now() <= self.expires_at
+
+    def __str__(self):
+        status = "Usado" if self.used_at else ("Válido" if self.is_valid else "Expirado")
+        return f"SHOP-{self.token} [{status}]"
+
+
+class KeeperOnboardingToken(models.Model):
+    """Token para cadastro de novo Keeper via WhatsApp"""
+    token      = models.CharField(max_length=16, unique=True)
+    phone      = models.CharField(max_length=32, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='keeper_tokens_created')
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    used_at    = models.DateTimeField(null=True, blank=True)
+    used_by    = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='keeper_token_used')
+
+    class Meta:
+        verbose_name = 'Token de Cadastro Keeper'
+        verbose_name_plural = 'Tokens de Cadastro Keeper'
+
+    @property
+    def is_valid(self):
+        return self.used_at is None and timezone.now() <= self.expires_at
+
+    def __str__(self):
+        status = "Usado" if self.used_at else ("Válido" if self.is_valid else "Expirado")
+        return f"KEEP-{self.token} [{status}]"
+
+
+# ============================================================================
 # EXTENSÕES DO USER MODEL (helpers)
 # ============================================================================
 
