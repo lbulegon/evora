@@ -510,7 +510,7 @@ class Evento(models.Model):
     data_inicio      = models.DateTimeField()
     data_fim         = models.DateTimeField()
     clientes         = models.ManyToManyField(Cliente, related_name='eventos', blank=True)
-    estabelecimentos = models.ManyToManyField(Estabelecimento, related_name='eventos', blank=True)
+    # estabelecimentos = models.ManyToManyField(Estabelecimento, related_name='eventos', blank=True)
     status           = models.CharField(max_length=20, choices=Status.choices, default=Status.ATIVO)
     criado_em        = models.DateTimeField(auto_now_add=True)
 
@@ -591,21 +591,6 @@ class OpenAIKey(models.Model):
 # INTEGRAÇÃO WHATSAPP - VINCULAÇÃO E TOKENS
 # ============================================================================
 
-class WhatsappGroup(models.Model):
-    """Grupo do WhatsApp vinculado a um PersonalShopper"""
-    chat_id      = models.CharField(max_length=120, unique=True, help_text="JID do grupo (ex: 12036...@g.us)")
-    name         = models.CharField(max_length=160, blank=True)
-    shopper      = models.ForeignKey(PersonalShopper, on_delete=models.CASCADE, related_name='whatsapp_groups')
-    created_at   = models.DateTimeField(default=timezone.now)
-    active       = models.BooleanField(default=True)
-    meta         = models.JSONField(default=dict, blank=True)
-
-    class Meta:
-        verbose_name = 'Grupo WhatsApp'
-        verbose_name_plural = 'Grupos WhatsApp'
-
-    def __str__(self):
-        return f"{self.name or self.chat_id} → {self.shopper.user.username}"
 
 
 class GroupLinkRequest(models.Model):
@@ -690,6 +675,241 @@ class KeeperOnboardingToken(models.Model):
     def __str__(self):
         status = "Usado" if self.used_at else ("Válido" if self.is_valid else "Expirado")
         return f"KEEP-{self.token} [{status}]"
+
+
+# ============================================================================
+# MODELOS WHATSAPP - Grupos, Mensagens e Integração
+# ============================================================================
+
+class WhatsappGroup(models.Model):
+    """Grupo WhatsApp vinculado a um PersonalShopper ou Keeper"""
+    chat_id = models.CharField(max_length=100, unique=True, help_text="ID do grupo no WhatsApp")
+    name = models.CharField(max_length=200, help_text="Nome do grupo")
+    
+    # Usuário master (pode ser shopper ou keeper)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_whatsapp_groups')
+    shopper = models.ForeignKey(PersonalShopper, on_delete=models.CASCADE, null=True, blank=True, related_name='whatsapp_groups')
+    keeper = models.ForeignKey(Keeper, on_delete=models.CASCADE, null=True, blank=True, related_name='whatsapp_groups')
+    
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_activity = models.DateTimeField(null=True, blank=True)
+    
+    # Configurações do grupo
+    auto_approve_orders = models.BooleanField(default=False, help_text="Aprovar pedidos automaticamente")
+    send_notifications = models.BooleanField(default=True, help_text="Enviar notificações de status")
+    max_participants = models.IntegerField(default=100, help_text="Máximo de participantes")
+    
+    class Meta:
+        verbose_name = 'Grupo WhatsApp'
+        verbose_name_plural = 'Grupos WhatsApp'
+        ordering = ['-last_activity', '-created_at']
+    
+    def __str__(self):
+        return f"{self.name} ({self.owner.username})"
+    
+    @property
+    def participant_count(self):
+        return self.participants.count()
+    
+    @property
+    def is_active(self):
+        if self.shopper:
+            return self.active and self.shopper.ativo
+        elif self.keeper:
+            return self.active and self.keeper.ativo
+        return self.active
+    
+    @property
+    def owner_type(self):
+        """Retorna o tipo do proprietário: 'shopper' ou 'keeper'"""
+        if self.shopper:
+            return 'shopper'
+        elif self.keeper:
+            return 'keeper'
+        return 'unknown'
+
+
+class WhatsappParticipant(models.Model):
+    """Participante de um grupo WhatsApp"""
+    group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='participants')
+    phone = models.CharField(max_length=20, help_text="Número do WhatsApp")
+    name = models.CharField(max_length=100, blank=True, help_text="Nome no WhatsApp")
+    is_admin = models.BooleanField(default=False)
+    joined_at = models.DateTimeField(auto_now_add=True)
+    last_seen = models.DateTimeField(null=True, blank=True)
+    
+    # Se for cliente cadastrado
+    cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name='whatsapp_participations')
+    
+    class Meta:
+        verbose_name = 'Participante WhatsApp'
+        verbose_name_plural = 'Participantes WhatsApp'
+        unique_together = ['group', 'phone']
+        ordering = ['-joined_at']
+    
+    def __str__(self):
+        return f"{self.name or self.phone} em {self.group.name}"
+
+
+class WhatsappMessage(models.Model):
+    """Mensagem do WhatsApp"""
+    MESSAGE_TYPES = [
+        ('text', 'Texto'),
+        ('image', 'Imagem'),
+        ('video', 'Vídeo'),
+        ('audio', 'Áudio'),
+        ('document', 'Documento'),
+        ('location', 'Localização'),
+        ('contact', 'Contato'),
+    ]
+    
+    message_id = models.CharField(max_length=100, unique=True, help_text="ID da mensagem no WhatsApp")
+    group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(WhatsappParticipant, on_delete=models.CASCADE, related_name='sent_messages')
+    message_type = models.CharField(max_length=20, choices=MESSAGE_TYPES, default='text')
+    content = models.TextField(help_text="Conteúdo da mensagem")
+    media_url = models.URLField(blank=True, help_text="URL da mídia (se houver)")
+    timestamp = models.DateTimeField(help_text="Quando foi enviada")
+    processed = models.BooleanField(default=False, help_text="Se foi processada pelo sistema")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Mensagem WhatsApp'
+        verbose_name_plural = 'Mensagens WhatsApp'
+        ordering = ['-timestamp']
+    
+    def __str__(self):
+        return f"{self.sender.name}: {self.content[:50]}..."
+
+
+class Estabelecimento(models.Model):
+    """Estabelecimento onde o produto pode ser encontrado"""
+    nome = models.CharField(max_length=200, help_text="Nome do estabelecimento")
+    endereco = models.TextField(help_text="Endereço completo", default="")
+    cidade = models.CharField(max_length=100, default="Orlando")
+    estado = models.CharField(max_length=50, default="FL")
+    pais = models.CharField(max_length=50, default='USA')
+    
+    # Coordenadas (opcional)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    
+    # Informações de contato
+    telefone = models.CharField(max_length=20, blank=True)
+    website = models.URLField(blank=True)
+    
+    # Horários de funcionamento
+    horario_funcionamento = models.TextField(blank=True, help_text="Ex: Seg-Sex: 9h-18h, Sáb: 9h-14h")
+    
+    # Categorias de produtos que vende
+    categorias = models.JSONField(default=list, help_text="Categorias de produtos vendidos")
+    
+    # Status
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Estabelecimento'
+        verbose_name_plural = 'Estabelecimentos'
+        ordering = ['nome']
+    
+    def __str__(self):
+        return f"{self.nome} - {self.cidade}/{self.estado}"
+
+
+class WhatsappProduct(models.Model):
+    """Produto postado em grupo WhatsApp"""
+    group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='products')
+    message = models.ForeignKey(WhatsappMessage, on_delete=models.CASCADE, related_name='products')
+    posted_by = models.ForeignKey(WhatsappParticipant, on_delete=models.CASCADE, related_name='posted_products')
+    
+    # Dados do produto
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=3, default='USD')
+    brand = models.CharField(max_length=100, blank=True)
+    category = models.CharField(max_length=100, blank=True)
+    
+    # LOCALIZAÇÃO DO PRODUTO - ONDE ENCONTRAR
+    estabelecimento = models.ForeignKey(Estabelecimento, on_delete=models.CASCADE, related_name='produtos', help_text="Onde o produto pode ser encontrado", null=True, blank=True)
+    localizacao_especifica = models.CharField(max_length=200, blank=True, help_text="Ex: Corredor 3, Prateleira A, Seção de Perfumes")
+    codigo_barras = models.CharField(max_length=50, blank=True, help_text="Código de barras do produto")
+    sku_loja = models.CharField(max_length=50, blank=True, help_text="SKU ou código interno da loja")
+    
+    # Imagens
+    image_urls = models.JSONField(default=list, help_text="URLs das imagens")
+    
+    # Status
+    is_available = models.BooleanField(default=True)
+    is_featured = models.BooleanField(default=False, help_text="Produto em destaque")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Produto WhatsApp'
+        verbose_name_plural = 'Produtos WhatsApp'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.name} - {self.group.name}"
+
+
+class WhatsappOrder(models.Model):
+    """Pedido criado via WhatsApp"""
+    STATUS_CHOICES = [
+        ('pending', 'Pendente'),
+        ('confirmed', 'Confirmado'),
+        ('paid', 'Pago'),
+        ('purchased', 'Comprado'),
+        ('shipped', 'Enviado'),
+        ('delivered', 'Entregue'),
+        ('cancelled', 'Cancelado'),
+    ]
+    
+    group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='orders')
+    customer = models.ForeignKey(WhatsappParticipant, on_delete=models.CASCADE, related_name='orders')
+    cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name='whatsapp_orders')
+    
+    # Dados do pedido
+    order_number = models.CharField(max_length=20, unique=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default='USD')
+    
+    # Produtos
+    products = models.JSONField(default=list, help_text="Lista de produtos do pedido")
+    
+    # Entrega
+    delivery_method = models.CharField(max_length=50, blank=True, help_text="Método de entrega escolhido")
+    delivery_address = models.TextField(blank=True)
+    
+    # Pagamento
+    payment_method = models.CharField(max_length=50, blank=True)
+    payment_status = models.CharField(max_length=20, default='pending')
+    payment_reference = models.CharField(max_length=100, blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = 'Pedido WhatsApp'
+        verbose_name_plural = 'Pedidos WhatsApp'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Pedido {self.order_number} - {self.customer.name}"
+    
+    def save(self, *args, **kwargs):
+        if not self.order_number:
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%y%m%d%H%M")
+            self.order_number = f"WAP{timestamp}{self.id or 0:04d}"
+        super().save(*args, **kwargs)
 
 
 # ============================================================================

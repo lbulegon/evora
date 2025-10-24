@@ -1,0 +1,353 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Meus Grupos - Shopper Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .group-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .group-card:hover {
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        transform: translateY(-3px);
+    }
+    
+    .group-status {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .status-active {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-inactive {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .stats-badge {
+        background: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 0.5rem;
+        text-align: center;
+        margin: 0.25rem;
+    }
+    
+    .stats-badge .number {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #495057;
+    }
+    
+    .stats-badge .label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        text-transform: uppercase;
+    }
+    
+    .revenue-badge {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+    }
+    
+    .activity-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .filter-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .create-group-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.75rem 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .create-group-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fab fa-whatsapp text-success"></i>
+                        Meus Grupos WhatsApp
+                    </h1>
+                    <p class="text-muted mb-0">Gerencie seus grupos de vendas e clientes</p>
+                </div>
+                <button class="btn create-group-btn" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+                    <i class="fas fa-plus"></i> Novo Grupo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="filter-card">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" name="search" placeholder="Buscar grupos..." value="{{ search }}">
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="status">
+                            <option value="">Todos os status</option>
+                            <option value="active" {% if status == 'active' %}selected{% endif %}>Ativos</option>
+                            <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Inativos</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="sort">
+                            <option value="activity" {% if sort_by == 'activity' %}selected{% endif %}>Atividade</option>
+                            <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Nome</option>
+                            <option value="participants" {% if sort_by == 'participants' %}selected{% endif %}>Participantes</option>
+                            <option value="orders" {% if sort_by == 'orders' %}selected{% endif %}>Pedidos</option>
+                            <option value="revenue" {% if sort_by == 'revenue' %}selected{% endif %}>Receita</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-outline-primary me-2">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                        <a href="{% url 'shopper_groups' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Limpar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Grupos -->
+    <div class="row">
+        {% for group in page_obj %}
+        <div class="col-md-6 col-lg-4">
+            <div class="group-card">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h5 class="mb-1">{{ group.name }}</h5>
+                        <small class="text-muted">{{ group.chat_id }}</small>
+                    </div>
+                    <span class="group-status {% if group.active %}status-active{% else %}status-inactive{% endif %}">
+                        {% if group.active %}Ativo{% else %}Inativo{% endif %}
+                    </span>
+                </div>
+
+                <!-- Estatísticas do Grupo -->
+                <div class="row mb-3">
+                    <div class="col-4">
+                        <div class="stats-badge">
+                            <div class="number">{{ group.participant_count }}</div>
+                            <div class="label">Participantes</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="stats-badge activity-badge">
+                            <div class="number">{{ group.messages.count }}</div>
+                            <div class="label">Mensagens</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="stats-badge revenue-badge">
+                            <div class="number">{{ group.orders.count }}</div>
+                            <div class="label">Pedidos</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configurações -->
+                <div class="mb-3">
+                    <small class="text-muted">
+                        <i class="fas fa-cog"></i> Configurações:
+                        {% if group.auto_approve_orders %}<span class="badge bg-info">Auto-aprovar</span>{% endif %}
+                        {% if group.send_notifications %}<span class="badge bg-success">Notificações</span>{% endif %}
+                    </small>
+                </div>
+
+                <!-- Última Atividade -->
+                <div class="mb-3">
+                    <small class="text-muted">
+                        <i class="fas fa-clock"></i>
+                        {% if group.last_activity %}
+                            Última atividade: {{ group.last_activity|timesince }} atrás
+                        {% else %}
+                            Nenhuma atividade registrada
+                        {% endif %}
+                    </small>
+                </div>
+
+                <!-- Ações -->
+                <div class="d-flex gap-2">
+                    <a href="{% url 'shopper_group_detail' group.id %}" class="btn btn-sm btn-outline-primary flex-fill">
+                        <i class="fas fa-eye"></i> Ver Detalhes
+                    </a>
+                    <a href="{% url 'shopper_products' %}?group={{ group.id }}" class="btn btn-sm btn-outline-success">
+                        <i class="fas fa-box"></i> Produtos
+                    </a>
+                    <a href="{% url 'shopper_orders' %}?group={{ group.id }}" class="btn btn-sm btn-outline-warning">
+                        <i class="fas fa-shopping-cart"></i> Pedidos
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fab fa-whatsapp fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">Nenhum grupo encontrado</h4>
+                <p class="text-muted">Crie seu primeiro grupo WhatsApp para começar a vender!</p>
+                <button class="btn create-group-btn" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+                    <i class="fas fa-plus"></i> Criar Primeiro Grupo
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Paginação -->
+    {% if page_obj.has_other_pages %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <nav aria-label="Paginação dos grupos">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Primeira</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Anterior</a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Próxima</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if sort_by %}&sort={{ sort_by }}{% endif %}">Última</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Criar Grupo -->
+<div class="modal fade" id="createGroupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Criar Novo Grupo WhatsApp</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createGroupForm">
+                    <div class="mb-3">
+                        <label for="groupName" class="form-label">Nome do Grupo</label>
+                        <input type="text" class="form-control" id="groupName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="chatId" class="form-label">Chat ID do WhatsApp</label>
+                        <input type="text" class="form-control" id="chatId" required>
+                        <div class="form-text">ID único do grupo no WhatsApp (ex: 120363123456789012@g.us)</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="autoApprove" checked>
+                            <label class="form-check-label" for="autoApprove">
+                                Aprovar pedidos automaticamente
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="sendNotifications" checked>
+                            <label class="form-check-label" for="sendNotifications">
+                                Enviar notificações de status
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="createGroup()">Criar Grupo</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function createGroup() {
+    const form = document.getElementById('createGroupForm');
+    
+    fetch('{% url "api_create_group" %}', {
+        method: 'POST',
+        body: JSON.stringify({
+            name: document.getElementById('groupName').value,
+            chat_id: document.getElementById('chatId').value,
+            auto_approve_orders: document.getElementById('autoApprove').checked,
+            send_notifications: document.getElementById('sendNotifications').checked
+        }),
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao criar grupo');
+    });
+}
+</script>
+{% endblock %}

@@ -201,9 +201,9 @@ _(pode anexar foto)_
 
 ### Requisitos
 
-1. **Servidor** (Railway, Render, VPS)
+1. **Railway** (recomendado) ou **VPS**
 2. **Número WhatsApp dedicado** (chip pré-pago comum)
-3. **Docker** ou **Python 3.13+**
+3. **Python 3.13+**
 
 ### Stack
 
@@ -212,67 +212,39 @@ _(pode anexar foto)_
 - **PostgreSQL** - Banco de dados
 - **Redis** - Fila de tarefas (Celery)
 
-### Docker Compose (mínimo)
-
-```yaml
-version: "3.8"
-services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: evora
-      POSTGRES_USER: evora
-      POSTGRES_PASSWORD: evora_secret
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7
-
-  django:
-    build: .
-    command: python manage.py runserver 0.0.0.0:8000
-    environment:
-      DATABASE_URL: postgres://evora:evora_secret@db:5432/evora
-      REDIS_URL: redis://redis:6379/0
-    ports:
-      - "8000:8000"
-    depends_on: [db, redis]
-
-  wppconnect:
-    image: wppconnectteam/wppconnect:latest
-    environment:
-      WEBHOOK_URL: "http://django:8000/webhooks/whatsapp/"
-    ports:
-      - "21465:21465"
-    volumes:
-      - wpp-data:/usr/src/app/userDataDir
-
-volumes:
-  dbdata:
-  wpp-data:
-```
-
-### Primeiro Setup
+### Railway (Recomendado)
 
 ```bash
-# 1. Subir os serviços
-docker-compose up -d
+# 1. Adicionar serviços no Railway
+# - PostgreSQL Database
+# - Redis Database  
+# - Python Service (Django)
 
-# 2. Ver logs do WPPConnect para pegar QR Code
-docker-compose logs -f wppconnect
+# 2. Configurar variáveis
+DATABASE_URL=${{PostgreSQL.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+WPP_BASE=https://seu-wppconnect.up.railway.app
 
-# 3. Escanear QR Code com WhatsApp
-#    (Abrir WhatsApp → Dispositivos Conectados → Conectar Dispositivo)
+# 3. Deploy automático
+git push origin main
+```
 
-# 4. Aplicar migrações
-docker-compose exec django python manage.py migrate
+Ver guia completo: [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md)
 
-# 5. Criar superusuário
-docker-compose exec django python manage.py createsuperuser
+### Primeiro Setup (Railway)
 
-# 6. Acessar admin
-open http://localhost:8000/admin/
+```bash
+# 1. Deploy no Railway
+git push origin main
+
+# 2. Aplicar migrações
+railway run python manage.py migrate
+
+# 3. Criar superusuário
+railway run python manage.py createsuperuser
+
+# 4. Acessar admin
+# https://seu-projeto.up.railway.app/admin/
 ```
 
 ---
@@ -327,7 +299,7 @@ source .venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 
 # 3. Configurar .env
-cp .env.example .env
+cp environment_variables.example .env
 # Editar DATABASE_URL, REDIS_URL, etc.
 
 # 4. Migrar banco
@@ -338,16 +310,9 @@ python manage.py createsuperuser
 
 # 6. Rodar servidor
 python manage.py runserver
-
-# 7. Em outro terminal, rodar Celery
-celery -A setup worker -l info
-
-# 8. Rodar WPPConnect (com Docker)
-docker run -p 21465:21465 \
-  -e WEBHOOK_URL=http://host.docker.internal:8000/webhooks/whatsapp/ \
-  -v wpp-data:/usr/src/app/userDataDir \
-  wppconnectteam/wppconnect:latest
 ```
+
+Para integração WhatsApp, use o Railway: [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md)
 
 ---
 
@@ -356,14 +321,12 @@ docker run -p 21465:21465 \
 ### Logs Importantes
 
 ```bash
-# Django
-docker-compose logs -f django
+# Railway - todos os logs
+railway logs --tail
 
-# WPPConnect (conexão WhatsApp)
-docker-compose logs -f wppconnect
-
-# Celery (tarefas assíncronas)
-docker-compose logs -f worker
+# Logs específicos por serviço
+railway logs --service django
+railway logs --service wppconnect
 ```
 
 ### Métricas no Admin
@@ -380,21 +343,18 @@ docker-compose logs -f worker
 ### Bot não responde no grupo
 
 1. ✅ Verificar se o bot foi adicionado ao grupo
-2. ✅ Verificar logs do WPPConnect: `docker-compose logs wppconnect`
+2. ✅ Verificar logs do WPPConnect: `railway logs --tail`
 3. ✅ Verificar se o webhook está configurado corretamente
 4. ✅ Testar enviar mensagem direta para o bot
 
 ### QR Code não aparece
 
 ```bash
-# Parar e limpar dados
-docker-compose down
-docker volume rm evora_wpp-data
+# Verificar logs do WPPConnect
+railway logs --tail
 
-# Subir novamente
-docker-compose up -d wppconnect
-docker-compose logs -f wppconnect
-# QR aparecerá nos logs
+# Reiniciar serviço WPPConnect
+railway restart
 ```
 
 ### Grupo não vincula
@@ -520,6 +480,8 @@ Para dúvidas ou problemas:
 
 **ÉVORA Connect** - *Minimalist, Sophisticated Style*  
 *Onde tecnologia encontra humanidade.*
+
+
 
 
 

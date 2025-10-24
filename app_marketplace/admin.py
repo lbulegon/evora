@@ -26,6 +26,11 @@ from .models import (
     PedidoPacote,
     # Integração WhatsApp
     WhatsappGroup,
+    WhatsappParticipant,
+    WhatsappMessage,
+    WhatsappProduct,
+    WhatsappOrder,
+    Estabelecimento,
     GroupLinkRequest,
     ShopperOnboardingToken,
     KeeperOnboardingToken
@@ -166,7 +171,7 @@ class EventoAdmin(admin.ModelAdmin):
     list_filter = ['status', 'data_inicio', 'data_fim']
     search_fields = ['titulo', 'personal_shopper__user__username']
     autocomplete_fields = ['personal_shopper']
-    filter_horizontal = ['clientes', 'estabelecimentos']
+    filter_horizontal = ['clientes']
     inlines = [ProdutoEventoInline]
 
 
@@ -388,21 +393,36 @@ class PedidoPacoteAdmin(admin.ModelAdmin):
 
 @admin.register(WhatsappGroup)
 class WhatsappGroupAdmin(admin.ModelAdmin):
-    list_display = ['name', 'shopper', 'chat_id', 'active', 'created_at']
+    list_display = ['name', 'owner', 'owner_type', 'chat_id', 'active', 'created_at']
     list_filter = ['active', 'created_at']
-    search_fields = ['name', 'chat_id', 'shopper__user__username']
-    readonly_fields = ['chat_id', 'created_at']
-    autocomplete_fields = ['shopper']
+    search_fields = ['name', 'chat_id', 'owner__username']
+    readonly_fields = ['chat_id', 'created_at', 'owner_type']
+    autocomplete_fields = ['owner', 'shopper', 'keeper']
+    
+    # ISOLAMENTO DE DADOS - Cada usuário vê apenas seus grupos
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(owner=request.user)
+    
+    def save_model(self, request, obj, form, change):
+        if not change:  # Novo grupo
+            obj.owner = request.user
+        super().save_model(request, obj, form, change)
     
     fieldsets = (
         ('Grupo', {
             'fields': ('chat_id', 'name', 'active')
         }),
-        ('Vinculação', {
-            'fields': ('shopper',)
+        ('Proprietário', {
+            'fields': ('owner', 'owner_type', 'shopper', 'keeper')
+        }),
+        ('Configurações', {
+            'fields': ('auto_approve_orders', 'send_notifications', 'max_participants')
         }),
         ('Informações', {
-            'fields': ('created_at', 'meta')
+            'fields': ('created_at', 'last_activity')
         }),
     )
 
@@ -466,3 +486,115 @@ class KeeperOnboardingTokenAdmin(admin.ModelAdmin):
     def is_valid(self, obj):
         return "✅" if obj.is_valid else "❌"
     is_valid.short_description = 'Válido'
+
+
+# ============================================================================
+# NOVOS MODELOS WHATSAPP - COM ISOLAMENTO DE DADOS
+# ============================================================================
+
+@admin.register(WhatsappParticipant)
+class WhatsappParticipantAdmin(admin.ModelAdmin):
+    list_display = ['name', 'phone', 'group', 'is_admin', 'joined_at']
+    list_filter = ['is_admin', 'joined_at', 'group__owner']
+    search_fields = ['name', 'phone', 'group__name']
+    autocomplete_fields = ['group', 'cliente']
+    
+    # ISOLAMENTO - Apenas participantes dos grupos do usuário
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(group__owner=request.user)
+
+
+@admin.register(WhatsappMessage)
+class WhatsappMessageAdmin(admin.ModelAdmin):
+    list_display = ['sender', 'message_type', 'content_preview', 'group', 'timestamp', 'processed']
+    list_filter = ['message_type', 'processed', 'timestamp', 'group__owner']
+    search_fields = ['content', 'sender__name', 'group__name']
+    readonly_fields = ['message_id', 'timestamp', 'created_at']
+    autocomplete_fields = ['group', 'sender']
+    
+    # ISOLAMENTO - Apenas mensagens dos grupos do usuário
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(group__owner=request.user)
+    
+    def content_preview(self, obj):
+        return obj.content[:50] + "..." if len(obj.content) > 50 else obj.content
+    content_preview.short_description = 'Conteúdo'
+
+
+# EstabelecimentoAdmin já foi registrado anteriormente
+
+
+@admin.register(WhatsappProduct)
+class WhatsappProductAdmin(admin.ModelAdmin):
+    list_display = ['name', 'brand', 'price', 'currency', 'estabelecimento', 'group', 'is_available', 'created_at']
+    list_filter = ['is_available', 'is_featured', 'currency', 'created_at', 'group__owner', 'estabelecimento']
+    search_fields = ['name', 'brand', 'description', 'group__name', 'estabelecimento__nome']
+    autocomplete_fields = ['group', 'message', 'posted_by', 'estabelecimento']
+    
+    # ISOLAMENTO - Apenas produtos dos grupos do usuário
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(group__owner=request.user)
+    
+    fieldsets = (
+        ('Produto', {
+            'fields': ('name', 'description', 'brand', 'category', 'price', 'currency')
+        }),
+        ('Localização', {
+            'fields': ('estabelecimento', 'localizacao_especifica', 'codigo_barras', 'sku_loja')
+        }),
+        ('Grupo', {
+            'fields': ('group', 'message', 'posted_by')
+        }),
+        ('Mídia', {
+            'fields': ('image_urls',)
+        }),
+        ('Status', {
+            'fields': ('is_available', 'is_featured', 'created_at')
+        }),
+    )
+
+
+@admin.register(WhatsappOrder)
+class WhatsappOrderAdmin(admin.ModelAdmin):
+    list_display = ['order_number', 'customer', 'group', 'status', 'total_amount', 'currency', 'created_at']
+    list_filter = ['status', 'payment_status', 'currency', 'created_at', 'group__owner']
+    search_fields = ['order_number', 'customer__name', 'group__name']
+    readonly_fields = ['order_number', 'created_at', 'updated_at']
+    autocomplete_fields = ['group', 'customer', 'cliente']
+    
+    # ISOLAMENTO - Apenas pedidos dos grupos do usuário
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(group__owner=request.user)
+    
+    fieldsets = (
+        ('Pedido', {
+            'fields': ('order_number', 'group', 'customer', 'cliente')
+        }),
+        ('Status', {
+            'fields': ('status', 'total_amount', 'currency')
+        }),
+        ('Produtos', {
+            'fields': ('products',)
+        }),
+        ('Entrega', {
+            'fields': ('delivery_method', 'delivery_address')
+        }),
+        ('Pagamento', {
+            'fields': ('payment_method', 'payment_status', 'payment_reference')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at', 'confirmed_at', 'paid_at')
+        }),
+    )

@@ -1,0 +1,444 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Meus Pedidos - Shopper Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .order-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .order-card:hover {
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        transform: translateY(-3px);
+    }
+    
+    .order-status {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .status-pending {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-confirmed {
+        background-color: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .status-paid {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-purchased {
+        background-color: #cce5ff;
+        color: #004085;
+    }
+    
+    .status-shipped {
+        background-color: #e2e3e5;
+        color: #383d41;
+    }
+    
+    .status-delivered {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-cancelled {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .filter-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    
+    .stats-value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin: 0;
+    }
+    
+    .stats-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        margin: 0.5rem 0 0 0;
+    }
+    
+    .order-number {
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        color: #495057;
+    }
+    
+    .customer-info {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+    }
+    
+    .product-list {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+    }
+    
+    .product-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .product-item:last-child {
+        border-bottom: none;
+    }
+    
+    .action-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        border: none;
+        font-size: 0.8rem;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-update-status {
+        background: #007bff;
+        color: white;
+    }
+    
+    .btn-update-status:hover {
+        background: #0056b3;
+        color: white;
+    }
+    
+    .btn-view-details {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-view-details:hover {
+        background: #545b62;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-shopping-cart text-primary"></i>
+                        Meus Pedidos
+                    </h1>
+                    <p class="text-muted mb-0">Gerencie todos os pedidos dos seus grupos</p>
+                </div>
+                <div>
+                    <a href="{% url 'shopper_analytics' %}" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-chart-line"></i> Analytics
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-value">{{ total_orders }}</div>
+                <div class="stats-label">Total de Pedidos</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-value">R$ {{ total_revenue|floatformat:2 }}</div>
+                <div class="stats-label">Receita Total</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-value">{{ orders_by_status.pending.count }}</div>
+                <div class="stats-label">Pendentes</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="stats-value">{{ orders_by_status.delivered.count }}</div>
+                <div class="stats-label">Entregues</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="filter-card">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" name="search" placeholder="Buscar pedidos..." value="{{ search }}">
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="status">
+                            <option value="">Todos os status</option>
+                            {% for status_code, status_label in status_choices %}
+                            <option value="{{ status_code }}" {% if status == status_code %}selected{% endif %}>{{ status_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="payment_status">
+                            <option value="">Todos os pagamentos</option>
+                            <option value="pending" {% if payment_status == 'pending' %}selected{% endif %}>Pendente</option>
+                            <option value="paid" {% if payment_status == 'paid' %}selected{% endif %}>Pago</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" name="date_from" value="{{ date_from }}" placeholder="Data inicial">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" class="form-control" name="date_to" value="{{ date_to }}" placeholder="Data final">
+                    </div>
+                    <div class="col-md-1">
+                        <button type="submit" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Pedidos -->
+    <div class="row">
+        {% for order in page_obj %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="order-card">
+                <!-- Header do Pedido -->
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h6 class="order-number mb-1">{{ order.order_number }}</h6>
+                        <small class="text-muted">{{ order.created_at|date:"d/m/Y H:i" }}</small>
+                    </div>
+                    <span class="order-status status-{{ order.status }}">
+                        {{ order.get_status_display }}
+                    </span>
+                </div>
+
+                <!-- Cliente -->
+                <div class="customer-info">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ order.customer.name }}</strong>
+                            <br>
+                            <small class="text-muted">{{ order.customer.phone }}</small>
+                        </div>
+                        <div class="text-end">
+                            <div class="h5 mb-0">{{ order.currency }} {{ order.total_amount|floatformat:2 }}</div>
+                            <small class="text-muted">{{ order.get_payment_status_display }}</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grupo -->
+                <div class="mb-3">
+                    <small class="text-muted">
+                        <i class="fas fa-users"></i> {{ order.group.name }}
+                    </small>
+                </div>
+
+                <!-- Produtos -->
+                {% if order.products %}
+                <div class="product-list">
+                    <strong>Produtos:</strong>
+                    {% for product in order.products %}
+                    <div class="product-item">
+                        <span>{{ product.name }}</span>
+                        <span>{{ product.currency }} {{ product.price }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Informações de Entrega -->
+                {% if order.delivery_method %}
+                <div class="mb-3">
+                    <small class="text-muted">
+                        <i class="fas fa-truck"></i> {{ order.delivery_method }}
+                    </small>
+                </div>
+                {% endif %}
+
+                <!-- Ações -->
+                <div class="d-flex gap-2">
+                    <button class="btn action-btn btn-update-status flex-fill" onclick="updateOrderStatus({{ order.id }})">
+                        <i class="fas fa-edit"></i> Atualizar Status
+                    </button>
+                    <button class="btn action-btn btn-view-details" onclick="viewOrderDetails({{ order.id }})">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">Nenhum pedido encontrado</h4>
+                <p class="text-muted">Os pedidos dos seus grupos aparecerão aqui!</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Paginação -->
+    {% if page_obj.has_other_pages %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <nav aria-label="Paginação dos pedidos">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if payment_status %}&payment_status={{ payment_status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Primeira</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if payment_status %}&payment_status={{ payment_status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Anterior</a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if payment_status %}&payment_status={{ payment_status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Próxima</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if payment_status %}&payment_status={{ payment_status }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Última</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Atualizar Status -->
+<div class="modal fade" id="updateStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Atualizar Status do Pedido</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updateStatusForm">
+                    <input type="hidden" id="orderId" name="order_id">
+                    <div class="mb-3">
+                        <label for="newStatus" class="form-label">Novo Status</label>
+                        <select class="form-select" id="newStatus" required>
+                            <option value="pending">Pendente</option>
+                            <option value="confirmed">Confirmado</option>
+                            <option value="paid">Pago</option>
+                            <option value="purchased">Comprado</option>
+                            <option value="shipped">Enviado</option>
+                            <option value="delivered">Entregue</option>
+                            <option value="cancelled">Cancelado</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="statusNote" class="form-label">Observação (opcional)</label>
+                        <textarea class="form-control" id="statusNote" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmStatusUpdate()">Atualizar Status</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateOrderStatus(orderId) {
+    document.getElementById('orderId').value = orderId;
+    const modal = new bootstrap.Modal(document.getElementById('updateStatusModal'));
+    modal.show();
+}
+
+function confirmStatusUpdate() {
+    const orderId = document.getElementById('orderId').value;
+    const newStatus = document.getElementById('newStatus').value;
+    const note = document.getElementById('statusNote').value;
+    
+    fetch(`/api/whatsapp/orders/${orderId}/update-status/`, {
+        method: 'POST',
+        body: JSON.stringify({
+            status: newStatus,
+            note: note
+        }),
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao atualizar status');
+    });
+}
+
+function viewOrderDetails(orderId) {
+    // Implementar visualização de detalhes
+    console.log('Visualizando detalhes do pedido:', orderId);
+}
+</script>
+{% endblock %}

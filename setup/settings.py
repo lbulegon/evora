@@ -28,9 +28,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-8j^$b4kv512@8mlg=koq)5iu8#fpqz#=ot8ost*)g^eyexvq!b'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
-CSRF_TRUSTED_ORIGINS = ['https://evora-product.up.railway.app']
+CSRF_TRUSTED_ORIGINS = [
+    'https://evora-product.up.railway.app',
+    'http://127.0.0.1:8000',
+    'http://localhost:8000'
+]
 
 
 

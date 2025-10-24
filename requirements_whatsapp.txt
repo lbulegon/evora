@@ -1,0 +1,23 @@
+# WhatsApp Integration - Python
+# Alternativas ao WPPConnect descontinuado
+
+# Selenium para WhatsApp Web
+selenium==4.15.0
+webdriver-manager==4.0.1
+
+# PyWhatKit para envio simples
+pywhatkit==5.4
+
+# WhatsApp Business API
+requests==2.31.0
+python-dotenv==1.0.0
+
+# Opcional: WhatsApp Web API
+whatsapp-web-api==0.1.0
+
+# Opcional: PyAutoGUI para automação
+pyautogui==0.9.54
+
+# Opcional: BeautifulSoup para parsing
+beautifulsoup4==4.12.2
+lxml==4.9.3

@@ -11,6 +11,13 @@ from .models import Evento
 
 @login_required
 def home_view(request):
+    # Redirecionar Shoppers para dashboard específico
+    if request.user.is_shopper:
+        return redirect('shopper_dashboard')
+    elif request.user.is_keeper:
+        return redirect('whatsapp_dashboard')
+    
+    # Dashboard geral para outros usuários
     eventos = Evento.objects.all().order_by('-criado_em') # ordena por mais recente
     return render(request, 'app_marketplace/home.html', {'eventos': eventos})
 

@@ -1,0 +1,530 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Meus Produtos - Shopper Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .product-card:hover {
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        transform: translateY(-3px);
+    }
+    
+    .product-image {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+    
+    .product-status {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .status-available {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-unavailable {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .featured-badge {
+        background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+        color: #8b6914;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .filter-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .create-product-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.75rem 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .create-product-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        color: white;
+    }
+    
+    .price-tag {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #28a745;
+    }
+    
+    .stats-badge {
+        background: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 0.5rem;
+        text-align: center;
+        margin: 0.25rem;
+    }
+    
+    .stats-badge .number {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #495057;
+    }
+    
+    .stats-badge .label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        text-transform: uppercase;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- CSRF Token -->
+{% csrf_token %}
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-box text-primary"></i>
+                        Meus Produtos
+                    </h1>
+                    <p class="text-muted mb-0">Gerencie seu catálogo de produtos</p>
+                </div>
+                <button class="btn create-product-btn" data-bs-toggle="modal" data-bs-target="#createProductModal">
+                    <i class="fas fa-plus"></i> Novo Produto
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-badge">
+                <div class="number">{{ total_products }}</div>
+                <div class="label">Total</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-badge">
+                <div class="number">{{ available_products }}</div>
+                <div class="label">Disponíveis</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-badge">
+                <div class="number">{{ featured_products }}</div>
+                <div class="label">Em Destaque</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-badge">
+                <div class="number">{{ page_obj.paginator.count }}</div>
+                <div class="label">Filtrados</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="filter-card">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" name="search" placeholder="Buscar produtos..." value="{{ search }}">
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="category">
+                            <option value="">Todas as categorias</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="brand">
+                            <option value="">Todas as marcas</option>
+                            {% for brand in brands %}
+                            <option value="{{ brand }}" {% if brand == brand %}selected{% endif %}>{{ brand }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="availability">
+                            <option value="">Todos</option>
+                            <option value="available" {% if availability == 'available' %}selected{% endif %}>Disponíveis</option>
+                            <option value="unavailable" {% if availability == 'unavailable' %}selected{% endif %}>Indisponíveis</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="featured">
+                            <option value="">Todos</option>
+                            <option value="yes" {% if featured == 'yes' %}selected{% endif %}>Em Destaque</option>
+                            <option value="no" {% if featured == 'no' %}selected{% endif %}>Não Destacados</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="submit" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Produtos -->
+    <div class="row">
+        {% for product in page_obj %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="product-card">
+                <!-- Imagem do Produto -->
+                {% if product.image_urls %}
+                <img src="{{ product.image_urls.0 }}" alt="{{ product.name }}" class="product-image">
+                {% else %}
+                <div class="product-image bg-light d-flex align-items-center justify-content-center">
+                    <i class="fas fa-image fa-3x text-muted"></i>
+                </div>
+                {% endif %}
+
+                <!-- Informações do Produto -->
+                <div class="mb-3">
+                    <h5 class="mb-1">{{ product.name }}</h5>
+                    {% if product.brand %}
+                    <p class="text-muted mb-1">{{ product.brand }}</p>
+                    {% endif %}
+                    {% if product.description %}
+                    <p class="text-muted small">{{ product.description|truncatechars:100 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Preço -->
+                {% if product.price %}
+                <div class="mb-3">
+                    <span class="price-tag">{{ product.currency }} {{ product.price|floatformat:2 }}</span>
+                </div>
+                {% endif %}
+
+                <!-- Status e Badges -->
+                <div class="mb-3">
+                    <span class="product-status {% if product.is_available %}status-available{% else %}status-unavailable{% endif %}">
+                        {% if product.is_available %}Disponível{% else %}Indisponível{% endif %}
+                    </span>
+                    {% if product.is_featured %}
+                    <span class="featured-badge ms-2">
+                        <i class="fas fa-star"></i> Destaque
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Localização -->
+                <div class="mb-3">
+                    <small class="text-muted">
+                        <i class="fas fa-map-marker-alt"></i> {{ product.estabelecimento.nome }}
+                        {% if product.localizacao_especifica %}
+                        - {{ product.localizacao_especifica }}
+                        {% endif %}
+                    </small>
+                </div>
+
+                <!-- Grupo -->
+                <div class="mb-3">
+                    <small class="text-muted">
+                        <i class="fas fa-users"></i> {{ product.group.name }}
+                    </small>
+                </div>
+
+                <!-- Ações -->
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary flex-fill" onclick="editProduct({{ product.id }})">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="toggleFeatured({{ product.id }})">
+                        {% if product.is_featured %}
+                        <i class="fas fa-star"></i>
+                        {% else %}
+                        <i class="far fa-star"></i>
+                        {% endif %}
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="toggleAvailability({{ product.id }})">
+                        {% if product.is_available %}
+                        <i class="fas fa-eye-slash"></i>
+                        {% else %}
+                        <i class="fas fa-eye"></i>
+                        {% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="fas fa-box fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">Nenhum produto encontrado</h4>
+                <p class="text-muted">Adicione produtos ao seu catálogo para começar a vender!</p>
+                <button class="btn create-product-btn" data-bs-toggle="modal" data-bs-target="#createProductModal">
+                    <i class="fas fa-plus"></i> Adicionar Primeiro Produto
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Paginação -->
+    {% if page_obj.has_other_pages %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <nav aria-label="Paginação dos produtos">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if category %}&category={{ category }}{% endif %}{% if brand %}&brand={{ brand }}{% endif %}{% if availability %}&availability={{ availability }}{% endif %}{% if featured %}&featured={{ featured }}{% endif %}">Primeira</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if category %}&category={{ category }}{% endif %}{% if brand %}&brand={{ brand }}{% endif %}{% if availability %}&availability={{ availability }}{% endif %}{% if featured %}&featured={{ featured }}{% endif %}">Anterior</a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if category %}&category={{ category }}{% endif %}{% if brand %}&brand={{ brand }}{% endif %}{% if availability %}&availability={{ availability }}{% endif %}{% if featured %}&featured={{ featured }}{% endif %}">Próxima</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if category %}&category={{ category }}{% endif %}{% if brand %}&brand={{ brand }}{% endif %}{% if availability %}&availability={{ availability }}{% endif %}{% if featured %}&featured={{ featured }}{% endif %}">Última</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Criar Produto -->
+<div class="modal fade" id="createProductModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar Novo Produto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createProductForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productName" class="form-label">Nome do Produto</label>
+                                <input type="text" class="form-control" id="productName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productBrand" class="form-label">Marca</label>
+                                <input type="text" class="form-control" id="productBrand">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productPrice" class="form-label">Preço</label>
+                                <input type="number" class="form-control" id="productPrice" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productCurrency" class="form-label">Moeda</label>
+                                <select class="form-select" id="productCurrency">
+                                    <option value="USD">USD</option>
+                                    <option value="BRL">BRL</option>
+                                    <option value="EUR">EUR</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="productDescription" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="productDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productCategory" class="form-label">Categoria</label>
+                                <input type="text" class="form-control" id="productCategory">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productGroup" class="form-label">Grupo</label>
+                                <select class="form-select" id="productGroup" required>
+                                    <option value="">Selecione um grupo</option>
+                                    <!-- Será preenchido via JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Localização do Produto -->
+                    <div class="mb-3">
+                        <h6 class="text-primary">
+                            <i class="fas fa-map-marker-alt"></i> Localização do Produto
+                        </h6>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productStore" class="form-label">Estabelecimento</label>
+                                   <select class="form-select" id="productStore" required>
+                                       <option value="">Selecione onde encontrar</option>
+                                       {% for estabelecimento in estabelecimentos %}
+                                       <option value="{{ estabelecimento.id }}">{{ estabelecimento.nome }} - {{ estabelecimento.cidade }}/{{ estabelecimento.estado }}</option>
+                                       {% endfor %}
+                                   </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productLocation" class="form-label">Localização Específica</label>
+                                <input type="text" class="form-control" id="productLocation" placeholder="Ex: Corredor 3, Prateleira A">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productBarcode" class="form-label">Código de Barras</label>
+                                <input type="text" class="form-control" id="productBarcode" placeholder="Código de barras do produto">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="productSKU" class="form-label">SKU da Loja</label>
+                                <input type="text" class="form-control" id="productSKU" placeholder="Código interno da loja">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="productFeatured">
+                            <label class="form-check-label" for="productFeatured">
+                                Produto em destaque
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="createProduct()">Adicionar Produto</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Carregar grupos no modal
+document.addEventListener('DOMContentLoaded', function() {
+    // Aqui você pode carregar os grupos via AJAX
+    console.log('Carregando grupos para o modal...');
+});
+
+function createProduct() {
+    const form = document.getElementById('createProductForm');
+    
+           fetch('{% url "api_create_product_general" %}', {
+        method: 'POST',
+        body: JSON.stringify({
+            name: document.getElementById('productName').value,
+            brand: document.getElementById('productBrand').value,
+            price: document.getElementById('productPrice').value,
+            currency: document.getElementById('productCurrency').value,
+            description: document.getElementById('productDescription').value,
+            category: document.getElementById('productCategory').value,
+            group_id: document.getElementById('productGroup').value,
+            estabelecimento_id: document.getElementById('productStore').value,
+            localizacao_especifica: document.getElementById('productLocation').value,
+            codigo_barras: document.getElementById('productBarcode').value,
+            sku_loja: document.getElementById('productSKU').value,
+            is_featured: document.getElementById('productFeatured').checked
+        }),
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao criar produto');
+    });
+}
+
+function editProduct(productId) {
+    // Implementar edição de produto
+    console.log('Editando produto:', productId);
+}
+
+function toggleFeatured(productId) {
+    // Implementar toggle de destaque
+    console.log('Toggle destaque produto:', productId);
+}
+
+function toggleAvailability(productId) {
+    // Implementar toggle de disponibilidade
+    console.log('Toggle disponibilidade produto:', productId);
+}
+</script>
+{% endblock %}

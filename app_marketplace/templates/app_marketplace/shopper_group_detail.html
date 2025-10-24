@@ -1,0 +1,478 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}{{ group.name }} - Detalhes do Grupo{% endblock %}
+
+{% block extra_css %}
+<style>
+    .group-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stats-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    
+    .stats-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #495057;
+        margin: 0;
+    }
+    
+    .stats-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin: 0.5rem 0 0 0;
+    }
+    
+    .activity-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .participant-item {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .message-item {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .product-item {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .product-item:hover {
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .order-item {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .order-item:hover {
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-paid { background: #d4edda; color: #155724; }
+    .status-delivered { background: #d1ecf1; color: #0c5460; }
+    
+    .chart-container {
+        height: 300px;
+        margin: 1rem 0;
+    }
+    
+    .tab-content {
+        min-height: 400px;
+    }
+    
+    .nav-tabs .nav-link {
+        border-radius: 10px 10px 0 0;
+        border: none;
+        background: #f8f9fa;
+        color: #495057;
+        margin-right: 0.25rem;
+    }
+    
+    .nav-tabs .nav-link.active {
+        background: white;
+        color: #007bff;
+        border-bottom: 3px solid #007bff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header do Grupo -->
+    <div class="group-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="h3 mb-2">
+                    <i class="fab fa-whatsapp"></i>
+                    {{ group.name }}
+                </h1>
+                <p class="mb-0 opacity-75">
+                    <i class="fas fa-hashtag"></i> {{ group.chat_id }}
+                </p>
+                {% if group.last_activity %}
+                <p class="mb-0 opacity-75">
+                    <i class="fas fa-clock"></i> Última atividade: {{ group.last_activity|timesince }} atrás
+                </p>
+                {% endif %}
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="d-flex gap-2 justify-content-end">
+                    <a href="{% url 'shopper_groups' %}" class="btn btn-outline-light">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                    <button class="btn btn-light" onclick="sendMessage()">
+                        <i class="fas fa-paper-plane"></i> Enviar Mensagem
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas do Grupo -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="stats-card">
+                <div class="stats-value">{{ group_stats.participant_count }}</div>
+                <div class="stats-label">Participantes</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="stats-card">
+                <div class="stats-value">{{ group_stats.message_count }}</div>
+                <div class="stats-label">Mensagens</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="stats-card">
+                <div class="stats-value">{{ group_stats.product_count }}</div>
+                <div class="stats-label">Produtos</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="stats-card">
+                <div class="stats-value">{{ group_stats.order_count }}</div>
+                <div class="stats-label">Pedidos</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="stats-card">
+                <div class="stats-value">R$ {{ group_stats.total_revenue|floatformat:2 }}</div>
+                <div class="stats-label">Receita</div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="stats-card">
+                <div class="stats-value">{{ group_stats.conversion_rate|floatformat:1 }}%</div>
+                <div class="stats-label">Conversão</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navegação por Abas -->
+    <div class="row">
+        <div class="col-12">
+            <ul class="nav nav-tabs" id="groupTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab">
+                        <i class="fas fa-chart-pie"></i> Visão Geral
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="participants-tab" data-bs-toggle="tab" data-bs-target="#participants" type="button" role="tab">
+                        <i class="fas fa-users"></i> Participantes
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="messages-tab" data-bs-toggle="tab" data-bs-target="#messages" type="button" role="tab">
+                        <i class="fas fa-comments"></i> Mensagens
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="products-tab" data-bs-toggle="tab" data-bs-target="#products" type="button" role="tab">
+                        <i class="fas fa-box"></i> Produtos
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders" type="button" role="tab">
+                        <i class="fas fa-shopping-cart"></i> Pedidos
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="groupTabContent">
+                <!-- Visão Geral -->
+                <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                    <div class="row">
+                        <!-- Pedidos por Status -->
+                        <div class="col-md-6">
+                            <div class="activity-card">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-chart-pie text-info"></i>
+                                    Pedidos por Status
+                                </h5>
+                                {% for status, data in orders_by_status.items %}
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span>{{ data.label }}</span>
+                                    <span class="badge bg-primary">{{ data.count }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Atividade Diária -->
+                        <div class="col-md-6">
+                            <div class="activity-card">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-chart-line text-success"></i>
+                                    Atividade dos Últimos 7 Dias
+                                </h5>
+                                <div class="chart-container">
+                                    <canvas id="dailyActivityChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Participantes Recentes -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="activity-card">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-user-plus text-success"></i>
+                                    Participantes Recentes
+                                </h5>
+                                {% if recent_participants %}
+                                    {% for participant in recent_participants %}
+                                    <div class="participant-item">
+                                        <div>
+                                            <strong>{{ participant.name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ participant.phone }}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <small class="text-muted">{{ participant.joined_at|timesince }} atrás</small>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted">Nenhum participante recente</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Participantes -->
+                <div class="tab-pane fade" id="participants" role="tabpanel">
+                    <div class="activity-card">
+                        <h5 class="mb-3">
+                            <i class="fas fa-users text-primary"></i>
+                            Participantes do Grupo ({{ participants.count }})
+                        </h5>
+                        {% if participants %}
+                            {% for participant in participants %}
+                            <div class="participant-item">
+                                <div>
+                                    <strong>{{ participant.name }}</strong>
+                                    {% if participant.is_admin %}
+                                    <span class="badge bg-warning ms-2">Admin</span>
+                                    {% endif %}
+                                    <br>
+                                    <small class="text-muted">{{ participant.phone }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <small class="text-muted">Entrou {{ participant.joined_at|timesince }} atrás</small>
+                                    {% if participant.cliente %}
+                                    <br>
+                                    <span class="badge bg-success">Cliente Cadastrado</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">Nenhum participante no grupo</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Mensagens -->
+                <div class="tab-pane fade" id="messages" role="tabpanel">
+                    <div class="activity-card">
+                        <h5 class="mb-3">
+                            <i class="fas fa-comments text-info"></i>
+                            Mensagens Recentes ({{ messages.count }})
+                        </h5>
+                        {% if recent_messages %}
+                            {% for message in recent_messages %}
+                            <div class="message-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>{{ message.sender.name }}</strong>
+                                        <span class="badge bg-secondary ms-2">{{ message.get_message_type_display }}</span>
+                                        <br>
+                                        <p class="mb-1">{{ message.content|truncatechars:100 }}</p>
+                                        <small class="text-muted">{{ message.timestamp|timesince }} atrás</small>
+                                    </div>
+                                    <div>
+                                        {% if message.processed %}
+                                        <span class="badge bg-success">Processada</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">Pendente</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">Nenhuma mensagem no grupo</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Produtos -->
+                <div class="tab-pane fade" id="products" role="tabpanel">
+                    <div class="activity-card">
+                        <h5 class="mb-3">
+                            <i class="fas fa-box text-warning"></i>
+                            Produtos do Grupo ({{ products.count }})
+                        </h5>
+                        {% if featured_products %}
+                            {% for product in featured_products %}
+                            <div class="product-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ product.name }}</h6>
+                                        {% if product.brand %}
+                                        <p class="text-muted mb-1">{{ product.brand }}</p>
+                                        {% endif %}
+                                        {% if product.description %}
+                                        <p class="text-muted small">{{ product.description|truncatechars:100 }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-end">
+                                        {% if product.price %}
+                                        <div class="h6 mb-1">{{ product.currency }} {{ product.price|floatformat:2 }}</div>
+                                        {% endif %}
+                                        {% if product.is_featured %}
+                                        <span class="badge bg-warning">Destaque</span>
+                                        {% endif %}
+                                        {% if product.is_available %}
+                                        <span class="badge bg-success">Disponível</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Indisponível</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">Nenhum produto no grupo</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Pedidos -->
+                <div class="tab-pane fade" id="orders" role="tabpanel">
+                    <div class="activity-card">
+                        <h5 class="mb-3">
+                            <i class="fas fa-shopping-cart text-success"></i>
+                            Pedidos do Grupo ({{ orders.count }})
+                        </h5>
+                        {% if orders %}
+                            {% for order in orders %}
+                            <div class="order-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="order-number mb-1">{{ order.order_number }}</h6>
+                                        <p class="text-muted mb-1">{{ order.customer.name }} - {{ order.customer.phone }}</p>
+                                        <small class="text-muted">{{ order.created_at|date:"d/m/Y H:i" }}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="h6 mb-1">{{ order.currency }} {{ order.total_amount|floatformat:2 }}</div>
+                                        <span class="status-badge status-{{ order.status }}">
+                                            {{ order.get_status_display }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted">Nenhum pedido no grupo</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Gráfico de atividade diária
+    const dailyActivityData = {{ daily_activity|safe }};
+    
+    const ctx = document.getElementById('dailyActivityChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dailyActivityData.map(item => item.date),
+            datasets: [{
+                label: 'Mensagens',
+                data: dailyActivityData.map(item => item.messages),
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Pedidos',
+                data: dailyActivityData.map(item => item.orders),
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    function sendMessage() {
+        // Implementar envio de mensagem
+        console.log('Enviando mensagem para o grupo...');
+    }
+</script>
+{% endblock %}

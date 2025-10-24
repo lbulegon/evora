@@ -1,0 +1,245 @@
+{% extends 'app_marketplace/base.html' %}
+
+{% block title %}Obter Chat ID WhatsApp{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-id-card {
+        background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .method-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .method-card:hover {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    .chat-id-example {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 1rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        margin: 1rem 0;
+    }
+    
+    .step-number {
+        background: #25D366;
+        color: white;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="chat-id-card text-center">
+                <h1><i class="fab fa-whatsapp"></i> Obter Chat ID do WhatsApp</h1>
+                <p class="lead">Configure seus grupos WhatsApp para integração com ÉVORA</p>
+            </div>
+            
+            <!-- Método 1: WPPConnect -->
+            <div class="method-card">
+                <h4><span class="step-number">1</span>Via WPPConnect (Recomendado)</h4>
+                <p>Use o WPPConnect para obter automaticamente os Chat IDs dos seus grupos.</p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>🔧 Configuração:</h6>
+                        <ol>
+                            <li>Instale o WPPConnect</li>
+                            <li>Conecte com seu WhatsApp</li>
+                            <li>Execute o script abaixo</li>
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>📋 Script:</h6>
+                        <div class="chat-id-example">
+# Executar no terminal
+python get_whatsapp_groups.py
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Método 2: WhatsApp Web -->
+            <div class="method-card">
+                <h4><span class="step-number">2</span>Via WhatsApp Web (Manual)</h4>
+                <p>Obtenha o Chat ID diretamente do WhatsApp Web.</p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>📱 Passos:</h6>
+                        <ol>
+                            <li>Abra WhatsApp Web</li>
+                            <li>Entre no grupo desejado</li>
+                            <li>Copie a URL do navegador</li>
+                            <li>Extraia o Chat ID</li>
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>🔗 Exemplo de URL:</h6>
+                        <div class="chat-id-example">
+https://web.whatsapp.com/send?phone=120363123456789012@g.us
+                        </div>
+                        <p><strong>Chat ID:</strong> <code>120363123456789012@g.us</code></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Método 3: API Direta -->
+            <div class="method-card">
+                <h4><span class="step-number">3</span>Via API WPPConnect</h4>
+                <p>Acesse diretamente a API do WPPConnect para obter os grupos.</p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>🌐 Endpoint:</h6>
+                        <div class="chat-id-example">
+GET http://localhost:21465/api/groups
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>📄 Resposta:</h6>
+                        <div class="chat-id-example">
+{
+  "groups": [
+    {
+      "id": "120363123456789012@g.us",
+      "name": "Grupo de Vendas",
+      "participants": 25
+    }
+  ]
+}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Formulário para Adicionar Grupo -->
+            <div class="method-card">
+                <h4><span class="step-number">4</span>Adicionar Grupo no ÉVORA</h4>
+                <p>Após obter o Chat ID, adicione o grupo ao sistema.</p>
+                
+                <form id="addGroupForm">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="chatId" class="form-label">Chat ID</label>
+                                <input type="text" class="form-control" id="chatId" 
+                                       placeholder="120363123456789012@g.us" required>
+                                <div class="form-text">Cole o Chat ID obtido acima</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="groupName" class="form-label">Nome do Grupo</label>
+                                <input type="text" class="form-control" id="groupName" 
+                                       placeholder="Grupo de Vendas" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success">
+                        <i class="fab fa-whatsapp"></i> Adicionar Grupo
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Exemplos de Chat IDs -->
+            <div class="method-card">
+                <h4><span class="step-number">5</span>Exemplos de Chat IDs</h4>
+                <p>Formatos comuns de Chat IDs do WhatsApp:</p>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>🇧🇷 Brasil:</h6>
+                        <div class="chat-id-example">
+120363123456789012@g.us
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>🇺🇸 EUA:</h6>
+                        <div class="chat-id-example">
+120363123456789012@g.us
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-3">
+                    <strong>💡 Dica:</strong> O Chat ID sempre termina com <code>@g.us</code> para grupos.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('addGroupForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const chatId = document.getElementById('chatId').value;
+    const groupName = document.getElementById('groupName').value;
+    
+    if (!chatId || !groupName) {
+        alert('Preencha todos os campos!');
+        return;
+    }
+    
+    // Validar formato do Chat ID
+    if (!chatId.includes('@g.us')) {
+        alert('Chat ID inválido! Deve terminar com @g.us');
+        return;
+    }
+    
+    // Enviar para o servidor
+    fetch('{% url "api_create_group" %}', {
+        method: 'POST',
+        body: JSON.stringify({
+            chat_id: chatId,
+            name: groupName
+        }),
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Grupo adicionado com sucesso!');
+            window.location.href = '{% url "shopper_groups" %}';
+        } else {
+            alert('❌ Erro: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('❌ Erro ao adicionar grupo');
+    });
+});
+</script>
+{% endblock %}

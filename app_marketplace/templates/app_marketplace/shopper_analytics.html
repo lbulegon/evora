@@ -1,0 +1,296 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Analytics - Shopper Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .analytics-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 0;
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        margin: 0.5rem 0 0 0;
+    }
+    
+    .chart-container {
+        height: 300px;
+        margin: 1rem 0;
+    }
+    
+    .table-responsive {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-chart-line text-primary"></i>
+                        Analytics Detalhados
+                    </h1>
+                    <p class="text-muted mb-0">Análise completa do seu desempenho de vendas</p>
+                </div>
+                <div>
+                    <a href="{% url 'shopper_dashboard' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas Principais -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">{{ total_orders }}</div>
+                <div class="metric-label">Pedidos Totais</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">R$ {{ total_revenue|floatformat:2 }}</div>
+                <div class="metric-label">Receita Total</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">R$ {{ avg_order_value|floatformat:2 }}</div>
+                <div class="metric-label">Ticket Médio</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-value">{{ total_participants }}</div>
+                <div class="metric-label">Participantes</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vendas por Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="analytics-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-chart-pie text-info"></i>
+                    Vendas por Status
+                </h5>
+                <div class="row">
+                    {% for status, data in sales_by_status.items %}
+                    <div class="col-md-2 mb-3">
+                        <div class="text-center">
+                            <div class="h4 mb-1">{{ data.count }}</div>
+                            <div class="text-muted">{{ data.label }}</div>
+                            <div class="small text-success">R$ {{ data.revenue|floatformat:2 }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vendas por Grupo -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="analytics-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-users text-success"></i>
+                    Vendas por Grupo
+                </h5>
+                {% if sales_by_group %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Grupo</th>
+                                    <th>Pedidos</th>
+                                    <th>Receita</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for group in sales_by_group %}
+                                <tr>
+                                    <td>{{ group.name }}</td>
+                                    <td>{{ group.order_count }}</td>
+                                    <td>R$ {{ group.revenue|floatformat:2|default:"0.00" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">Nenhum dado disponível</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Produtos Mais Vendidos -->
+        <div class="col-md-6">
+            <div class="analytics-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-star text-warning"></i>
+                    Produtos Mais Vendidos
+                </h5>
+                {% if popular_products %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Pedidos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for product in popular_products %}
+                                <tr>
+                                    <td>{{ product.name }}</td>
+                                    <td>{{ product.order_count }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">Nenhum produto vendido ainda</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico de Vendas Diárias -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="analytics-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-chart-line text-primary"></i>
+                    Vendas dos Últimos 30 Dias
+                </h5>
+                <div class="chart-container">
+                    <canvas id="dailySalesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Atividade por Hora -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="analytics-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-clock text-info"></i>
+                    Atividade por Hora do Dia
+                </h5>
+                <div class="chart-container">
+                    <canvas id="hourlyActivityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Gráfico de vendas diárias
+    const dailySalesData = {{ daily_sales|safe }};
+    
+    const dailyCtx = document.getElementById('dailySalesChart').getContext('2d');
+    new Chart(dailyCtx, {
+        type: 'line',
+        data: {
+            labels: dailySalesData.map(item => item.date),
+            datasets: [{
+                label: 'Pedidos',
+                data: dailySalesData.map(item => item.orders),
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Receita (R$)',
+                data: dailySalesData.map(item => item.revenue),
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+
+    // Gráfico de atividade por hora
+    const hourlyData = {{ hourly_activity|safe }};
+    
+    const hourlyCtx = document.getElementById('hourlyActivityChart').getContext('2d');
+    new Chart(hourlyCtx, {
+        type: 'bar',
+        data: {
+            labels: hourlyData.map(item => item.hour),
+            datasets: [{
+                label: 'Pedidos por Hora',
+                data: hourlyData.map(item => item.orders),
+                backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                borderColor: 'rgba(102, 126, 234, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

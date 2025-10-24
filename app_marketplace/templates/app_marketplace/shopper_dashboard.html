@@ -1,0 +1,436 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Shopper - ÉVORA Connect{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stats-card h3 {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 0;
+    }
+    
+    .stats-card p {
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
+        font-size: 0.9rem;
+    }
+    
+    .stats-card .icon {
+        font-size: 2rem;
+        opacity: 0.7;
+    }
+    
+    .revenue-card {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    
+    .orders-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .products-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .groups-card {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .activity-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .group-item {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid #007bff;
+        transition: all 0.3s ease;
+    }
+    
+    .group-item:hover {
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transform: translateX(5px);
+    }
+    
+    .order-item {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border-left: 4px solid #28a745;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .product-item {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border: 1px solid #e0e0e0;
+        transition: all 0.3s ease;
+    }
+    
+    .product-item:hover {
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-paid { background: #d4edda; color: #155724; }
+    .status-delivered { background: #d1ecf1; color: #0c5460; }
+    
+    .chart-container {
+        height: 300px;
+        margin: 1rem 0;
+    }
+    
+    .quick-actions {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .action-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.75rem 1.5rem;
+        margin: 0.25rem;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .action-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-store text-primary"></i>
+                        Dashboard Shopper
+                    </h1>
+                    <p class="text-muted mb-0">Bem-vindo, {{ shopper.nome }}! Gerencie seus grupos e vendas.</p>
+                </div>
+                <div>
+                    <a href="{% url 'shopper_analytics' %}" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-chart-line"></i> Analytics
+                    </a>
+                    <a href="{% url 'shopper_groups' %}" class="btn btn-primary">
+                        <i class="fas fa-users"></i> Gerenciar Grupos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas Principais -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card revenue-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3>R$ {{ total_revenue|floatformat:2 }}</h3>
+                        <p>Receita Total</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card orders-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3>{{ total_orders }}</h3>
+                        <p>Pedidos Totais</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card products-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3>{{ total_products }}</h3>
+                        <p>Produtos</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fas fa-box"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card groups-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3>{{ total_groups }}</h3>
+                        <p>Grupos WhatsApp</p>
+                    </div>
+                    <div class="icon">
+                        <i class="fab fa-whatsapp"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="quick-actions">
+                <h5 class="mb-3">
+                    <i class="fas fa-bolt text-warning"></i>
+                    Ações Rápidas
+                </h5>
+                <div class="d-flex flex-wrap">
+                    <a href="{% url 'shopper_groups' %}" class="action-btn">
+                        <i class="fas fa-plus"></i> Novo Grupo
+                    </a>
+                    <a href="{% url 'shopper_products' %}" class="action-btn">
+                        <i class="fas fa-box"></i> Adicionar Produto
+                    </a>
+                    <a href="{% url 'shopper_orders' %}" class="action-btn">
+                        <i class="fas fa-shopping-cart"></i> Ver Pedidos
+                    </a>
+                    <a href="{% url 'shopper_analytics' %}" class="action-btn">
+                        <i class="fas fa-chart-bar"></i> Relatórios
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Grupos Ativos -->
+        <div class="col-md-6">
+            <div class="activity-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="fab fa-whatsapp text-success"></i>
+                        Grupos Ativos
+                    </h5>
+                    <a href="{% url 'shopper_groups' %}" class="btn btn-sm btn-outline-primary">Ver Todos</a>
+                </div>
+                
+                {% if active_groups_data %}
+                    {% for group in active_groups_data %}
+                    <div class="group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ group.name }}</h6>
+                                <small class="text-muted">
+                                    {{ group.participant_count }} participantes • 
+                                    {{ group.message_count }} mensagens • 
+                                    {{ group.order_count }} pedidos
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-success">Ativo</span>
+                                <br>
+                                <small class="text-muted">{{ group.last_activity|timesince }} atrás</small>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <a href="{% url 'shopper_group_detail' group.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i> Ver Detalhes
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">Nenhum grupo ativo ainda.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Pedidos Recentes -->
+        <div class="col-md-6">
+            <div class="activity-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shopping-cart text-primary"></i>
+                        Pedidos Recentes
+                    </h5>
+                    <a href="{% url 'shopper_orders' %}" class="btn btn-sm btn-outline-primary">Ver Todos</a>
+                </div>
+                
+                {% if recent_orders %}
+                    {% for order in recent_orders %}
+                    <div class="order-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ order.order_number }}</h6>
+                                <small class="text-muted">{{ order.customer.name }} - {{ order.group.name }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="status-badge status-{{ order.status }}">
+                                    {{ order.get_status_display }}
+                                </span>
+                                <br>
+                                <small class="text-muted">R$ {{ order.total_amount|floatformat:2 }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">Nenhum pedido ainda.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Produtos em Destaque -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="activity-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-star text-warning"></i>
+                        Produtos em Destaque
+                    </h5>
+                    <a href="{% url 'shopper_products' %}" class="btn btn-sm btn-outline-primary">Ver Todos</a>
+                </div>
+                
+                {% if popular_products %}
+                    <div class="row">
+                        {% for product in popular_products %}
+                        <div class="col-md-4 mb-3">
+                            <div class="product-item">
+                                <h6 class="mb-1">{{ product.name }}</h6>
+                                <p class="text-muted mb-1">{{ product.brand }}</p>
+                                {% if product.price %}
+                                <p class="mb-1"><strong>{{ product.currency }} {{ product.price|floatformat:2 }}</strong></p>
+                                {% endif %}
+                                <small class="text-muted">{{ product.group.name }}</small>
+                                {% if product.is_featured %}
+                                <span class="badge bg-warning ms-2">Destaque</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">Nenhum produto em destaque ainda.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico de Crescimento -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="activity-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-chart-line text-info"></i>
+                    Crescimento Mensal
+                </h5>
+                <div class="chart-container">
+                    <canvas id="growthChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Gráfico de crescimento mensal
+    const growthData = {{ monthly_growth|safe }};
+    
+    const ctx = document.getElementById('growthChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: growthData.map(item => item.month),
+            datasets: [{
+                label: 'Pedidos',
+                data: growthData.map(item => item.orders),
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Receita (R$)',
+                data: growthData.map(item => item.revenue),
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+
+    // Auto-refresh das estatísticas a cada 30 segundos
+    setInterval(function() {
+        // Aqui você pode adicionar AJAX para atualizar as estatísticas
+        console.log('Atualizando dashboard shopper...');
+    }, 30000);
+</script>
+{% endblock %}

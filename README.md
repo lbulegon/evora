@@ -42,18 +42,19 @@ python manage.py runserver
 
 ## 📁 Documentação
 
-- **[Guia de Migração](MIGRATION_GUIDE.md)** - Como migrar o banco de dados
+- **[Deploy Railway](DEPLOY_RAILWAY.md)** - 🚂 Deploy simplificado no Railway
+- **[Setup Python](RAILWAY_PYTHON_SETUP.md)** - Configuração Python buildpack
 - **[Integração WhatsApp](WHATSAPP_INTEGRATION.md)** - Como usar WhatsApp para vendas
-- **[Setup Railway + WPPConnect](RAILWAY_SETUP.md)** - 🚂 Deploy completo no Railway
+- **[Guia de Migração](MIGRATION_GUIDE.md)** - Como migrar o banco de dados
 - **[Resumo da Evolução](RESUMO_EVOLUCAO_EVORA.md)** - Histórico do projeto
 
 ## 🏗️ Arquitetura
 
-- **Django 5.2.2** - Backend
+- **Django 5.2.2** - Backend Python
 - **PostgreSQL** - Banco de dados
-- **Redis + Celery** - Fila de tarefas
-- **WPPConnect** - Integração WhatsApp
-- **Railway** - Deploy em produção
+- **Redis** - Cache e filas
+- **Railway** - Deploy com Python buildpack
+- **WhatsApp** - Interface de usuário (opcional)
 
 ## 📱 Comandos WhatsApp
 
@@ -91,21 +92,23 @@ Ver documentação completa em [WHATSAPP_INTEGRATION.md](WHATSAPP_INTEGRATION.md
 
 ## 🌐 Deploy
 
-### Railway
+### Railway (Python Buildpack)
 
 ```bash
 # Login
 railway login
 
 # Vincular projeto
-railway link -p 3d0f75f4-cab0-4751-ba59-f664bd9c896e
+railway link
 
-# Deploy
-railway up
+# Deploy automático
+git push origin main
 
 # Ver logs
-railway logs
+railway logs --tail
 ```
+
+Ver guia completo: [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md)
 
 ## 🔧 Comandos Úteis
 
