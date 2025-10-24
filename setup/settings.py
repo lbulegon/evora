@@ -27,8 +27,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-8j^$b4kv512@8mlg=koq)5iu8#fpqz#=ot8ost*)g^eyexvq!b'
 
+# Detectar se está no Railway
+import os
+IS_RAILWAY = os.getenv('RAILWAY_ENVIRONMENT') is not None
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = not IS_RAILWAY  # False no Railway, True local
 
 CSRF_TRUSTED_ORIGINS = [
     'https://evora-product.up.railway.app',
@@ -36,11 +40,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000'
 ]
 
-
-
-#ALLOWED_HOSTS = ['192.168.0.18','localhost', '127.0.0.1', '192.168.0.30']
-
-ALLOWED_HOSTS = ['*']  # Ou ['seu-domínio.railway.app'] para produção
+ALLOWED_HOSTS = ['*']  # Permitir todos os hosts
 
 # Application definition
 
@@ -103,18 +103,27 @@ DATABASES = {
 '''
 
 
-DATABASES = {
-    'default': {
-        'ENGINE'  : 'django.db.backends.postgresql',
-        'NAME'    : 'railway',                                  # Nome do banco de dados
-        'USER'    : 'postgres',                               # Nome de usuário
-        'PASSWORD': 'dtzlYwfACCJRCJcZPQpnlKEZgnxKqzMM',       # Senha
-        'HOST'    : 'yamanote.proxy.rlwy.net',                 # Host do banco de dados (use o IP ou hostname se for remoto)
-        'PORT'    : '47941',                                  # Porta padrão do PostgreSQL
+# Configuração do banco baseada no ambiente
+if IS_RAILWAY:
+    # Railway - usar variáveis de ambiente
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('PGDATABASE', 'railway'),
+            'USER': os.getenv('PGUSER', 'postgres'),
+            'PASSWORD': os.getenv('PGPASSWORD', ''),
+            'HOST': os.getenv('PGHOST', 'localhost'),
+            'PORT': os.getenv('PGPORT', '5432'),
+        }
     }
-
-
- }
+else:
+    # Local - usar SQLite para desenvolvimento
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 
@@ -152,7 +161,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para Railway
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

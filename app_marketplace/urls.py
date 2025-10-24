@@ -47,6 +47,6 @@ urlpatterns = [
     path('shopper/orders/', shopper_dashboard_views.shopper_orders, name='shopper_orders'),
     path('shopper/analytics/', shopper_dashboard_views.shopper_analytics, name='shopper_analytics'),
     
-    # Helper para Chat ID WhatsApp
-    path('shopper/chat-id-helper/', shopper_dashboard_views.chat_id_helper, name='chat_id_helper'),
+    # Helper para Chat ID WhatsApp (comentado temporariamente)
+    # path('shopper/chat-id-helper/', shopper_dashboard_views.chat_id_helper, name='chat_id_helper'),
 ]
