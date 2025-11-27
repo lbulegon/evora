@@ -2,10 +2,14 @@
 nixPkgs = ["nodejs_18", "python311", "python311Packages.pip"]
 
 [phases.install]
-cmds = ["pip install -r requirements.txt"]
+cmds = [
+  "python -m venv /app/.venv",
+  "/app/.venv/bin/pip install --upgrade pip",
+  "/app/.venv/bin/pip install -r requirements.txt"
+]
 
 [phases.build]
-cmds = ["python manage.py collectstatic --noinput"]
+cmds = ["/app/.venv/bin/python manage.py collectstatic --noinput"]
 
 [start]
-cmd = "python manage.py migrate --noinput && gunicorn setup.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --max-requests 1000"
+cmd = "/app/.venv/bin/python manage.py migrate --noinput && /app/.venv/bin/gunicorn setup.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --max-requests 1000"
