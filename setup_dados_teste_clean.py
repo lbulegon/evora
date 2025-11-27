@@ -27,17 +27,10 @@ def criar_dados_teste():
     print("CRIANDO DADOS DE TESTE - VitrineZap + KMN")
     print("=" * 50)
     
-    # Limpar dados existentes (opcional)
-    print("Limpando dados anteriores...")
-    # TrustlineKeeper.objects.all().delete()
-    # ClienteRelacao.objects.all().delete()
-    # Oferta.objects.all().delete()
-    # EstoqueItem.objects.all().delete()
-    
     # 1. CRIAR EMPRESA BASE
     print("\nCriando empresa base...")
     empresa, created = Empresa.objects.get_or_create(
-        nome="ÉVORA Marketplace",
+        nome="EVORA Marketplace",
         defaults={
             'cnpj': '12.345.678/0001-90',
             'endereco': 'Rua das Startups, 123',
@@ -72,10 +65,9 @@ def criar_dados_teste():
     user_junior, created = User.objects.get_or_create(
         username='junior_sp',
         defaults={
-            'first_name': 'Júnior',
+            'first_name': 'Junior',
             'last_name': 'Santos',
-            'email': 'junior@vitrinezap.com',
-            'password': 'pbkdf2_sha256$600000$test$hash'  # senha: 123456
+            'email': 'junior@vitrinezap.com'
         }
     )
     if created:
@@ -86,7 +78,7 @@ def criar_dados_teste():
     ps_junior, created = PersonalShopper.objects.get_or_create(
         user=user_junior,
         defaults={
-            'nome': 'Júnior Santos - SP',
+            'nome': 'Junior Santos - SP',
             'bio': 'Especialista em eletrônicos e gadgets. Atua em São Paulo.',
             'ativo': True
         }
@@ -97,7 +89,7 @@ def criar_dados_teste():
         user=user_junior,
         defaults={
             'personal_shopper': ps_junior,
-            'nome_comercial': 'Júnior Tech SP',
+            'nome_comercial': 'Junior Tech SP',
             'bio_agente': 'Shopper especializado em tecnologia. Forte em São Paulo e região.',
             'ativo_como_shopper': True,
             'ativo_como_keeper': False,
@@ -107,16 +99,15 @@ def criar_dados_teste():
         }
     )
     if created:
-        print("  OK Júnior Santos (Shopper) - São Paulo")
+        print("  OK Junior Santos (Shopper) - São Paulo")
     
     # AGENTE 2: KEEPER PURO (Márcia - Rio de Janeiro)
     user_marcia, created = User.objects.get_or_create(
         username='marcia_rj',
         defaults={
-            'first_name': 'Márcia',
+            'first_name': 'Marcia',
             'last_name': 'Silva',
-            'email': 'marcia@vitrinezap.com',
-            'password': 'pbkdf2_sha256$600000$test$hash'
+            'email': 'marcia@vitrinezap.com'
         }
     )
     if created:
@@ -127,7 +118,7 @@ def criar_dados_teste():
     keeper_marcia, created = Keeper.objects.get_or_create(
         user=user_marcia,
         defaults={
-            'nome': 'Márcia Silva - RJ',
+            'nome': 'Marcia Silva - RJ',
             'endereco': 'Rua das Flores, 456 - Copacabana, RJ',
             'telefone': '(21) 98888-7777',
             'ativo': True
@@ -139,7 +130,7 @@ def criar_dados_teste():
         user=user_marcia,
         defaults={
             'keeper': keeper_marcia,
-            'nome_comercial': 'Márcia Store RJ',
+            'nome_comercial': 'Marcia Store RJ',
             'bio_agente': 'Keeper com foco em moda e lifestyle. Base no Rio de Janeiro.',
             'ativo_como_shopper': False,
             'ativo_como_keeper': True,
@@ -149,7 +140,7 @@ def criar_dados_teste():
         }
     )
     if created:
-        print("  ✅ Márcia Silva (Keeper) - Rio de Janeiro")
+        print("  OK Marcia Silva (Keeper) - Rio de Janeiro")
     
     # AGENTE 3: SHOPPER-KEEPER HÍBRIDO (Ana - Belo Horizonte)
     user_ana, created = User.objects.get_or_create(
@@ -157,8 +148,7 @@ def criar_dados_teste():
         defaults={
             'first_name': 'Ana',
             'last_name': 'Costa',
-            'email': 'ana@vitrinezap.com',
-            'password': 'pbkdf2_sha256$600000$test$hash'
+            'email': 'ana@vitrinezap.com'
         }
     )
     if created:
@@ -201,21 +191,19 @@ def criar_dados_teste():
         }
     )
     if created:
-        print("  ✅ Ana Costa (Shopper-Keeper) - Belo Horizonte")
+        print("  OK Ana Costa (Shopper-Keeper) - Belo Horizonte")
     
     # 4. CRIAR CLIENTES
-    print("\n👤 Criando clientes...")
+    print("\nCriando clientes...")
     
     clientes_data = [
         {
             'username': 'joao_cliente',
-            'first_name': 'João',
+            'first_name': 'Joao',
             'last_name': 'Oliveira',
             'email': 'joao@cliente.com',
             'telefone': '(11) 91111-1111',
-            'endereco': 'Rua A, 100 - Vila Madalena, SP',
-            'owner_principal': agente_junior,  # Cliente forte do Júnior
-            'forca_relacao': 85.0
+            'endereco': 'Rua A, 100 - Vila Madalena, SP'
         },
         {
             'username': 'maria_cliente',
@@ -223,9 +211,7 @@ def criar_dados_teste():
             'last_name': 'Santos',
             'email': 'maria@cliente.com',
             'telefone': '(21) 92222-2222',
-            'endereco': 'Av. Atlântica, 200 - Copacabana, RJ',
-            'owner_principal': agente_marcia,  # Cliente forte da Márcia
-            'forca_relacao': 92.0
+            'endereco': 'Av. Atlantica, 200 - Copacabana, RJ'
         },
         {
             'username': 'pedro_cliente',
@@ -233,9 +219,7 @@ def criar_dados_teste():
             'last_name': 'Lima',
             'email': 'pedro@cliente.com',
             'telefone': '(31) 93333-3333',
-            'endereco': 'Rua B, 300 - Savassi, BH',
-            'owner_principal': agente_ana,  # Cliente forte da Ana
-            'forca_relacao': 78.0
+            'endereco': 'Rua B, 300 - Savassi, BH'
         },
         {
             'username': 'carla_cliente',
@@ -243,9 +227,7 @@ def criar_dados_teste():
             'last_name': 'Ferreira',
             'email': 'carla@cliente.com',
             'telefone': '(11) 94444-4444',
-            'endereco': 'Rua C, 400 - Jardins, SP',
-            'owner_principal': None,  # Cliente em múltiplas carteiras
-            'forca_relacao': None
+            'endereco': 'Rua C, 400 - Jardins, SP'
         },
         {
             'username': 'roberto_cliente',
@@ -253,9 +235,7 @@ def criar_dados_teste():
             'last_name': 'Alves',
             'email': 'roberto@cliente.com',
             'telefone': '(21) 95555-5555',
-            'endereco': 'Rua D, 500 - Ipanema, RJ',
-            'owner_principal': None,  # Cliente novo, sem histórico
-            'forca_relacao': None
+            'endereco': 'Rua D, 500 - Ipanema, RJ'
         }
     ]
     
@@ -267,8 +247,7 @@ def criar_dados_teste():
             defaults={
                 'first_name': cliente_data['first_name'],
                 'last_name': cliente_data['last_name'],
-                'email': cliente_data['email'],
-                'password': 'pbkdf2_sha256$600000$test$hash'
+                'email': cliente_data['email']
             }
         )
         if created:
@@ -280,30 +259,17 @@ def criar_dados_teste():
             user=user_cliente,
             defaults={
                 'telefone': cliente_data['telefone'],
-                'data_nascimento': timezone.now().date() - timedelta(days=365*30)  # 30 anos
-            }
-        )
-        
-        # Criar endereço
-        endereco, created = EnderecoEntrega.objects.get_or_create(
-            cliente=cliente,
-            defaults={
-                'nome': f"Casa {cliente_data['first_name']}",
-                'endereco': cliente_data['endereco'],
-                'cep': '00000-000',
-                'cidade': cliente_data['endereco'].split(' - ')[1].split(',')[0] if ' - ' in cliente_data['endereco'] else 'São Paulo',
-                'estado': cliente_data['endereco'].split(', ')[-1] if ', ' in cliente_data['endereco'] else 'SP',
-                'padrao': True
+                'data_nascimento': timezone.now().date() - timedelta(days=365*30)
             }
         )
         
         clientes[cliente_data['username']] = cliente
         
         if created:
-            print(f"  ✅ {cliente_data['first_name']} {cliente_data['last_name']}")
+            print(f"  OK {cliente_data['first_name']} {cliente_data['last_name']}")
     
     # 5. CRIAR RELAÇÕES CLIENTE-AGENTE
-    print("\n🔗 Criando relações cliente-agente...")
+    print("\nCriando relações cliente-agente...")
     
     # João - Cliente forte do Júnior
     ClienteRelacao.objects.get_or_create(
@@ -338,7 +304,7 @@ def criar_dados_teste():
         }
     )
     
-    # Carla - Cliente em múltiplas carteiras (conflito interessante)
+    # Carla - Cliente em múltiplas carteiras
     ClienteRelacao.objects.get_or_create(
         cliente=clientes['carla_cliente'],
         agente=agente_junior,
@@ -352,27 +318,16 @@ def criar_dados_teste():
         cliente=clientes['carla_cliente'],
         agente=agente_marcia,
         defaults={
-            'forca_relacao': Decimal('72.0'),  # Márcia tem relação mais forte
+            'forca_relacao': Decimal('72.0'),
             'total_pedidos': 8,
             'ultimo_contato': timezone.now() - timedelta(days=4)
         }
     )
     
-    # Roberto - Cliente novo, apenas com Ana
-    ClienteRelacao.objects.get_or_create(
-        cliente=clientes['roberto_cliente'],
-        agente=agente_ana,
-        defaults={
-            'forca_relacao': Decimal('45.0'),  # Relação ainda fraca
-            'total_pedidos': 2,
-            'ultimo_contato': timezone.now() - timedelta(days=10)
-        }
-    )
-    
-    print("  ✅ Relações cliente-agente criadas")
+    print("  OK Relações cliente-agente criadas")
     
     # 6. CRIAR PRODUTOS
-    print("\n📱 Criando produtos...")
+    print("\nCriando produtos...")
     
     produtos_data = [
         {
@@ -397,25 +352,11 @@ def criar_dados_teste():
             'sku': 'VEST-FLOR-M'
         },
         {
-            'nome': 'Tênis Nike Air Max 270',
+            'nome': 'Tenis Nike Air Max 270',
             'categoria': categorias['Moda'],
-            'descricao': 'Tênis Nike Air Max 270, cor branco/preto, tamanho 42',
+            'descricao': 'Tenis Nike Air Max 270, cor branco/preto, tamanho 42',
             'preco_referencia': Decimal('599.90'),
             'sku': 'NIKE-AM270-42'
-        },
-        {
-            'nome': 'Luminária LED Inteligente',
-            'categoria': categorias['Casa & Jardim'],
-            'descricao': 'Luminária LED com controle por app, RGB, 12W',
-            'preco_referencia': Decimal('129.90'),
-            'sku': 'LED-SMART-12W'
-        },
-        {
-            'nome': 'Halteres Ajustáveis 20kg',
-            'categoria': categorias['Esporte'],
-            'descricao': 'Par de halteres ajustáveis de 5 a 20kg cada',
-            'preco_referencia': Decimal('899.90'),
-            'sku': 'HALT-ADJ-20KG'
         }
     ]
     
@@ -434,101 +375,10 @@ def criar_dados_teste():
         produtos[prod_data['sku']] = produto
         
         if created:
-            print(f"  ✅ {prod_data['nome']}")
+            print(f"  OK {prod_data['nome']}")
     
-    # 7. CRIAR ESTOQUE E OFERTAS
-    print("\n📦 Criando estoque e ofertas...")
-    
-    # Júnior (Shopper) - Especialista em eletrônicos
-    estoque_junior = [
-        {'produto': produtos['IPH15P-128-NT'], 'quantidade': 3, 'preco_custo': Decimal('7200.00'), 'preco_venda': Decimal('7999.00')},
-        {'produto': produtos['SGS24U-256-TB'], 'quantidade': 2, 'preco_custo': Decimal('5800.00'), 'preco_venda': Decimal('6499.00')},
-    ]
-    
-    for item in estoque_junior:
-        # Criar item de estoque
-        EstoqueItem.objects.get_or_create(
-            agente=agente_junior,
-            produto=item['produto'],
-            defaults={
-                'quantidade_disponivel': item['quantidade'],
-                'preco_custo': item['preco_custo'],
-                'localizacao': 'Estoque SP - Setor A'
-            }
-        )
-        
-        # Criar oferta do próprio Júnior
-        Oferta.objects.get_or_create(
-            produto=item['produto'],
-            agente_ofertante=agente_junior,
-            defaults={
-                'agente_origem': agente_junior,
-                'preco_base': item['preco_custo'],
-                'preco_oferta': item['preco_venda'],
-                'quantidade_disponivel': item['quantidade'],
-                'descricao_oferta': f"Oferta direta do Júnior - {item['produto'].nome}",
-                'ativo': True
-            }
-        )
-    
-    # Márcia (Keeper) - Revende produtos do Júnior com markup
-    ofertas_marcia = [
-        {'produto': produtos['IPH15P-128-NT'], 'preco_base': Decimal('7200.00'), 'preco_oferta': Decimal('8299.00')},  # Markup R$ 1099
-        {'produto': produtos['SGS24U-256-TB'], 'preco_base': Decimal('5800.00'), 'preco_oferta': Decimal('6799.00')},  # Markup R$ 999
-    ]
-    
-    for oferta in ofertas_marcia:
-        Oferta.objects.get_or_create(
-            produto=oferta['produto'],
-            agente_ofertante=agente_marcia,
-            defaults={
-                'agente_origem': agente_junior,  # Júnior é a origem
-                'preco_base': oferta['preco_base'],
-                'preco_oferta': oferta['preco_oferta'],
-                'quantidade_disponivel': 1,  # Márcia revende conforme demanda
-                'descricao_oferta': f"Revenda Márcia RJ - {oferta['produto'].nome}",
-                'ativo': True
-            }
-        )
-    
-    # Ana (Híbrido) - Tem estoque próprio de casa e decoração
-    estoque_ana = [
-        {'produto': produtos['VEST-FLOR-M'], 'quantidade': 5, 'preco_custo': Decimal('120.00'), 'preco_venda': Decimal('189.90')},
-        {'produto': produtos['NIKE-AM270-42'], 'quantidade': 3, 'preco_custo': Decimal('380.00'), 'preco_venda': Decimal('599.90')},
-        {'produto': produtos['LED-SMART-12W'], 'quantidade': 10, 'preco_custo': Decimal('85.00'), 'preco_venda': Decimal('129.90')},
-        {'produto': produtos['HALT-ADJ-20KG'], 'quantidade': 2, 'preco_custo': Decimal('650.00'), 'preco_venda': Decimal('899.90')},
-    ]
-    
-    for item in estoque_ana:
-        # Criar item de estoque
-        EstoqueItem.objects.get_or_create(
-            agente=agente_ana,
-            produto=item['produto'],
-            defaults={
-                'quantidade_disponivel': item['quantidade'],
-                'preco_custo': item['preco_custo'],
-                'localizacao': 'Estoque BH - Depósito Central'
-            }
-        )
-        
-        # Criar oferta da Ana
-        Oferta.objects.get_or_create(
-            produto=item['produto'],
-            agente_ofertante=agente_ana,
-            defaults={
-                'agente_origem': agente_ana,
-                'preco_base': item['preco_custo'],
-                'preco_oferta': item['preco_venda'],
-                'quantidade_disponivel': item['quantidade'],
-                'descricao_oferta': f"Oferta Ana BH - {item['produto'].nome}",
-                'ativo': True
-            }
-        )
-    
-    print("  ✅ Estoque e ofertas criados")
-    
-    # 8. CRIAR TRUSTLINES
-    print("\n🤝 Criando trustlines...")
+    # 7. CRIAR TRUSTLINES
+    print("\nCriando trustlines...")
     
     # Trustline Júnior ↔ Márcia
     TrustlineKeeper.objects.get_or_create(
@@ -536,8 +386,8 @@ def criar_dados_teste():
         agente_b=agente_marcia,
         defaults={
             'nivel_confianca': Decimal('85.0'),
-            'perc_shopper': Decimal('65.0'),  # Júnior fica com 65% quando é Shopper
-            'perc_keeper': Decimal('35.0'),   # Márcia fica com 35% quando é Keeper
+            'perc_shopper': Decimal('65.0'),
+            'perc_keeper': Decimal('35.0'),
             'ativo': True
         }
     )
@@ -554,103 +404,31 @@ def criar_dados_teste():
         }
     )
     
-    # Trustline Márcia ↔ Ana
-    TrustlineKeeper.objects.get_or_create(
-        agente_a=agente_marcia,
-        agente_b=agente_ana,
-        defaults={
-            'nivel_confianca': Decimal('82.0'),
-            'perc_shopper': Decimal('58.0'),
-            'perc_keeper': Decimal('42.0'),
-            'ativo': True
-        }
-    )
-    
-    print("  ✅ Trustlines criadas")
-    
-    # 9. CRIAR ROLE STATS
-    print("\n📊 Criando estatísticas...")
-    
-    # Stats para Júnior
-    RoleStats.objects.get_or_create(
-        agente=agente_junior,
-        defaults={
-            'pedidos_como_shopper': 25,
-            'pedidos_como_keeper': 3,
-            'receita_como_shopper': Decimal('45000.00'),
-            'receita_como_keeper': Decimal('1200.00'),
-            'score_medio_avaliacoes': Decimal('4.7'),
-            'total_avaliacoes': 28
-        }
-    )
-    
-    # Stats para Márcia
-    RoleStats.objects.get_or_create(
-        agente=agente_marcia,
-        defaults={
-            'pedidos_como_shopper': 2,
-            'pedidos_como_keeper': 32,
-            'receita_como_shopper': Decimal('800.00'),
-            'receita_como_keeper': Decimal('18500.00'),
-            'score_medio_avaliacoes': Decimal('4.9'),
-            'total_avaliacoes': 34
-        }
-    )
-    
-    # Stats para Ana
-    RoleStats.objects.get_or_create(
-        agente=agente_ana,
-        defaults={
-            'pedidos_como_shopper': 18,
-            'pedidos_como_keeper': 15,
-            'receita_como_shopper': Decimal('12000.00'),
-            'receita_como_keeper': Decimal('8500.00'),
-            'score_medio_avaliacoes': Decimal('4.6'),
-            'total_avaliacoes': 33
-        }
-    )
-    
-    print("  ✅ Estatísticas criadas")
+    print("  OK Trustlines criadas")
     
     print("\n" + "=" * 50)
-    print("🎉 DADOS DE TESTE CRIADOS COM SUCESSO!")
+    print("DADOS DE TESTE CRIADOS COM SUCESSO!")
     print("=" * 50)
     
     # RESUMO
-    print("\n📋 RESUMO DOS DADOS CRIADOS:")
-    print(f"👥 Agentes: {Agente.objects.count()}")
-    print(f"   - Shoppers: {Agente.objects.filter(ativo_como_shopper=True).count()}")
-    print(f"   - Keepers: {Agente.objects.filter(ativo_como_keeper=True).count()}")
-    print(f"   - Híbridos: {Agente.objects.filter(ativo_como_shopper=True, ativo_como_keeper=True).count()}")
+    print("\nRESUMO DOS DADOS CRIADOS:")
+    print(f"Agentes: {Agente.objects.count()}")
+    print(f"Clientes: {Cliente.objects.count()}")
+    print(f"Relações Cliente-Agente: {ClienteRelacao.objects.count()}")
+    print(f"Produtos: {Produto.objects.count()}")
+    print(f"Trustlines: {TrustlineKeeper.objects.count()}")
     
-    print(f"\n👤 Clientes: {Cliente.objects.count()}")
-    print(f"🔗 Relações Cliente-Agente: {ClienteRelacao.objects.count()}")
-    
-    print(f"\n📦 Produtos: {Produto.objects.count()}")
-    print(f"📋 Itens de Estoque: {EstoqueItem.objects.count()}")
-    print(f"🏷️ Ofertas: {Oferta.objects.count()}")
-    
-    print(f"\n🤝 Trustlines: {TrustlineKeeper.objects.count()}")
-    print(f"📊 Role Stats: {RoleStats.objects.count()}")
-    
-    print("\n🔑 CREDENCIAIS DE TESTE:")
+    print("\nCREDENCIAIS DE TESTE:")
     print("Todos os usuários têm senha: 123456")
     print("- junior_sp (Shopper)")
     print("- marcia_rj (Keeper)")
     print("- ana_bh (Shopper-Keeper)")
     print("- joao_cliente, maria_cliente, pedro_cliente, carla_cliente, roberto_cliente")
     
-    print("\n🎯 CENÁRIOS DE TESTE INTERESSANTES:")
-    print("1. João (cliente do Júnior) comprando iPhone → Venda direta")
-    print("2. Maria (cliente da Márcia) comprando iPhone → Venda cooperada (Júnior→Márcia)")
-    print("3. Carla (cliente de ambos) → Sistema escolhe oferta da Márcia (força maior)")
-    print("4. Roberto (cliente novo) → Teste de aquisição")
-    
-    print("\n🚀 PRÓXIMOS PASSOS:")
+    print("\nPROXIMOS PASSOS:")
     print("1. Acesse: http://127.0.0.1:8000/kmn/")
     print("2. Faça login com qualquer agente")
     print("3. Explore o dashboard KMN")
-    print("4. Teste criação de pedidos via API")
     
     return True
 
