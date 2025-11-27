@@ -33,7 +33,14 @@ from .models import (
     Estabelecimento,
     GroupLinkRequest,
     ShopperOnboardingToken,
-    KeeperOnboardingToken
+    KeeperOnboardingToken,
+    # Modelos KMN
+    Agente,
+    ClienteRelacao,
+    EstoqueItem,
+    Oferta,
+    TrustlineKeeper,
+    RoleStats
 )
 
 # Ação para importar produtos de um evento para outro
@@ -598,3 +605,197 @@ class WhatsappOrderAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at', 'confirmed_at', 'paid_at')
         }),
     )
+
+
+# ============================================================================
+# ADMIN KMN - KEEPER MESH NETWORK
+# ============================================================================
+
+class ClienteRelacaoInline(admin.TabularInline):
+    model = ClienteRelacao
+    extra = 0
+    readonly_fields = ['total_pedidos', 'valor_total_pedidos', 'ultimo_pedido', 'criado_em']
+
+
+class EstoqueItemInline(admin.TabularInline):
+    model = EstoqueItem
+    extra = 0
+    readonly_fields = ['quantidade_total', 'criado_em', 'atualizado_em']
+
+
+class OfertaInline(admin.TabularInline):
+    model = Oferta
+    fk_name = 'agente_ofertante'
+    extra = 0
+    readonly_fields = ['markup_local', 'percentual_markup', 'criado_em']
+
+
+@admin.register(Agente)
+class AgenteAdmin(admin.ModelAdmin):
+    list_display = ['user', 'nome_comercial', 'score_keeper', 'score_shopper', 'dual_role_score', 'ativo_como_keeper', 'ativo_como_shopper', 'verificado_kmn']
+    list_filter = ['ativo_como_keeper', 'ativo_como_shopper', 'verificado_kmn', 'criado_em']
+    search_fields = ['user__username', 'user__first_name', 'user__last_name', 'nome_comercial']
+    readonly_fields = ['score_keeper', 'score_shopper', 'dual_role_score', 'is_dual_role', 'criado_em', 'atualizado_em']
+    
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('user', 'nome_comercial', 'bio_agente')
+        }),
+        ('Papéis KMN', {
+            'fields': ('ativo_como_keeper', 'ativo_como_shopper', 'verificado_kmn')
+        }),
+        ('Scores', {
+            'fields': ('score_keeper', 'score_shopper', 'dual_role_score', 'is_dual_role'),
+            'classes': ('collapse',)
+        }),
+        ('Vinculações', {
+            'fields': ('personal_shopper', 'keeper'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    inlines = [ClienteRelacaoInline, EstoqueItemInline, OfertaInline]
+
+
+@admin.register(ClienteRelacao)
+class ClienteRelacaoAdmin(admin.ModelAdmin):
+    list_display = ['cliente', 'agente', 'forca_relacao', 'status', 'total_pedidos', 'valor_total_pedidos', 'ultimo_pedido']
+    list_filter = ['status', 'criado_em', 'ultimo_pedido']
+    search_fields = ['cliente__user__username', 'agente__user__username']
+    readonly_fields = ['total_pedidos', 'valor_total_pedidos', 'ultimo_pedido', 'criado_em', 'atualizado_em']
+    
+    fieldsets = (
+        ('Relação', {
+            'fields': ('cliente', 'agente', 'forca_relacao', 'status')
+        }),
+        ('Histórico', {
+            'fields': ('total_pedidos', 'valor_total_pedidos', 'ultimo_pedido', 'satisfacao_media')
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
+
+
+@admin.register(EstoqueItem)
+class EstoqueItemAdmin(admin.ModelAdmin):
+    list_display = ['produto', 'agente', 'quantidade_disponivel', 'quantidade_reservada', 'quantidade_total', 'preco_base', 'ativo']
+    list_filter = ['ativo', 'disponivel_para_rede', 'estabelecimento', 'criado_em']
+    search_fields = ['produto__nome', 'agente__user__username', 'estabelecimento__nome']
+    readonly_fields = ['quantidade_total', 'criado_em', 'atualizado_em']
+    
+    fieldsets = (
+        ('Produto e Agente', {
+            'fields': ('agente', 'produto')
+        }),
+        ('Estoque', {
+            'fields': ('quantidade_disponivel', 'quantidade_reservada', 'quantidade_total')
+        }),
+        ('Localização', {
+            'fields': ('estabelecimento', 'localizacao_especifica')
+        }),
+        ('Preços', {
+            'fields': ('preco_custo', 'preco_base')
+        }),
+        ('Status', {
+            'fields': ('ativo', 'disponivel_para_rede')
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
+
+
+@admin.register(Oferta)
+class OfertaAdmin(admin.ModelAdmin):
+    list_display = ['produto', 'agente_ofertante', 'preco_base', 'preco_oferta', 'markup_local', 'percentual_markup', 'quantidade_disponivel', 'ativo']
+    list_filter = ['ativo', 'exclusiva_para_clientes', 'criado_em']
+    search_fields = ['produto__nome', 'agente_ofertante__user__username', 'agente_origem__user__username']
+    readonly_fields = ['markup_local', 'percentual_markup', 'criado_em', 'atualizado_em']
+    
+    fieldsets = (
+        ('Produto e Agentes', {
+            'fields': ('produto', 'agente_origem', 'agente_ofertante')
+        }),
+        ('Preços', {
+            'fields': ('preco_base', 'preco_oferta', 'markup_local', 'percentual_markup')
+        }),
+        ('Disponibilidade', {
+            'fields': ('quantidade_disponivel', 'ativo', 'exclusiva_para_clientes', 'valida_ate')
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
+
+
+@admin.register(TrustlineKeeper)
+class TrustlineKeeperAdmin(admin.ModelAdmin):
+    list_display = ['agente_a', 'agente_b', 'nivel_confianca_medio', 'perc_shopper', 'perc_keeper', 'status', 'aceito_em']
+    list_filter = ['status', 'permite_indicacao', 'criado_em', 'aceito_em']
+    search_fields = ['agente_a__user__username', 'agente_b__user__username']
+    readonly_fields = ['nivel_confianca_medio', 'criado_em', 'atualizado_em']
+    
+    fieldsets = (
+        ('Agentes', {
+            'fields': ('agente_a', 'agente_b')
+        }),
+        ('Confiança', {
+            'fields': ('nivel_confianca_a_para_b', 'nivel_confianca_b_para_a', 'nivel_confianca_medio')
+        }),
+        ('Comissionamento', {
+            'fields': ('perc_shopper', 'perc_keeper')
+        }),
+        ('Indicação', {
+            'fields': ('permite_indicacao', 'perc_indicacao')
+        }),
+        ('Status', {
+            'fields': ('status', 'aceito_em')
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
+
+
+@admin.register(RoleStats)
+class RoleStatsAdmin(admin.ModelAdmin):
+    list_display = ['agente', 'pedidos_como_keeper', 'valor_total_como_keeper', 'pedidos_como_shopper', 'valor_total_como_shopper', 'total_clientes_atendidos']
+    search_fields = ['agente__user__username']
+    readonly_fields = ['atualizado_em']
+    
+    fieldsets = (
+        ('Agente', {
+            'fields': ('agente',)
+        }),
+        ('Stats como Keeper', {
+            'fields': ('pedidos_como_keeper', 'valor_total_como_keeper', 'satisfacao_media_keeper')
+        }),
+        ('Stats como Shopper', {
+            'fields': ('pedidos_como_shopper', 'valor_total_como_shopper', 'satisfacao_media_shopper')
+        }),
+        ('Stats Gerais', {
+            'fields': ('total_clientes_atendidos', 'total_agentes_parceiros')
+        }),
+        ('Timestamps', {
+            'fields': ('atualizado_em',),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['atualizar_scores']
+    
+    def atualizar_scores(self, request, queryset):
+        """Ação para atualizar scores dos agentes selecionados"""
+        for stats in queryset:
+            stats.atualizar_scores()
+        self.message_user(request, f"Scores atualizados para {queryset.count()} agentes.")
+    atualizar_scores.short_description = "Atualizar scores dos agentes selecionados"

@@ -1,0 +1,33 @@
+body {
+  background-color: #f9f9f9;
+  font-family: 'Helvetica Neue', sans-serif;
+}
+
+.hero h1 {
+  letter-spacing: 1px;
+}
+
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1c1c1c;
+}
+
+.card-text {
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.card {
+  border-radius: 12px;
+}
+
+.btn-primary {
+  background-color: #1d3557;
+  border: none;
+  border-radius: 6px;
+}
+
+.btn-primary:hover {
+  background-color: #16324f;
+}

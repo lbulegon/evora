@@ -1,8 +1,9 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 from . import whatsapp_views
 from . import whatsapp_dashboard_views
 from . import shopper_dashboard_views
+from . import kmn_views
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -49,4 +50,20 @@ urlpatterns = [
     
     # Helper para Chat ID WhatsApp (comentado temporariamente)
     # path('shopper/chat-id-helper/', shopper_dashboard_views.chat_id_helper, name='chat_id_helper'),
+    
+    # API KMN
+    path('api/kmn/', include('app_marketplace.api_urls')),
+    
+    # KMN Frontend
+    path('kmn/', kmn_views.kmn_dashboard, name='kmn_dashboard'),
+    path('kmn/clientes/', kmn_views.kmn_clientes, name='kmn_clientes'),
+    path('kmn/ofertas/', kmn_views.kmn_ofertas, name='kmn_ofertas'),
+    path('kmn/estoque/', kmn_views.kmn_estoque, name='kmn_estoque'),
+    path('kmn/trustlines/', kmn_views.kmn_trustlines, name='kmn_trustlines'),
+    path('kmn/catalogo/<int:cliente_id>/', kmn_views.kmn_catalogo_cliente, name='kmn_catalogo_cliente'),
+    
+    # AJAX KMN
+    path('ajax/kmn/criar-oferta/', kmn_views.ajax_criar_oferta, name='ajax_criar_oferta'),
+    path('ajax/kmn/atualizar-estoque/', kmn_views.ajax_atualizar_estoque, name='ajax_atualizar_estoque'),
+    path('ajax/kmn/aceitar-trustline/', kmn_views.ajax_aceitar_trustline, name='ajax_aceitar_trustline'),
 ]

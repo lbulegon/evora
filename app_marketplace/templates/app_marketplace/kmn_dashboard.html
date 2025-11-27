@@ -1,0 +1,335 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard KMN - ÉVORA Connect{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-network-wired text-primary"></i>
+                        Dashboard KMN
+                    </h1>
+                    <p class="text-muted mb-0">
+                        {{ agente.nome_comercial }}
+                        {% if agente.is_dual_role %}
+                            <span class="badge bg-success">Shopper + Keeper</span>
+                        {% elif agente.ativo_como_shopper %}
+                            <span class="badge bg-primary">Shopper</span>
+                        {% elif agente.ativo_como_keeper %}
+                            <span class="badge bg-info">Keeper</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <span class="badge bg-warning fs-6">
+                        Score: {{ scores.dual_role_score|floatformat:1 }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.total_clientes }}</h4>
+                            <p class="mb-0">Clientes Ativos</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.total_ofertas }}</h4>
+                            <p class="mb-0">Ofertas Ativas</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-tags fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.total_estoque }}</h4>
+                            <p class="mb-0">Produtos em Estoque</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-boxes fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ stats.total_trustlines }}</h4>
+                            <p class="mb-0">Trustlines Ativas</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-handshake fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scores Section -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-star text-warning"></i>
+                        Scores de Reputação
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% if agente.ativo_como_keeper %}
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 class="text-info">{{ scores.score_keeper|floatformat:1 }}</h3>
+                                <p class="mb-0">Score Keeper</p>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-info" style="width: {{ scores.score_keeper|floatformat:0 }}0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if agente.ativo_como_shopper %}
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 class="text-primary">{{ scores.score_shopper|floatformat:1 }}</h3>
+                                <p class="mb-0">Score Shopper</p>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-primary" style="width: {{ scores.score_shopper|floatformat:0 }}0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h3 class="text-warning">{{ scores.dual_role_score|floatformat:1 }}</h3>
+                                <p class="mb-0">Score Geral</p>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-warning" style="width: {{ scores.dual_role_score|floatformat:0 }}0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i>
+                                Total de Pedidos: {{ scores.total_pedidos }}
+                            </small>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <small class="text-muted">
+                                <i class="fas fa-dollar-sign"></i>
+                                Volume Total: R$ {{ scores.valor_total|floatformat:2 }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row">
+        <!-- Clientes Principais -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-users text-primary"></i>
+                        Clientes Principais
+                    </h5>
+                    <a href="{% url 'kmn_clientes' %}" class="btn btn-sm btn-outline-primary">
+                        Ver Todos
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if clientes_principais %}
+                        {% for relacao in clientes_principais %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <strong>{{ relacao.cliente.user.get_full_name }}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    {{ relacao.total_pedidos }} pedidos • 
+                                    R$ {{ relacao.valor_total_pedidos|floatformat:2 }}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-success">{{ relacao.forca_relacao|floatformat:0 }}%</span>
+                                <br>
+                                <a href="{% url 'kmn_catalogo_cliente' relacao.cliente.id %}" 
+                                   class="btn btn-sm btn-outline-info mt-1">
+                                    Catálogo
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center">Nenhum cliente encontrado</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Ofertas Recentes -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tags text-success"></i>
+                        Ofertas Recentes
+                    </h5>
+                    <a href="{% url 'kmn_ofertas' %}" class="btn btn-sm btn-outline-success">
+                        Ver Todas
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if ofertas_recentes %}
+                        {% for oferta in ofertas_recentes %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <strong>{{ oferta.produto.nome }}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    {{ oferta.quantidade_disponivel }} disponível
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="h6 text-success">R$ {{ oferta.preco_oferta }}</span>
+                                {% if oferta.markup_local > 0 %}
+                                    <br>
+                                    <small class="text-warning">
+                                        +{{ oferta.percentual_markup|floatformat:1 }}%
+                                    </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center">Nenhuma oferta encontrada</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trustlines e Produtos -->
+    <div class="row">
+        <!-- Trustlines Ativas -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-handshake text-warning"></i>
+                        Trustlines Ativas
+                    </h5>
+                    <a href="{% url 'kmn_trustlines' %}" class="btn btn-sm btn-outline-warning">
+                        Gerenciar
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if trustlines_ativas %}
+                        {% for trustline in trustlines_ativas %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                {% if trustline.agente_a == agente %}
+                                    <strong>{{ trustline.agente_b.user.get_full_name }}</strong>
+                                {% else %}
+                                    <strong>{{ trustline.agente_a.user.get_full_name }}</strong>
+                                {% endif %}
+                                <br>
+                                <small class="text-muted">
+                                    {{ trustline.perc_shopper|floatformat:0 }}% Shopper / 
+                                    {{ trustline.perc_keeper|floatformat:0 }}% Keeper
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-warning">
+                                    {{ trustline.nivel_confianca_medio|floatformat:0 }}%
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center">Nenhuma trustline encontrada</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Produtos Populares -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-fire text-danger"></i>
+                        Produtos Populares
+                    </h5>
+                    <a href="{% url 'kmn_estoque' %}" class="btn btn-sm btn-outline-danger">
+                        Ver Estoque
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if produtos_populares %}
+                        {% for produto in produtos_populares %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <strong>{{ produto.nome }}</strong>
+                                <br>
+                                <small class="text-muted">{{ produto.categoria.nome }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-danger">
+                                    {{ produto.total_ofertas }} ofertas
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center">Nenhum produto encontrado</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

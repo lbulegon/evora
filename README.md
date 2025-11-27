@@ -1,10 +1,10 @@
-# ÉVORA Connect - Minimalist, Sophisticated Style
+# VitrineZap by ÉVORA - Minimalist, Sophisticated Style
 
-**Marketplace de Moda + Personal Shopping + Address Keeper + Integração WhatsApp**
+**Dropkeeping + KMN + Personal Shopping + Address Keeper + Integração WhatsApp**
 
-## 🎯 O que é o ÉVORA?
+## 🎯 O que é o VitrineZap?
 
-ÉVORA é uma **rede social de cooperação** para compras internacionais (Orlando/EUA → Brasil), onde:
+VitrineZap é o aplicativo da **ÉVORA** - uma **rede de comércio distribuído** baseada no modelo Dropkeeping, onde:
 
 - **Clientes** compram produtos pelo WhatsApp
 - **Personal Shoppers** fazem compras em lojas físicas
@@ -15,8 +15,8 @@
 
 ```bash
 # Clone o repositório
-git clone https://github.com/seu-usuario/evora.git
-cd evora
+git clone https://github.com/seu-usuario/vitrinezap.git
+cd vitrinezap
 
 # Crie ambiente virtual
 python -m venv .venv

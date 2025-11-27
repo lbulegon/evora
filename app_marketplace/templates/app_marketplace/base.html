@@ -44,11 +44,55 @@
                                     <i class="fas fa-chart-line"></i> Analytics
                                 </a>
                             </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-network-wired"></i> KMN
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{% url 'kmn_dashboard' %}">
+                                        <i class="fas fa-tachometer-alt"></i> Dashboard KMN
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'kmn_ofertas' %}">
+                                        <i class="fas fa-tags"></i> Minhas Ofertas
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'kmn_estoque' %}">
+                                        <i class="fas fa-boxes"></i> Estoque
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'kmn_clientes' %}">
+                                        <i class="fas fa-users"></i> Clientes
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'kmn_trustlines' %}">
+                                        <i class="fas fa-handshake"></i> Trustlines
+                                    </a></li>
+                                </ul>
+                            </li>
                         {% elif user.is_keeper %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'whatsapp_dashboard' %}">
                                     <i class="fas fa-tachometer-alt"></i> Dashboard
                                 </a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-network-wired"></i> KMN
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{% url 'kmn_dashboard' %}">
+                                        <i class="fas fa-tachometer-alt"></i> Dashboard KMN
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'kmn_ofertas' %}">
+                                        <i class="fas fa-tags"></i> Minhas Ofertas
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'kmn_estoque' %}">
+                                        <i class="fas fa-boxes"></i> Estoque
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'kmn_clientes' %}">
+                                        <i class="fas fa-users"></i> Clientes
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{% url 'kmn_trustlines' %}">
+                                        <i class="fas fa-handshake"></i> Trustlines
+                                    </a></li>
+                                </ul>
                             </li>
                         {% endif %}
                     </ul>

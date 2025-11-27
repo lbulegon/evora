@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 
 
 # ============================================================================
@@ -480,20 +481,6 @@ class PedidoPacote(models.Model):
 # EVENTOS E ESTABELECIMENTOS
 # ============================================================================
 
-class Estabelecimento(models.Model):
-    nome        = models.CharField(max_length=150)
-    endereco    = models.CharField(max_length=300, blank=True)
-    telefone    = models.CharField(max_length=20, blank=True)
-    email       = models.EmailField(blank=True)
-    descricao   = models.TextField(blank=True)
-    criado_em   = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = 'Estabelecimento'
-        verbose_name_plural = 'Estabelecimentos'
-
-    def __str__(self):
-        return self.nome
 
 
 class Evento(models.Model):
@@ -913,6 +900,311 @@ class WhatsappOrder(models.Model):
 
 
 # ============================================================================
+# SISTEMA KMN - DROPKEEPING + KEEPER MESH NETWORK
+# ============================================================================
+
+class Agente(models.Model):
+    """
+    Agente unificado que pode ser Shopper, Keeper ou ambos.
+    Compatível com PersonalShopper e Keeper existentes.
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='agente')
+    
+    # Vinculação com modelos existentes
+    personal_shopper = models.OneToOneField(PersonalShopper, on_delete=models.SET_NULL, null=True, blank=True, related_name='agente_profile')
+    keeper = models.OneToOneField(Keeper, on_delete=models.SET_NULL, null=True, blank=True, related_name='agente_profile')
+    
+    # Dados do agente
+    nome_comercial = models.CharField(max_length=200, blank=True, help_text="Nome comercial do agente")
+    bio_agente = models.TextField(blank=True, help_text="Biografia como agente KMN")
+    
+    # Scores de reputação
+    score_keeper = models.DecimalField(max_digits=5, decimal_places=2, default=5.0, help_text="Score como Keeper (0-10)")
+    score_shopper = models.DecimalField(max_digits=5, decimal_places=2, default=5.0, help_text="Score como Shopper (0-10)")
+    
+    # Status
+    ativo_como_keeper = models.BooleanField(default=False)
+    ativo_como_shopper = models.BooleanField(default=False)
+    verificado_kmn = models.BooleanField(default=False, help_text="Verificado pela rede KMN")
+    
+    # Timestamps
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Agente KMN'
+        verbose_name_plural = 'Agentes KMN'
+        ordering = ['-score_keeper', '-score_shopper']
+    
+    @property
+    def dual_role_score(self):
+        """Score médio harmônico para agentes que fazem ambos os papéis"""
+        if self.score_keeper > 0 and self.score_shopper > 0:
+            return (2 * self.score_keeper * self.score_shopper) / (self.score_keeper + self.score_shopper)
+        return max(self.score_keeper, self.score_shopper)
+    
+    @property
+    def is_dual_role(self):
+        """Verifica se o agente atua como Shopper e Keeper"""
+        return self.ativo_como_keeper and self.ativo_como_shopper
+    
+    def __str__(self):
+        roles = []
+        if self.ativo_como_shopper:
+            roles.append("Shopper")
+        if self.ativo_como_keeper:
+            roles.append("Keeper")
+        role_str = "/".join(roles) if roles else "Inativo"
+        return f"{self.user.get_full_name() or self.user.username} ({role_str})"
+
+
+class ClienteRelacao(models.Model):
+    """
+    Relacionamento entre Cliente e Agente com força da relação.
+    Compatível com RelacionamentoClienteShopper existente.
+    """
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='relacoes_agente')
+    agente = models.ForeignKey(Agente, on_delete=models.CASCADE, related_name='relacoes_cliente')
+    
+    # Força da relação (0-100)
+    forca_relacao = models.DecimalField(max_digits=5, decimal_places=2, default=50.0, help_text="Força da relação (0-100)")
+    
+    # Status da relação
+    class StatusRelacao(models.TextChoices):
+        ATIVA = 'ativa', 'Ativa'
+        INATIVA = 'inativa', 'Inativa'
+        BLOQUEADA = 'bloqueada', 'Bloqueada'
+        PENDENTE = 'pendente', 'Pendente'
+    
+    status = models.CharField(max_length=20, choices=StatusRelacao.choices, default=StatusRelacao.PENDENTE)
+    
+    # Histórico
+    total_pedidos = models.PositiveIntegerField(default=0)
+    valor_total_pedidos = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    ultimo_pedido = models.DateTimeField(null=True, blank=True)
+    satisfacao_media = models.DecimalField(max_digits=3, decimal_places=2, default=5.0, help_text="Satisfação média (0-10)")
+    
+    # Timestamps
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Relação Cliente-Agente'
+        verbose_name_plural = 'Relações Cliente-Agente'
+        unique_together = ('cliente', 'agente')
+        ordering = ['-forca_relacao', '-ultimo_pedido']
+    
+    def __str__(self):
+        return f"{self.cliente.user.username} ↔ {self.agente.user.username} (Força: {self.forca_relacao})"
+
+
+class EstoqueItem(models.Model):
+    """
+    Item de estoque gerenciado por um Agente.
+    """
+    agente = models.ForeignKey(Agente, on_delete=models.CASCADE, related_name='estoque')
+    produto = models.ForeignKey(Produto, on_delete=models.CASCADE, related_name='estoque_items')
+    
+    # Estoque
+    quantidade_disponivel = models.PositiveIntegerField(default=0)
+    quantidade_reservada = models.PositiveIntegerField(default=0)
+    
+    # Localização física
+    estabelecimento = models.ForeignKey(Estabelecimento, on_delete=models.SET_NULL, null=True, blank=True, related_name='estoque_items')
+    localizacao_especifica = models.CharField(max_length=200, blank=True, help_text="Ex: Prateleira A3, Corredor 5")
+    
+    # Preços
+    preco_custo = models.DecimalField(max_digits=10, decimal_places=2, help_text="Preço de custo do agente")
+    preco_base = models.DecimalField(max_digits=10, decimal_places=2, help_text="Preço base para a rede KMN")
+    
+    # Status
+    ativo = models.BooleanField(default=True)
+    disponivel_para_rede = models.BooleanField(default=True, help_text="Disponível para outros agentes da rede")
+    
+    # Timestamps
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Item de Estoque'
+        verbose_name_plural = 'Itens de Estoque'
+        unique_together = ('agente', 'produto')
+        ordering = ['-atualizado_em']
+    
+    @property
+    def quantidade_total(self):
+        return self.quantidade_disponivel + self.quantidade_reservada
+    
+    def __str__(self):
+        return f"{self.produto.nome} - {self.agente.user.username} ({self.quantidade_disponivel} disp.)"
+
+
+class Oferta(models.Model):
+    """
+    Oferta de produto por um agente, com markup local.
+    """
+    produto = models.ForeignKey(Produto, on_delete=models.CASCADE, related_name='ofertas')
+    agente_origem = models.ForeignKey(Agente, on_delete=models.CASCADE, related_name='ofertas_origem', help_text="Agente que possui o produto")
+    agente_ofertante = models.ForeignKey(Agente, on_delete=models.CASCADE, related_name='ofertas_feitas', help_text="Agente que está oferecendo")
+    
+    # Preços
+    preco_base = models.DecimalField(max_digits=10, decimal_places=2, help_text="Preço base do agente origem")
+    preco_oferta = models.DecimalField(max_digits=10, decimal_places=2, help_text="Preço final da oferta")
+    
+    # Disponibilidade
+    quantidade_disponivel = models.PositiveIntegerField(default=1)
+    
+    # Status
+    ativo = models.BooleanField(default=True)
+    exclusiva_para_clientes = models.BooleanField(default=False, help_text="Oferta apenas para clientes do agente")
+    
+    # Timestamps
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    valida_ate = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = 'Oferta'
+        verbose_name_plural = 'Ofertas'
+        unique_together = ('produto', 'agente_ofertante')
+        ordering = ['preco_oferta', '-criado_em']
+    
+    @property
+    def markup_local(self):
+        """Markup aplicado pelo agente ofertante"""
+        return self.preco_oferta - self.preco_base
+    
+    @property
+    def percentual_markup(self):
+        """Percentual de markup"""
+        if self.preco_base > 0:
+            return (self.markup_local / self.preco_base) * 100
+        return 0
+    
+    def __str__(self):
+        markup = self.markup_local
+        return f"{self.produto.nome} - {self.agente_ofertante.user.username} (R$ {self.preco_oferta}, +{markup})"
+
+
+class TrustlineKeeper(models.Model):
+    """
+    Linha de confiança entre dois agentes da rede KMN.
+    """
+    agente_a = models.ForeignKey(Agente, on_delete=models.CASCADE, related_name='trustlines_como_a')
+    agente_b = models.ForeignKey(Agente, on_delete=models.CASCADE, related_name='trustlines_como_b')
+    
+    # Níveis de confiança (0-100)
+    nivel_confianca_a_para_b = models.DecimalField(max_digits=5, decimal_places=2, default=50.0)
+    nivel_confianca_b_para_a = models.DecimalField(max_digits=5, decimal_places=2, default=50.0)
+    
+    # Percentuais de comissão
+    perc_shopper = models.DecimalField(max_digits=5, decimal_places=2, default=60.0, help_text="% para o fornecedor (Shopper)")
+    perc_keeper = models.DecimalField(max_digits=5, decimal_places=2, default=40.0, help_text="% para o dono do cliente (Keeper)")
+    
+    # Status
+    class StatusTrustline(models.TextChoices):
+        ATIVA = 'ativa', 'Ativa'
+        PENDENTE = 'pendente', 'Pendente'
+        SUSPENSA = 'suspensa', 'Suspensa'
+        CANCELADA = 'cancelada', 'Cancelada'
+    
+    status = models.CharField(max_length=20, choices=StatusTrustline.choices, default=StatusTrustline.PENDENTE)
+    
+    # Regras adicionais
+    permite_indicacao = models.BooleanField(default=True)
+    perc_indicacao = models.DecimalField(max_digits=5, decimal_places=2, default=5.0, help_text="% para indicação")
+    
+    # Timestamps
+    criado_em = models.DateTimeField(auto_now_add=True)
+    aceito_em = models.DateTimeField(null=True, blank=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Trustline KMN'
+        verbose_name_plural = 'Trustlines KMN'
+        unique_together = ('agente_a', 'agente_b')
+        ordering = ['-nivel_confianca_a_para_b', '-aceito_em']
+    
+    def clean(self):
+        if self.agente_a == self.agente_b:
+            raise ValidationError("Um agente não pode ter trustline consigo mesmo")
+        if self.perc_shopper + self.perc_keeper != 100:
+            raise ValidationError("A soma dos percentuais deve ser 100%")
+    
+    @property
+    def nivel_confianca_medio(self):
+        """Nível médio de confiança bidirecional"""
+        return (self.nivel_confianca_a_para_b + self.nivel_confianca_b_para_a) / 2
+    
+    def __str__(self):
+        return f"{self.agente_a.user.username} ↔ {self.agente_b.user.username} (Conf: {self.nivel_confianca_medio:.1f})"
+
+
+class RoleStats(models.Model):
+    """
+    Estatísticas de performance do agente em cada papel.
+    """
+    agente = models.OneToOneField(Agente, on_delete=models.CASCADE, related_name='stats')
+    
+    # Stats como Keeper
+    pedidos_como_keeper = models.PositiveIntegerField(default=0)
+    valor_total_como_keeper = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    satisfacao_media_keeper = models.DecimalField(max_digits=3, decimal_places=2, default=5.0)
+    
+    # Stats como Shopper
+    pedidos_como_shopper = models.PositiveIntegerField(default=0)
+    valor_total_como_shopper = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    satisfacao_media_shopper = models.DecimalField(max_digits=3, decimal_places=2, default=5.0)
+    
+    # Stats gerais
+    total_clientes_atendidos = models.PositiveIntegerField(default=0)
+    total_agentes_parceiros = models.PositiveIntegerField(default=0)
+    
+    # Timestamps
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Estatísticas de Papel'
+        verbose_name_plural = 'Estatísticas de Papéis'
+    
+    def atualizar_scores(self):
+        """Atualiza os scores do agente baseado nas estatísticas"""
+        # Score Keeper baseado em satisfação e volume
+        if self.pedidos_como_keeper > 0:
+            volume_factor = min(self.pedidos_como_keeper / 10, 1.0)  # Max factor = 1.0 com 10+ pedidos
+            self.agente.score_keeper = self.satisfacao_media_keeper * volume_factor
+        
+        # Score Shopper baseado em satisfação e volume
+        if self.pedidos_como_shopper > 0:
+            volume_factor = min(self.pedidos_como_shopper / 10, 1.0)
+            self.agente.score_shopper = self.satisfacao_media_shopper * volume_factor
+        
+        self.agente.save()
+    
+    def __str__(self):
+        return f"Stats {self.agente.user.username} - K:{self.pedidos_como_keeper} S:{self.pedidos_como_shopper}"
+
+
+# ============================================================================
+# EXTENSÃO DO MODELO PEDIDO PARA KMN
+# ============================================================================
+
+# Adicionar campos KMN ao modelo Pedido existente via migration
+# Estes campos serão adicionados na migration:
+# - agente_shopper (ForeignKey para Agente)
+# - agente_keeper (ForeignKey para Agente) 
+# - canal_entrada (ForeignKey para Agente, null=True)
+# - oferta_utilizada (ForeignKey para Oferta, null=True)
+# - preco_base_kmn (DecimalField)
+# - preco_oferta_kmn (DecimalField)
+# - markup_local_kmn (DecimalField)
+# - tipo_operacao_kmn (CharField com choices)
+# - comissao_shopper (DecimalField)
+# - comissao_keeper (DecimalField)
+# - comissao_indicacao (DecimalField, default=0)
+
+
+# ============================================================================
 # EXTENSÕES DO USER MODEL (helpers)
 # ============================================================================
 
@@ -920,3 +1212,4 @@ class WhatsappOrder(models.Model):
 User.add_to_class('is_cliente', property(lambda u: hasattr(u, 'cliente')))
 User.add_to_class('is_shopper', property(lambda u: hasattr(u, 'personalshopper')))
 User.add_to_class('is_keeper', property(lambda u: hasattr(u, 'keeper')))
+User.add_to_class('is_agente', property(lambda u: hasattr(u, 'agente')))

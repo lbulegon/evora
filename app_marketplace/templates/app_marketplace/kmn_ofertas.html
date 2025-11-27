@@ -1,0 +1,301 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Ofertas KMN - ÉVORA Connect{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-tags text-success"></i>
+                        Minhas Ofertas KMN
+                    </h1>
+                    <p class="text-muted mb-0">Gerencie suas ofertas com markup local</p>
+                </div>
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#criarOfertaModal">
+                    <i class="fas fa-plus"></i> Nova Oferta
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Buscar Produto</label>
+                            <input type="text" class="form-control" name="search" 
+                                   value="{{ search }}" placeholder="Nome do produto...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="ativo">
+                                <option value="">Todos</option>
+                                <option value="true" {% if ativo_filter == 'true' %}selected{% endif %}>Ativo</option>
+                                <option value="false" {% if ativo_filter == 'false' %}selected{% endif %}>Inativo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary me-2">
+                                <i class="fas fa-search"></i> Filtrar
+                            </button>
+                            <a href="{% url 'kmn_ofertas' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Limpar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Ofertas -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i>
+                        Ofertas ({{ page_obj.paginator.count }} total)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if page_obj %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Produto</th>
+                                        <th>Preço Base</th>
+                                        <th>Preço Oferta</th>
+                                        <th>Markup</th>
+                                        <th>Disponível</th>
+                                        <th>Status</th>
+                                        <th>Criado</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for oferta in page_obj %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ oferta.produto.nome }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ oferta.produto.categoria.nome }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="text-muted">R$ {{ oferta.preco_base }}</span>
+                                        </td>
+                                        <td>
+                                            <strong class="text-success">R$ {{ oferta.preco_oferta }}</strong>
+                                        </td>
+                                        <td>
+                                            {% if oferta.markup_local > 0 %}
+                                                <span class="badge bg-warning">
+                                                    +R$ {{ oferta.markup_local|floatformat:2 }}
+                                                    ({{ oferta.percentual_markup|floatformat:1 }}%)
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Sem markup</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if oferta.quantidade_disponivel > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                                {{ oferta.quantidade_disponivel }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if oferta.ativo %}
+                                                <span class="badge bg-success">Ativo</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Inativo</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                {{ oferta.criado_em|date:"d/m/Y H:i" }}
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary" 
+                                                        onclick="editarOferta({{ oferta.id }})">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-outline-danger"
+                                                        onclick="toggleOferta({{ oferta.id }}, {{ oferta.ativo|yesno:'false,true' }})">
+                                                    {% if oferta.ativo %}
+                                                        <i class="fas fa-pause"></i>
+                                                    {% else %}
+                                                        <i class="fas fa-play"></i>
+                                                    {% endif %}
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Paginação -->
+                        {% if page_obj.has_other_pages %}
+                        <nav aria-label="Paginação">
+                            <ul class="pagination justify-content-center">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if ativo_filter %}&ativo={{ ativo_filter }}{% endif %}">Primeira</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if ativo_filter %}&ativo={{ ativo_filter }}{% endif %}">Anterior</a>
+                                    </li>
+                                {% endif %}
+
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                                </li>
+
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if ativo_filter %}&ativo={{ ativo_filter }}{% endif %}">Próxima</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if ativo_filter %}&ativo={{ ativo_filter }}{% endif %}">Última</a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">Nenhuma oferta encontrada</h5>
+                            <p class="text-muted">Crie sua primeira oferta para começar a vender na rede KMN.</p>
+                            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#criarOfertaModal">
+                                <i class="fas fa-plus"></i> Criar Primeira Oferta
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Criar Oferta -->
+<div class="modal fade" id="criarOfertaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus text-success"></i>
+                    Nova Oferta
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="criarOfertaForm">
+                    <div class="mb-3">
+                        <label class="form-label">Produto</label>
+                        <select class="form-select" name="produto_id" required>
+                            <option value="">Selecione um produto...</option>
+                            {% for produto in produtos_disponiveis %}
+                            <option value="{{ produto.id }}">{{ produto.nome }} - R$ {{ produto.preco }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Preço da Oferta</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" class="form-control" name="preco_oferta" 
+                                   step="0.01" min="0" required>
+                        </div>
+                        <small class="form-text text-muted">
+                            Defina o preço final que será cobrado do cliente
+                        </small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Quantidade Disponível</label>
+                        <input type="number" class="form-control" name="quantidade" 
+                               min="1" value="1" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="exclusiva" id="exclusiva">
+                            <label class="form-check-label" for="exclusiva">
+                                Oferta exclusiva para meus clientes
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Markup:</strong> A diferença entre o preço base e o preço da oferta será seu markup local (100% seu).
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="criarOferta()">
+                    <i class="fas fa-save"></i> Criar Oferta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function criarOferta() {
+    const form = document.getElementById('criarOfertaForm');
+    const formData = new FormData(form);
+    
+    const data = {
+        produto_id: formData.get('produto_id'),
+        preco_oferta: formData.get('preco_oferta'),
+        quantidade: formData.get('quantidade'),
+        exclusiva: formData.get('exclusiva') === 'on'
+    };
+    
+    fetch('{% url "ajax_criar_oferta" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Erro ao criar oferta: ' + error);
+    });
+}
+
+function toggleOferta(ofertaId, novoStatus) {
+    // Implementar toggle de status da oferta
+    console.log('Toggle oferta:', ofertaId, novoStatus);
+}
+
+function editarOferta(ofertaId) {
+    // Implementar edição de oferta
+    console.log('Editar oferta:', ofertaId);
+}
+</script>
+{% endblock %}
