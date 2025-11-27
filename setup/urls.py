@@ -18,14 +18,21 @@ from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.cache import never_cache
 
+@never_cache
 def health_check(request):
-    """View simples para healthcheck do Railway"""
+    """View para healthcheck do Railway"""
     return JsonResponse({
         'status': 'ok',
         'message': 'VitrineZap is running',
         'version': '1.0.0'
     })
+
+# Customizar a página inicial do admin para aceitar healthcheck
+admin.site.site_header = "VitrineZap Admin"
+admin.site.site_title = "VitrineZap"
+admin.site.index_title = "Administração VitrineZap"
 
 urlpatterns = [
     path('health/', health_check, name='health_check'),

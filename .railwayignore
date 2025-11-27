@@ -1,0 +1,53 @@
+# Arquivos de desenvolvimento
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Local database
+db.sqlite3
+*.sqlite3
+
+# Scripts de teste locais
+setup_dados_teste.py
+setup_dados_teste_clean.py
+setup_kmn_simples.py
+test_*.py
+
+# Documentação de desenvolvimento
+*_FIXES.md
+RESUMO_*.md
