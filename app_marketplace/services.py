@@ -367,3 +367,5 @@ class CatalogoService:
         except Exception as e:
             catalogo['debug']['error'] = str(e)
             return catalogo
+
+

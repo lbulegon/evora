@@ -236,3 +236,5 @@ class ScoreAgenteSerializer(serializers.Serializer):
     dual_role_score = serializers.FloatField()
     total_pedidos = serializers.IntegerField()
     valor_total = serializers.FloatField()
+
+

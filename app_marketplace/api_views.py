@@ -434,3 +434,5 @@ def resolver_operacao(request):
         
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
+

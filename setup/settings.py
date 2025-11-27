@@ -111,7 +111,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'app_marketplace.middleware.HealthCheckMiddleware',  # Primeiro para interceptar healthchecks
+    'app_marketplace.middleware.RailwayHealthCheckMiddleware',  # Primeiro para interceptar healthchecks
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -151,8 +151,8 @@ DATABASES = {
         'NAME'    : 'railway',                                  # Nome do banco de dados
         'USER'    : 'postgres',                               # Nome de usuário
         'PASSWORD': 'dtzlYwfACCJRCJcZPQpnlKEZgnxKqzMM',       # Senha
-        'HOST'    : 'trolley.proxy.rlwy.net',                 # Host do banco de dados (use o IP ou hostname se for remoto)
-        'PORT'    : '23534',                                  # Porta padrão do PostgreSQL
+        'HOST'    : 'yamanote.proxy.rlwy.net',                 # Host do banco de dados (use o IP ou hostname se for remoto)
+        'PORT'    : '47941',                                  # Porta padrão do PostgreSQL
     }
 
 

@@ -93,3 +93,5 @@ class Pedido(models.Model):
 O sistema atual já está EXCELENTE e funcional. Essas melhorias são opcionais e podem ser implementadas gradualmente conforme a necessidade e feedback dos usuários.
 
 **Status Atual: 95% COMPLETO E FUNCIONAL** ✅
+
+
