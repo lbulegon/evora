@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Script para criar dados de teste para o sistema VitrineZap + KMN
-Cria agentes, clientes, produtos, ofertas e trustlines para demonstração
+Script simples para criar dados de teste KMN
+Foca apenas nos modelos que sabemos que existem
 """
 import os
 import django
@@ -17,42 +17,19 @@ django.setup()
 from django.contrib.auth.models import User
 from app_marketplace.models import (
     Cliente, PersonalShopper, Keeper, Agente, ClienteRelacao,
-    Categoria, Produto, EstoqueItem, Oferta, TrustlineKeeper,
-    RoleStats, EnderecoEntrega
+    TrustlineKeeper, RoleStats
 )
 
-def criar_dados_teste():
-    """Cria estrutura completa de dados para teste do KMN"""
+def criar_dados_kmn():
+    """Cria dados básicos para teste do KMN"""
     
-    print("CRIANDO DADOS DE TESTE - VitrineZap + KMN")
-    print("=" * 50)
+    print("CRIANDO DADOS KMN - VitrineZap")
+    print("=" * 40)
     
-    # 1. PULAR EMPRESA (não existe no modelo atual)
-    print("\nPulando criação de empresa...")
-    
-    # 2. CRIAR CATEGORIAS
-    print("Criando categorias...")
-    categorias = {}
-    cat_data = [
-        ('Eletrônicos', 'Smartphones, tablets, acessórios'),
-        ('Moda', 'Roupas, calçados, acessórios'),
-        ('Casa & Jardim', 'Decoração, utensílios, plantas'),
-        ('Esporte', 'Equipamentos esportivos e fitness')
-    ]
-    
-    for nome, desc in cat_data:
-        cat, created = Categoria.objects.get_or_create(
-            nome=nome,
-            defaults={'descricao': desc}
-        )
-        categorias[nome] = cat
-        if created:
-            print(f"  OK Categoria: {nome}")
-    
-    # 3. CRIAR USUÁRIOS E AGENTES
+    # 1. CRIAR AGENTES
     print("\nCriando agentes...")
     
-    # AGENTE 1: SHOPPER PURO (Júnior - São Paulo)
+    # AGENTE 1: SHOPPER (Júnior - São Paulo)
     user_junior, created = User.objects.get_or_create(
         username='junior_sp',
         defaults={
@@ -70,7 +47,7 @@ def criar_dados_teste():
         user=user_junior,
         defaults={
             'nome': 'Junior Santos - SP',
-            'bio': 'Especialista em eletrônicos e gadgets. Atua em São Paulo.',
+            'bio': 'Especialista em eletrônicos',
             'ativo': True
         }
     )
@@ -81,7 +58,7 @@ def criar_dados_teste():
         defaults={
             'personal_shopper': ps_junior,
             'nome_comercial': 'Junior Tech SP',
-            'bio_agente': 'Shopper especializado em tecnologia. Forte em São Paulo e região.',
+            'bio_agente': 'Shopper especializado em tecnologia',
             'ativo_como_shopper': True,
             'ativo_como_keeper': False,
             'score_shopper': Decimal('8.5'),
@@ -90,9 +67,9 @@ def criar_dados_teste():
         }
     )
     if created:
-        print("  OK Junior Santos (Shopper) - São Paulo")
+        print("  OK Junior Santos (Shopper)")
     
-    # AGENTE 2: KEEPER PURO (Márcia - Rio de Janeiro)
+    # AGENTE 2: KEEPER (Márcia - Rio de Janeiro)
     user_marcia, created = User.objects.get_or_create(
         username='marcia_rj',
         defaults={
@@ -110,7 +87,7 @@ def criar_dados_teste():
         user=user_marcia,
         defaults={
             'nome': 'Marcia Silva - RJ',
-            'endereco': 'Rua das Flores, 456 - Copacabana, RJ',
+            'endereco': 'Rio de Janeiro, RJ',
             'telefone': '(21) 98888-7777',
             'ativo': True
         }
@@ -122,7 +99,7 @@ def criar_dados_teste():
         defaults={
             'keeper': keeper_marcia,
             'nome_comercial': 'Marcia Store RJ',
-            'bio_agente': 'Keeper com foco em moda e lifestyle. Base no Rio de Janeiro.',
+            'bio_agente': 'Keeper especializada em moda',
             'ativo_como_shopper': False,
             'ativo_como_keeper': True,
             'score_shopper': Decimal('4.0'),
@@ -131,9 +108,9 @@ def criar_dados_teste():
         }
     )
     if created:
-        print("  OK Marcia Silva (Keeper) - Rio de Janeiro")
+        print("  OK Marcia Silva (Keeper)")
     
-    # AGENTE 3: SHOPPER-KEEPER HÍBRIDO (Ana - Belo Horizonte)
+    # AGENTE 3: HÍBRIDO (Ana - Belo Horizonte)
     user_ana, created = User.objects.get_or_create(
         username='ana_bh',
         defaults={
@@ -151,7 +128,7 @@ def criar_dados_teste():
         user=user_ana,
         defaults={
             'nome': 'Ana Costa - BH',
-            'bio': 'Personal Shopper e Keeper híbrida. Especialista em casa e decoração.',
+            'bio': 'Personal Shopper e Keeper híbrida',
             'ativo': True
         }
     )
@@ -160,7 +137,7 @@ def criar_dados_teste():
         user=user_ana,
         defaults={
             'nome': 'Ana Costa - BH',
-            'endereco': 'Av. Afonso Pena, 789 - Centro, BH',
+            'endereco': 'Belo Horizonte, MG',
             'telefone': '(31) 97777-6666',
             'ativo': True
         }
@@ -173,7 +150,7 @@ def criar_dados_teste():
             'personal_shopper': ps_ana,
             'keeper': keeper_ana,
             'nome_comercial': 'Ana Home & Style',
-            'bio_agente': 'Agente completa: compra, guarda e entrega. Especialista em casa e decoração.',
+            'bio_agente': 'Agente completa: compra, guarda e entrega',
             'ativo_como_shopper': True,
             'ativo_como_keeper': True,
             'score_shopper': Decimal('7.8'),
@@ -182,63 +159,28 @@ def criar_dados_teste():
         }
     )
     if created:
-        print("  OK Ana Costa (Shopper-Keeper) - Belo Horizonte")
+        print("  OK Ana Costa (Shopper-Keeper)")
     
-    # 4. CRIAR CLIENTES
+    # 2. CRIAR CLIENTES
     print("\nCriando clientes...")
     
     clientes_data = [
-        {
-            'username': 'joao_cliente',
-            'first_name': 'Joao',
-            'last_name': 'Oliveira',
-            'email': 'joao@cliente.com',
-            'telefone': '(11) 91111-1111',
-            'endereco': 'Rua A, 100 - Vila Madalena, SP'
-        },
-        {
-            'username': 'maria_cliente',
-            'first_name': 'Maria',
-            'last_name': 'Santos',
-            'email': 'maria@cliente.com',
-            'telefone': '(21) 92222-2222',
-            'endereco': 'Av. Atlantica, 200 - Copacabana, RJ'
-        },
-        {
-            'username': 'pedro_cliente',
-            'first_name': 'Pedro',
-            'last_name': 'Lima',
-            'email': 'pedro@cliente.com',
-            'telefone': '(31) 93333-3333',
-            'endereco': 'Rua B, 300 - Savassi, BH'
-        },
-        {
-            'username': 'carla_cliente',
-            'first_name': 'Carla',
-            'last_name': 'Ferreira',
-            'email': 'carla@cliente.com',
-            'telefone': '(11) 94444-4444',
-            'endereco': 'Rua C, 400 - Jardins, SP'
-        },
-        {
-            'username': 'roberto_cliente',
-            'first_name': 'Roberto',
-            'last_name': 'Alves',
-            'email': 'roberto@cliente.com',
-            'telefone': '(21) 95555-5555',
-            'endereco': 'Rua D, 500 - Ipanema, RJ'
-        }
+        ('joao_cliente', 'Joao', 'Oliveira', 'joao@cliente.com'),
+        ('maria_cliente', 'Maria', 'Santos', 'maria@cliente.com'),
+        ('pedro_cliente', 'Pedro', 'Lima', 'pedro@cliente.com'),
+        ('carla_cliente', 'Carla', 'Ferreira', 'carla@cliente.com'),
+        ('roberto_cliente', 'Roberto', 'Alves', 'roberto@cliente.com')
     ]
     
     clientes = {}
-    for cliente_data in clientes_data:
+    for username, first_name, last_name, email in clientes_data:
         # Criar usuário
         user_cliente, created = User.objects.get_or_create(
-            username=cliente_data['username'],
+            username=username,
             defaults={
-                'first_name': cliente_data['first_name'],
-                'last_name': cliente_data['last_name'],
-                'email': cliente_data['email']
+                'first_name': first_name,
+                'last_name': last_name,
+                'email': email
             }
         )
         if created:
@@ -249,17 +191,17 @@ def criar_dados_teste():
         cliente, created = Cliente.objects.get_or_create(
             user=user_cliente,
             defaults={
-                'telefone': cliente_data['telefone'],
+                'telefone': f'(11) 9999-{len(clientes):04d}',
                 'data_nascimento': timezone.now().date() - timedelta(days=365*30)
             }
         )
         
-        clientes[cliente_data['username']] = cliente
+        clientes[username] = cliente
         
         if created:
-            print(f"  OK {cliente_data['first_name']} {cliente_data['last_name']}")
+            print(f"  OK {first_name} {last_name}")
     
-    # 5. CRIAR RELAÇÕES CLIENTE-AGENTE
+    # 3. CRIAR RELAÇÕES CLIENTE-AGENTE
     print("\nCriando relações cliente-agente...")
     
     # João - Cliente forte do Júnior
@@ -295,7 +237,7 @@ def criar_dados_teste():
         }
     )
     
-    # Carla - Cliente em múltiplas carteiras
+    # Carla - Cliente em múltiplas carteiras (caso interessante)
     ClienteRelacao.objects.get_or_create(
         cliente=clientes['carla_cliente'],
         agente=agente_junior,
@@ -309,66 +251,26 @@ def criar_dados_teste():
         cliente=clientes['carla_cliente'],
         agente=agente_marcia,
         defaults={
-            'forca_relacao': Decimal('72.0'),
+            'forca_relacao': Decimal('72.0'),  # Márcia tem relação mais forte
             'total_pedidos': 8,
             'ultimo_contato': timezone.now() - timedelta(days=4)
         }
     )
     
-    print("  OK Relações cliente-agente criadas")
-    
-    # 6. CRIAR PRODUTOS
-    print("\nCriando produtos...")
-    
-    produtos_data = [
-        {
-            'nome': 'iPhone 15 Pro 128GB',
-            'categoria': categorias['Eletrônicos'],
-            'descricao': 'iPhone 15 Pro com 128GB, cor Natural Titanium',
-            'preco_referencia': Decimal('7999.00'),
-            'sku': 'IPH15P-128-NT'
-        },
-        {
-            'nome': 'Samsung Galaxy S24 Ultra',
-            'categoria': categorias['Eletrônicos'],
-            'descricao': 'Galaxy S24 Ultra 256GB, cor Titanium Black',
-            'preco_referencia': Decimal('6499.00'),
-            'sku': 'SGS24U-256-TB'
-        },
-        {
-            'nome': 'Vestido Floral Primavera',
-            'categoria': categorias['Moda'],
-            'descricao': 'Vestido midi floral, tecido viscose, tamanho M',
-            'preco_referencia': Decimal('189.90'),
-            'sku': 'VEST-FLOR-M'
-        },
-        {
-            'nome': 'Tenis Nike Air Max 270',
-            'categoria': categorias['Moda'],
-            'descricao': 'Tenis Nike Air Max 270, cor branco/preto, tamanho 42',
-            'preco_referencia': Decimal('599.90'),
-            'sku': 'NIKE-AM270-42'
+    # Roberto - Cliente novo, apenas com Ana
+    ClienteRelacao.objects.get_or_create(
+        cliente=clientes['roberto_cliente'],
+        agente=agente_ana,
+        defaults={
+            'forca_relacao': Decimal('45.0'),
+            'total_pedidos': 2,
+            'ultimo_contato': timezone.now() - timedelta(days=10)
         }
-    ]
+    )
     
-    produtos = {}
-    for prod_data in produtos_data:
-        produto, created = Produto.objects.get_or_create(
-            sku=prod_data['sku'],
-            defaults={
-                'nome': prod_data['nome'],
-                'categoria': prod_data['categoria'],
-                'descricao': prod_data['descricao'],
-                'preco': prod_data['preco_referencia'],
-                'ativo': True
-            }
-        )
-        produtos[prod_data['sku']] = produto
-        
-        if created:
-            print(f"  OK {prod_data['nome']}")
+    print("  OK Relações criadas")
     
-    # 7. CRIAR TRUSTLINES
+    # 4. CRIAR TRUSTLINES
     print("\nCriando trustlines...")
     
     # Trustline Júnior ↔ Márcia
@@ -395,38 +297,93 @@ def criar_dados_teste():
         }
     )
     
+    # Trustline Márcia ↔ Ana
+    TrustlineKeeper.objects.get_or_create(
+        agente_a=agente_marcia,
+        agente_b=agente_ana,
+        defaults={
+            'nivel_confianca': Decimal('82.0'),
+            'perc_shopper': Decimal('58.0'),
+            'perc_keeper': Decimal('42.0'),
+            'ativo': True
+        }
+    )
+    
     print("  OK Trustlines criadas")
     
-    print("\n" + "=" * 50)
-    print("DADOS DE TESTE CRIADOS COM SUCESSO!")
-    print("=" * 50)
+    # 5. CRIAR ROLE STATS
+    print("\nCriando estatísticas...")
+    
+    # Stats para Júnior
+    RoleStats.objects.get_or_create(
+        agente=agente_junior,
+        defaults={
+            'pedidos_como_shopper': 25,
+            'pedidos_como_keeper': 3,
+            'receita_como_shopper': Decimal('45000.00'),
+            'receita_como_keeper': Decimal('1200.00'),
+            'score_medio_avaliacoes': Decimal('4.7'),
+            'total_avaliacoes': 28
+        }
+    )
+    
+    # Stats para Márcia
+    RoleStats.objects.get_or_create(
+        agente=agente_marcia,
+        defaults={
+            'pedidos_como_shopper': 2,
+            'pedidos_como_keeper': 32,
+            'receita_como_shopper': Decimal('800.00'),
+            'receita_como_keeper': Decimal('18500.00'),
+            'score_medio_avaliacoes': Decimal('4.9'),
+            'total_avaliacoes': 34
+        }
+    )
+    
+    # Stats para Ana
+    RoleStats.objects.get_or_create(
+        agente=agente_ana,
+        defaults={
+            'pedidos_como_shopper': 18,
+            'pedidos_como_keeper': 15,
+            'receita_como_shopper': Decimal('12000.00'),
+            'receita_como_keeper': Decimal('8500.00'),
+            'score_medio_avaliacoes': Decimal('4.6'),
+            'total_avaliacoes': 33
+        }
+    )
+    
+    print("  OK Estatísticas criadas")
+    
+    print("\n" + "=" * 40)
+    print("DADOS KMN CRIADOS COM SUCESSO!")
+    print("=" * 40)
     
     # RESUMO
-    print("\nRESUMO DOS DADOS CRIADOS:")
-    print(f"Agentes: {Agente.objects.count()}")
+    print(f"\nAgentes: {Agente.objects.count()}")
     print(f"Clientes: {Cliente.objects.count()}")
-    print(f"Relações Cliente-Agente: {ClienteRelacao.objects.count()}")
-    print(f"Produtos: {Produto.objects.count()}")
+    print(f"Relações: {ClienteRelacao.objects.count()}")
     print(f"Trustlines: {TrustlineKeeper.objects.count()}")
+    print(f"Role Stats: {RoleStats.objects.count()}")
     
-    print("\nCREDENCIAIS DE TESTE:")
-    print("Todos os usuários têm senha: 123456")
+    print("\nCREDENCIAIS (senha: 123456):")
     print("- junior_sp (Shopper)")
     print("- marcia_rj (Keeper)")
     print("- ana_bh (Shopper-Keeper)")
     print("- joao_cliente, maria_cliente, pedro_cliente, carla_cliente, roberto_cliente")
     
-    print("\nPROXIMOS PASSOS:")
-    print("1. Acesse: http://127.0.0.1:8000/kmn/")
-    print("2. Faça login com qualquer agente")
-    print("3. Explore o dashboard KMN")
+    print("\nTESTE INTERESSANTE:")
+    print("Carla está na carteira do Junior (65%) e da Marcia (72%)")
+    print("Sistema deve escolher oferta da Marcia (força maior)")
+    
+    print("\nACESSE: http://127.0.0.1:8000/kmn/")
     
     return True
 
 if __name__ == '__main__':
     try:
-        criar_dados_teste()
+        criar_dados_kmn()
     except Exception as e:
-        print(f"ERRO ao criar dados: {e}")
+        print(f"ERRO: {e}")
         import traceback
         traceback.print_exc()
