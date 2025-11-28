@@ -37,5 +37,6 @@ admin.site.index_title = "Administração VitrineZap"
 urlpatterns = [
     path('health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),
+    path('api/whatsapp/', include('whatsapp_integration.urls')),  # WhatsApp Integration
     path('', include('app_marketplace.urls')),
 ]
