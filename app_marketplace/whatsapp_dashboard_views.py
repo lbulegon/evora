@@ -31,7 +31,7 @@ from .whatsapp_views import send_message, send_reaction
 def whatsapp_dashboard(request):
     """Dashboard principal para gerenciar grupos WhatsApp"""
     # Verificar se é shopper ou keeper
-    if not (request.user.is_shopper or request.user.is_keeper):
+    if not (request.user.is_shopper or request.user.is_address_keeper):
         messages.error(request, "Acesso restrito a Personal Shoppers ou Keepers.")
         return redirect('home')
     
@@ -39,8 +39,8 @@ def whatsapp_dashboard(request):
     user_profile = None
     if request.user.is_shopper:
         user_profile = request.user.personalshopper
-    elif request.user.is_keeper:
-        user_profile = request.user.keeper
+    elif request.user.is_address_keeper:
+        user_profile = request.user.address_keeper
     
     # Estatísticas gerais - FILTRAR POR USUÁRIO MASTER
     groups = WhatsappGroup.objects.filter(owner=request.user)
@@ -88,7 +88,7 @@ def whatsapp_dashboard(request):
 @login_required
 def groups_list(request):
     """Lista todos os grupos WhatsApp do usuário master"""
-    if not (request.user.is_shopper or request.user.is_keeper):
+    if not (request.user.is_shopper or request.user.is_address_keeper):
         messages.error(request, "Acesso restrito a Personal Shoppers ou Keepers.")
         return redirect('home')
     
@@ -127,7 +127,7 @@ def groups_list(request):
 @login_required
 def group_detail(request, group_id):
     """Detalhes de um grupo WhatsApp específico"""
-    if not (request.user.is_shopper or request.user.is_keeper):
+    if not (request.user.is_shopper or request.user.is_address_keeper):
         messages.error(request, "Acesso restrito a Personal Shoppers ou Keepers.")
         return redirect('home')
     
@@ -177,7 +177,7 @@ def group_detail(request, group_id):
 @require_http_methods(["POST"])
 def create_group(request):
     """Criar novo grupo WhatsApp"""
-    if not (request.user.is_shopper or request.user.is_keeper):
+    if not (request.user.is_shopper or request.user.is_address_keeper):
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
@@ -198,7 +198,7 @@ def create_group(request):
             name=name,
             owner=request.user,  # Usuário master
             shopper=request.user.personalshopper if request.user.is_shopper else None,
-            keeper=request.user.keeper if request.user.is_keeper else None
+            address_keeper=request.user.address_keeper if request.user.is_address_keeper else None
         )
         
         return JsonResponse({

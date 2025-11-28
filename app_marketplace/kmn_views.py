@@ -334,12 +334,12 @@ def criar_agente_automatico(user):
                 'ativo_como_keeper': False,
             })
         
-        if hasattr(user, 'keeper'):
-            keeper = user.keeper
+        if hasattr(user, 'address_keeper'):
+            address_keeper = user.address_keeper
             agente_data.update({
-                'keeper': keeper,
-                'nome_comercial': f"{user.get_full_name()} - Keeper",
-                'ativo_como_keeper': keeper.ativo,
+                'address_keeper': address_keeper,
+                'nome_comercial': f"{user.get_full_name()} - Address Keeper",
+                'ativo_como_address_keeper': address_keeper.ativo,
                 'ativo_como_shopper': agente_data.get('ativo_como_shopper', False),
             })
         

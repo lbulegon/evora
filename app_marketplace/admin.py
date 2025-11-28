@@ -15,7 +15,7 @@ from .models import (
     Estabelecimento,
     CupomDesconto,
     # Novos modelos
-    Keeper,
+    AddressKeeper,
     Pacote,
     MovimentoPacote,
     FotoPacote,
@@ -33,7 +33,7 @@ from .models import (
     Estabelecimento,
     GroupLinkRequest,
     ShopperOnboardingToken,
-    KeeperOnboardingToken,
+    AddressKeeperOnboardingToken,
     # Modelos KMN
     Agente,
     ClienteRelacao,
@@ -290,8 +290,8 @@ class CupomDescontoAdmin(admin.ModelAdmin):
 # NOVOS MODELOS - KEEPER, PACOTE, PAGAMENTOS
 # ============================================================================
 
-@admin.register(Keeper)
-class KeeperAdmin(admin.ModelAdmin):
+@admin.register(AddressKeeper)
+class AddressKeeperAdmin(admin.ModelAdmin):
     list_display = ['user', 'cidade', 'pais', 'capacidade_itens', 'verificado', 'ativo']
     list_filter = ['verificado', 'ativo', 'pais', 'aceita_retirada', 'aceita_envio']
     search_fields = ['user__username', 'user__first_name', 'user__last_name', 'cidade', 'apelido_local']
@@ -334,11 +334,11 @@ class MovimentoPacoteInline(admin.TabularInline):
 
 @admin.register(Pacote)
 class PacoteAdmin(admin.ModelAdmin):
-    list_display = ['codigo_publico', 'cliente', 'keeper', 'status', 'confirmacao_visual', 'valor_declarado', 'criado_em']
-    list_filter = ['status', 'confirmacao_visual', 'keeper', 'criado_em']
+    list_display = ['codigo_publico', 'cliente', 'address_keeper', 'status', 'confirmacao_visual', 'valor_declarado', 'criado_em']
+    list_filter = ['status', 'confirmacao_visual', 'address_keeper', 'criado_em']
     search_fields = ['codigo_publico', 'descricao', 'cliente__user__username']
     readonly_fields = ['criado_em', 'atualizado_em', 'dias_em_guarda', 'custo_guarda_estimado']
-    autocomplete_fields = ['cliente', 'personal_shopper', 'keeper']
+    autocomplete_fields = ['cliente', 'personal_shopper', 'address_keeper']
     inlines = [FotoPacoteInline, MovimentoPacoteInline]
     
     fieldsets = (
@@ -346,7 +346,7 @@ class PacoteAdmin(admin.ModelAdmin):
             'fields': ('codigo_publico', 'descricao')
         }),
         ('Pessoas Envolvidas', {
-            'fields': ('cliente', 'personal_shopper', 'keeper')
+            'fields': ('cliente', 'personal_shopper', 'address_keeper')
         }),
         ('Detalhes do Pacote', {
             'fields': ('valor_declarado', 'peso_kg', 'dimensoes_cm', 'foto_recebimento')
@@ -383,13 +383,13 @@ class FotoPacoteAdmin(admin.ModelAdmin):
 
 @admin.register(OpcaoEnvio)
 class OpcaoEnvioAdmin(admin.ModelAdmin):
-    list_display = ['keeper', 'tipo', 'cidade', 'valor_base', 'ativo']
-    list_filter = ['tipo', 'ativo', 'keeper']
-    search_fields = ['keeper__user__username', 'cidade']
+    list_display = ['address_keeper', 'tipo', 'cidade', 'valor_base', 'ativo']
+    list_filter = ['tipo', 'ativo', 'address_keeper']
+    search_fields = ['address_keeper__user__username', 'cidade']
     
     fieldsets = (
-        ('Keeper', {
-            'fields': ('keeper',)
+        ('Address Keeper (Ponto de Guarda)', {
+            'fields': ('address_keeper',)
         }),
         ('Tipo de Envio', {
             'fields': ('tipo', 'cidade', 'valor_base')
@@ -476,7 +476,7 @@ class WhatsappGroupAdmin(admin.ModelAdmin):
     list_filter = ['active', 'created_at']
     search_fields = ['name', 'chat_id', 'owner__username']
     readonly_fields = ['chat_id', 'created_at', 'owner_type']
-    autocomplete_fields = ['owner', 'shopper', 'keeper']
+    autocomplete_fields = ['owner', 'shopper', 'address_keeper']
     
     # ISOLAMENTO DE DADOS - Cada usuário vê apenas seus grupos
     def get_queryset(self, request):
@@ -543,8 +543,8 @@ class ShopperOnboardingTokenAdmin(admin.ModelAdmin):
     is_valid.short_description = 'Válido'
 
 
-@admin.register(KeeperOnboardingToken)
-class KeeperOnboardingTokenAdmin(admin.ModelAdmin):
+@admin.register(AddressKeeperOnboardingToken)
+class AddressKeeperOnboardingTokenAdmin(admin.ModelAdmin):
     list_display = ['__str__', 'phone', 'created_by', 'is_valid', 'created_at', 'used_at']
     list_filter = ['created_at', 'expires_at']
     search_fields = ['token', 'phone']

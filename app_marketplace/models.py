@@ -164,9 +164,15 @@ class PersonalShopper(models.Model):
         return self.user.get_full_name() or self.user.username
 
 
-class Keeper(models.Model):
-    """Address Keeper - pessoa que recebe, guarda e despacha produtos"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='keeper')
+class AddressKeeper(models.Model):
+    """
+    Address Keeper (Ponto de Guarda) - pessoa que recebe, guarda e despacha pacotes/produtos.
+    
+    NOTA: Este é diferente do "Keeper" oficial (vendedor passivo).
+    O Keeper oficial é representado por User + CarteiraCliente, não por este modelo.
+    Este modelo é apenas para pontos físicos de guarda de pacotes.
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='address_keeper')
     
     # Localização do ponto de guarda
     apelido_local = models.CharField(max_length=100, blank=True, help_text="Ex: Vila Angélica - Sorocaba")
@@ -195,11 +201,12 @@ class Keeper(models.Model):
     criado_em  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Keeper'
-        verbose_name_plural = 'Keepers'
+        verbose_name = 'Address Keeper (Ponto de Guarda)'
+        verbose_name_plural = 'Address Keepers (Pontos de Guarda)'
+        db_table = 'app_marketplace_addresskeeper'  # Nome da tabela no banco
 
     def __str__(self):
-        return f"Keeper {self.user.get_full_name() or self.user.username} - {self.apelido_local or self.cidade}"
+        return f"Address Keeper {self.user.get_full_name() or self.user.username} - {self.apelido_local or self.cidade}"
 
 
 class RelacionamentoClienteShopper(models.Model):
@@ -251,7 +258,7 @@ class Pacote(models.Model):
     codigo_publico   = models.CharField(max_length=20, unique=True, help_text="Código que o cliente usa para referência")
     cliente          = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='pacotes')
     personal_shopper = models.ForeignKey(PersonalShopper, on_delete=models.SET_NULL, null=True, blank=True, related_name='pacotes')
-    keeper           = models.ForeignKey(Keeper, on_delete=models.SET_NULL, null=True, blank=True, related_name='pacotes')
+    address_keeper   = models.ForeignKey(AddressKeeper, on_delete=models.SET_NULL, null=True, blank=True, related_name='pacotes', help_text="Ponto de guarda que recebe/guarda este pacote")
 
     descricao        = models.CharField(max_length=200, blank=True)
     valor_declarado  = models.DecimalField(max_digits=10, decimal_places=2, default=0, validators=[MinValueValidator(0)])
@@ -285,9 +292,9 @@ class Pacote(models.Model):
 
     def custo_guarda_estimado(self):
         """Calcula o custo estimado de guarda"""
-        if not self.keeper or not self.keeper.taxa_guarda_dia:
+        if not self.address_keeper or not self.address_keeper.taxa_guarda_dia:
             return 0
-        return self.dias_em_guarda() * float(self.keeper.taxa_guarda_dia)
+        return self.dias_em_guarda() * float(self.address_keeper.taxa_guarda_dia)
 
     def __str__(self):
         return f"Pacote {self.codigo_publico} ({self.get_status_display()})"
@@ -336,7 +343,7 @@ class OpcaoEnvio(models.Model):
         COURIER        = 'courier', 'Courier (FedEx/UPS/DHL)'
         VIAJANTE       = 'viajante', 'Viajante'
 
-    keeper       = models.ForeignKey(Keeper, on_delete=models.CASCADE, related_name='opcoes_envio')
+    address_keeper = models.ForeignKey(AddressKeeper, on_delete=models.CASCADE, null=True, blank=True, related_name='opcoes_envio', help_text="Ponto de guarda que oferece esta opção de envio")
     tipo         = models.CharField(max_length=20, choices=Tipo.choices)
     cidade       = models.CharField(max_length=100, blank=True)
     valor_base   = models.DecimalField(max_digits=8, decimal_places=2, default=0)
@@ -826,19 +833,19 @@ class ShopperOnboardingToken(models.Model):
         return f"SHOP-{self.token} [{status}]"
 
 
-class KeeperOnboardingToken(models.Model):
-    """Token para cadastro de novo Keeper via WhatsApp"""
+class AddressKeeperOnboardingToken(models.Model):
+    """Token para cadastro de novo Address Keeper (ponto de guarda) via WhatsApp"""
     token      = models.CharField(max_length=16, unique=True)
     phone      = models.CharField(max_length=32, blank=True)
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='keeper_tokens_created')
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='address_keeper_tokens_created')
     created_at = models.DateTimeField(default=timezone.now)
     expires_at = models.DateTimeField()
     used_at    = models.DateTimeField(null=True, blank=True)
-    used_by    = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='keeper_token_used')
+    used_by    = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='address_keeper_token_used')
 
     class Meta:
-        verbose_name = 'Token de Cadastro Keeper'
-        verbose_name_plural = 'Tokens de Cadastro Keeper'
+        verbose_name = 'Token de Cadastro Address Keeper'
+        verbose_name_plural = 'Tokens de Cadastro Address Keeper'
 
     @property
     def is_valid(self):
@@ -846,7 +853,7 @@ class KeeperOnboardingToken(models.Model):
 
     def __str__(self):
         status = "Usado" if self.used_at else ("Válido" if self.is_valid else "Expirado")
-        return f"KEEP-{self.token} [{status}]"
+        return f"ADDRKEEP-{self.token} [{status}]"
 
 
 # ============================================================================
@@ -854,14 +861,14 @@ class KeeperOnboardingToken(models.Model):
 # ============================================================================
 
 class WhatsappGroup(models.Model):
-    """Grupo WhatsApp vinculado a um PersonalShopper ou Keeper"""
+    """Grupo WhatsApp vinculado a um PersonalShopper ou Address Keeper (ponto de guarda)"""
     chat_id = models.CharField(max_length=100, unique=True, help_text="ID do grupo no WhatsApp")
     name = models.CharField(max_length=200, help_text="Nome do grupo")
     
     # Usuário master (pode ser shopper ou keeper)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_whatsapp_groups')
     shopper = models.ForeignKey(PersonalShopper, on_delete=models.CASCADE, null=True, blank=True, related_name='whatsapp_groups')
-    keeper = models.ForeignKey(Keeper, on_delete=models.CASCADE, null=True, blank=True, related_name='whatsapp_groups')
+    address_keeper = models.ForeignKey(AddressKeeper, on_delete=models.CASCADE, null=True, blank=True, related_name='whatsapp_groups', help_text="Address Keeper (ponto de guarda) dono deste grupo")
     
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -888,17 +895,17 @@ class WhatsappGroup(models.Model):
     def is_active(self):
         if self.shopper:
             return self.active and self.shopper.ativo
-        elif self.keeper:
-            return self.active and self.keeper.ativo
+        elif self.address_keeper:
+            return self.active and self.address_keeper.ativo
         return self.active
     
     @property
     def owner_type(self):
-        """Retorna o tipo do proprietário: 'shopper' ou 'keeper'"""
+        """Retorna o tipo do proprietário: 'shopper' ou 'address_keeper'"""
         if self.shopper:
             return 'shopper'
-        elif self.keeper:
-            return 'keeper'
+        elif self.address_keeper:
+            return 'address_keeper'
         return 'unknown'
 
 
@@ -1090,14 +1097,17 @@ class WhatsappOrder(models.Model):
 
 class Agente(models.Model):
     """
-    Agente unificado que pode ser Shopper, Keeper ou ambos.
-    Compatível com PersonalShopper e Keeper existentes.
+    Agente unificado que pode ser Shopper, Address Keeper (ponto de guarda) ou ambos.
+    Compatível com PersonalShopper e AddressKeeper existentes.
+    
+    NOTA: O "Keeper" oficial (vendedor passivo) é representado por User + CarteiraCliente,
+    não por este modelo Agente. Este modelo é para Address Keeper (ponto de guarda).
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='agente')
     
     # Vinculação com modelos existentes
     personal_shopper = models.OneToOneField(PersonalShopper, on_delete=models.SET_NULL, null=True, blank=True, related_name='agente_profile')
-    keeper = models.OneToOneField(Keeper, on_delete=models.SET_NULL, null=True, blank=True, related_name='agente_profile')
+    address_keeper = models.OneToOneField(AddressKeeper, on_delete=models.SET_NULL, null=True, blank=True, related_name='agente_profile', help_text="Address Keeper (ponto de guarda) associado a este agente")
     
     # Dados do agente
     nome_comercial = models.CharField(max_length=200, blank=True, help_text="Nome comercial do agente")
@@ -1544,5 +1554,5 @@ class LiquidacaoFinanceira(models.Model):
 # Adiciona propriedades convenientes ao User
 User.add_to_class('is_cliente', property(lambda u: hasattr(u, 'cliente')))
 User.add_to_class('is_shopper', property(lambda u: hasattr(u, 'personalshopper')))
-User.add_to_class('is_keeper', property(lambda u: hasattr(u, 'keeper')))
+User.add_to_class('is_address_keeper', property(lambda u: hasattr(u, 'address_keeper')))
 User.add_to_class('is_agente', property(lambda u: hasattr(u, 'agente')))

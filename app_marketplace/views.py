@@ -20,7 +20,7 @@ def home_view(request):
     # Redirecionar Shoppers para dashboard específico
     if request.user.is_shopper:
         return redirect('shopper_dashboard')
-    elif request.user.is_keeper:
+    elif request.user.is_address_keeper:
         return redirect('whatsapp_dashboard')
     
     # Dashboard geral para outros usuários

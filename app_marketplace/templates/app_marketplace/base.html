@@ -79,7 +79,7 @@
                             </li>
                             
                         <!-- Menu para Keepers -->
-                        {% elif user.is_keeper %}
+                        {% elif user.is_address_keeper %}
                             <li class="nav-item">
                                 <a class="nav-link {% if 'whatsapp_dashboard' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'whatsapp_dashboard' %}">
                                     <i class="fas fa-tachometer-alt"></i> Dashboard
@@ -187,8 +187,8 @@
                                     <span class="ms-1">{{ user.get_full_name|default:user.username }}</span>
                                     {% if user.is_shopper %}
                                         <span class="badge bg-success ms-2">Shopper</span>
-                                    {% elif user.is_keeper %}
-                                        <span class="badge bg-info ms-2">Keeper</span>
+                                    {% elif user.is_address_keeper %}
+                                        <span class="badge bg-info ms-2">Address Keeper</span>
                                     {% elif user.is_cliente %}
                                         <span class="badge bg-primary ms-2">Cliente</span>
                                     {% elif user.is_agente %}

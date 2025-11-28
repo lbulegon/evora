@@ -14,8 +14,8 @@ from django.contrib.auth.models import User
 
 from .models import (
     WhatsappGroup, GroupLinkRequest,
-    ShopperOnboardingToken, KeeperOnboardingToken,
-    PersonalShopper, Keeper, Cliente,
+    ShopperOnboardingToken, AddressKeeperOnboardingToken,
+    PersonalShopper, AddressKeeper, Cliente,
     Pacote, Categoria, Produto
 )
 from .whatsapp_integration import (
@@ -308,8 +308,8 @@ def handle_cadastro_keeper(chat_id: str, sender_phone: str, sender_name: str, bo
     token = parts[1].upper().strip().replace("KEEP-", "")
     
     try:
-        onboarding_token = KeeperOnboardingToken.objects.get(token=token)
-    except KeeperOnboardingToken.DoesNotExist:
+        onboarding_token = AddressKeeperOnboardingToken.objects.get(token=token)
+    except AddressKeeperOnboardingToken.DoesNotExist:
         send_message(f"{sender_phone}@c.us", "❌ Token inválido.")
         return JsonResponse({"ok": True, "error": "invalid_token"})
     
@@ -328,8 +328,8 @@ def handle_cadastro_keeper(chat_id: str, sender_phone: str, sender_name: str, bo
         }
     )
     
-    # Criar perfil de Keeper
-    keeper, created = Keeper.objects.get_or_create(
+    # Criar perfil de Address Keeper
+    address_keeper, created = AddressKeeper.objects.get_or_create(
         user=user,
         defaults={
             'ativo': True,
