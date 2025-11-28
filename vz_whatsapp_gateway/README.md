@@ -170,7 +170,7 @@ O gateway registra todas as operações:
 
 1. Crie um novo serviço no Railway
 2. Configure as variáveis de ambiente
-3. Use o `Procfile` ou `nixpacks.toml` para iniciar o FastAPI
+3. Use o `Procfile` para iniciar o FastAPI
 
 **Procfile:**
 ```
