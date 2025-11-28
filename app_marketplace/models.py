@@ -435,12 +435,13 @@ class Pedido(models.Model):
     """
     
     class Status(models.TextChoices):
-        PENDENTE      = 'pendente', 'Pendente'
-        PAGO          = 'pago', 'Pago'
-        EM_PREPARACAO = 'em_preparacao', 'Em preparação'
-        ENVIADO       = 'enviado', 'Enviado'
-        ENTREGUE      = 'entregue', 'Entregue'
-        CANCELADO     = 'cancelado', 'Cancelado'
+        CRIADO                = 'criado', 'Criado'
+        AGUARDANDO_PAGAMENTO  = 'aguardando_pagamento', 'Aguardando pagamento'
+        PAGO                  = 'pago', 'Pago'
+        CANCELADO             = 'cancelado', 'Cancelado'
+        EM_PREPARACAO         = 'em_preparacao', 'Em preparação'
+        EM_TRANSPORTE         = 'em_transporte', 'Em transporte'
+        CONCLUIDO             = 'concluido', 'Concluído'
 
     class MetodoPagamento(models.TextChoices):
         PIX            = 'pix', 'PIX'
@@ -453,9 +454,22 @@ class Pedido(models.Model):
         DO_SHOPPER = 'do_shopper', 'Cliente do Shopper'
         DO_KEEPER = 'do_keeper', 'Cliente do Keeper'
 
+    # Código único do pedido (EV-000123)
+    codigo = models.CharField(
+        max_length=20,
+        unique=True,
+        blank=True,
+        help_text="Código único do pedido (ex: EV-000123)"
+    )
+    
+    # Snapshot dos dados do cliente (para histórico)
+    cliente_nome = models.CharField(max_length=150, blank=True, help_text="Nome do cliente no momento do pedido")
+    cliente_whatsapp = models.CharField(max_length=20, blank=True, help_text="WhatsApp do cliente")
+    cliente_email = models.EmailField(blank=True, null=True, help_text="Email do cliente")
+    
     # Campos principais
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='pedidos')
-    endereco_entrega = models.ForeignKey(EnderecoEntrega, on_delete=models.CASCADE)
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='pedidos', null=True, blank=True)
+    endereco_entrega = models.ForeignKey(EnderecoEntrega, on_delete=models.CASCADE, null=True, blank=True)
     cupom = models.ForeignKey(CupomDesconto, null=True, blank=True, on_delete=models.SET_NULL)
     
     # NOVOS CAMPOS - Modelo Oficial
@@ -509,26 +523,81 @@ class Pedido(models.Model):
         help_text="Preço final pago pelo cliente - P_final"
     )
     
+    # Valores detalhados (conforme documento)
+    valor_subtotal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00,
+        help_text="Valor subtotal (sem frete e taxas)"
+    )
+    valor_frete = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00,
+        help_text="Valor do frete"
+    )
+    valor_taxas = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00,
+        help_text="Valor de taxas adicionais"
+    )
+    valor_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    moeda = models.CharField(max_length=3, default='BRL', help_text="Moeda do pedido (BRL, USD, etc.)")
+    
+    # Evento/Campanha vinculada
+    evento = models.ForeignKey(
+        'Evento',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pedidos',
+        help_text="Evento/Campanha relacionada"
+    )
+    
     criado_em = models.DateTimeField(auto_now_add=True)
-    atualizado_em       = models.DateTimeField(auto_now=True)
-    status              = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
-    metodo_pagamento    = models.CharField(max_length=20, choices=MetodoPagamento.choices, blank=True, null=True)
-    valor_total         = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    observacoes         = models.TextField(blank=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.CRIADO)
+    metodo_pagamento = models.CharField(max_length=20, choices=MetodoPagamento.choices, blank=True, null=True)
+    observacoes = models.TextField(blank=True)
     codigo_rastreamento = models.CharField(max_length=100, blank=True, null=True)
-    is_revisado         = models.BooleanField(default=False)
-    is_prioritario      = models.BooleanField(default=False)
+    is_revisado = models.BooleanField(default=False)
+    is_prioritario = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Pedido'
         verbose_name_plural = 'Pedidos'
         ordering = ['-criado_em']
 
+    def gerar_codigo(self):
+        """Gera código único do pedido no formato EV-000123"""
+        if not self.codigo:
+            # Buscar último código
+            ultimo_pedido = Pedido.objects.filter(codigo__isnull=False).order_by('-id').first()
+            if ultimo_pedido and ultimo_pedido.codigo:
+                try:
+                    numero = int(ultimo_pedido.codigo.split('-')[1])
+                    numero += 1
+                except (ValueError, IndexError):
+                    numero = 1
+            else:
+                numero = 1
+            self.codigo = f"EV-{numero:06d}"
+        return self.codigo
+    
     def calcular_total(self):
-        """Calcula o total do pedido com itens e cupom"""
-        total = sum(item.subtotal() for item in self.itens.all())
+        """Calcula o total do pedido com itens, frete, taxas e cupom"""
+        # Subtotal dos itens
+        self.valor_subtotal = sum(item.subtotal() for item in self.itens.all())
+        
+        # Aplicar cupom se houver
+        total = self.valor_subtotal
         if self.cupom and self.cupom.ativo:
             total -= total * (self.cupom.desconto_percentual / 100)
+        
+        # Adicionar frete e taxas
+        total += self.valor_frete + self.valor_taxas
+        
         self.valor_total = total
         return total
 
@@ -697,6 +766,177 @@ class PedidoPacote(models.Model):
 
     def __str__(self):
         return f"Pedido #{self.pedido.id} → Pacote {self.pacote.codigo_publico}"
+
+
+# ============================================================================
+# SISTEMA DE PAGAMENTOS - GATEWAY
+# ============================================================================
+
+class Pagamento(models.Model):
+    """
+    Pagamento vinculado a um Pedido (relação 1:1).
+    Integração com gateways de pagamento (Mercado Pago, Stripe, etc.)
+    """
+    
+    class Metodo(models.TextChoices):
+        PIX = 'pix', 'Pix'
+        CARTAO = 'cartao', 'Cartão de Crédito'
+        PI = 'pi', 'Pi Network'
+        TOKEN = 'token', 'Token interno'
+    
+    class Status(models.TextChoices):
+        CRIADO = 'criado', 'Criado'
+        PENDENTE = 'pendente', 'Pendente'
+        CONFIRMADO = 'confirmado', 'Confirmado'
+        RECUSADO = 'recusado', 'Recusado'
+        CANCELADO = 'cancelado', 'Cancelado'
+        CHARGEBACK = 'chargeback', 'Chargeback'
+    
+    pedido = models.OneToOneField(
+        Pedido,
+        on_delete=models.CASCADE,
+        related_name='pagamento',
+        help_text="Pedido vinculado (1:1)"
+    )
+    metodo = models.CharField(
+        max_length=20,
+        choices=Metodo.choices,
+        help_text="Método de pagamento"
+    )
+    valor = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Valor do pagamento"
+    )
+    moeda = models.CharField(
+        max_length=3,
+        default='BRL',
+        help_text="Moeda (BRL, USD, etc.)"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.CRIADO
+    )
+    
+    # Dados do gateway
+    gateway = models.CharField(
+        max_length=50,
+        help_text="Gateway utilizado (mercadopago, stripe, pagarme, etc.)"
+    )
+    gateway_payment_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="ID do pagamento no gateway"
+    )
+    gateway_checkout_url = models.URLField(
+        blank=True,
+        null=True,
+        help_text="URL do checkout/link de pagamento"
+    )
+    gateway_qr_code = models.TextField(
+        blank=True,
+        null=True,
+        help_text="QR Code (para Pix)"
+    )
+    gateway_qr_code_base64 = models.TextField(
+        blank=True,
+        null=True,
+        help_text="QR Code em base64 (para exibição)"
+    )
+    
+    # Metadados
+    metadados = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Metadados adicionais do pagamento"
+    )
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    confirmado_em = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = 'Pagamento'
+        verbose_name_plural = 'Pagamentos'
+        ordering = ['-criado_em']
+    
+    def __str__(self):
+        return f"Pagamento {self.get_metodo_display()} - {self.pedido.codigo or f'Pedido #{self.pedido.id}'} ({self.get_status_display()})"
+    
+    def confirmar(self):
+        """Confirma o pagamento e atualiza o pedido"""
+        from django.utils import timezone
+        self.status = self.Status.CONFIRMADO
+        self.confirmado_em = timezone.now()
+        self.save()
+        
+        # Atualizar pedido
+        self.pedido.status = Pedido.Status.PAGO
+        self.pedido.save()
+        
+        # Disparar notificações (stub)
+        self._notificar_confirmacao()
+    
+    def recusar(self):
+        """Recusa o pagamento"""
+        self.status = self.Status.RECUSADO
+        self.save()
+        
+        # Pedido volta para aguardando pagamento
+        self.pedido.status = Pedido.Status.AGUARDANDO_PAGAMENTO
+        self.pedido.save()
+        
+        # Disparar notificações (stub)
+        self._notificar_recusa()
+    
+    def _notificar_confirmacao(self):
+        """Notifica confirmação de pagamento (stub - implementar depois)"""
+        pass
+    
+    def _notificar_recusa(self):
+        """Notifica recusa de pagamento (stub - implementar depois)"""
+        pass
+
+
+class TransacaoGateway(models.Model):
+    """
+    Log detalhado de eventos vindos do gateway.
+    Armazena todos os webhooks e eventos relacionados ao pagamento.
+    """
+    pagamento = models.ForeignKey(
+        Pagamento,
+        on_delete=models.CASCADE,
+        related_name='transacoes',
+        help_text="Pagamento relacionado"
+    )
+    tipo_evento = models.CharField(
+        max_length=50,
+        help_text="Tipo de evento (payment_created, payment_approved, payment_failed, etc.)"
+    )
+    payload = models.JSONField(
+        default=dict,
+        help_text="Payload completo do webhook/evento"
+    )
+    gateway_response = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Resposta do gateway (se aplicável)"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Transação Gateway'
+        verbose_name_plural = 'Transações Gateway'
+        ordering = ['-criado_em']
+        indexes = [
+            models.Index(fields=['pagamento', '-criado_em']),
+            models.Index(fields=['tipo_evento', '-criado_em']),
+        ]
+    
+    def __str__(self):
+        return f"{self.tipo_evento} - {self.pagamento.pedido.codigo or f'Pedido #{self.pagamento.pedido.id}'} ({self.criado_em.strftime('%d/%m/%Y %H:%M')})"
 
 
 # ============================================================================

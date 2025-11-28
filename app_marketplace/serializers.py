@@ -5,7 +5,8 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
     Agente, Cliente, ClienteRelacao, Produto, EstoqueItem,
-    Oferta, TrustlineKeeper, RoleStats, Pedido,
+    Oferta, TrustlineKeeper, RoleStats, Pedido, ItemPedido,
+    Pagamento, TransacaoGateway, Evento,
     PublicacaoAgora, EngajamentoAgora
 )
 
@@ -240,6 +241,121 @@ class ScoreAgenteSerializer(serializers.Serializer):
 
 
 # ============================================================================
+# SISTEMA DE PAGAMENTOS - SERIALIZERS
+# ============================================================================
+
+class ItemPedidoSerializer(serializers.ModelSerializer):
+    """Serializer para Item de Pedido"""
+    produto_nome = serializers.CharField(source='produto.nome', read_only=True)
+    
+    class Meta:
+        model = ItemPedido
+        fields = [
+            'id', 'produto', 'produto_nome', 'quantidade',
+            'preco_unitario', 'descricao', 'moeda', 'subtotal'
+        ]
+        read_only_fields = ['id', 'subtotal']
+
+
+class PedidoSerializer(serializers.ModelSerializer):
+    """Serializer para Pedido"""
+    itens = ItemPedidoSerializer(many=True, read_only=True)
+    pagamento = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Pedido
+        fields = [
+            'id', 'codigo', 'cliente_nome', 'cliente_whatsapp', 'cliente_email',
+            'valor_subtotal', 'valor_frete', 'valor_taxas', 'valor_total', 'moeda',
+            'status', 'metodo_pagamento', 'evento', 'criado_em', 'atualizado_em',
+            'itens', 'pagamento'
+        ]
+        read_only_fields = ['id', 'codigo', 'criado_em', 'atualizado_em']
+    
+    def get_pagamento(self, obj):
+        """Retorna dados do pagamento se existir"""
+        if hasattr(obj, 'pagamento'):
+            return PagamentoSerializer(obj.pagamento).data
+        return None
+
+
+class PagamentoSerializer(serializers.ModelSerializer):
+    """Serializer para Pagamento"""
+    pedido_codigo = serializers.CharField(source='pedido.codigo', read_only=True)
+    
+    class Meta:
+        model = Pagamento
+        fields = [
+            'id', 'pedido', 'pedido_codigo', 'metodo', 'valor', 'moeda', 'status',
+            'gateway', 'gateway_payment_id', 'gateway_checkout_url',
+            'gateway_qr_code', 'gateway_qr_code_base64',
+            'criado_em', 'atualizado_em', 'confirmado_em'
+        ]
+        read_only_fields = ['id', 'criado_em', 'atualizado_em', 'confirmado_em']
+
+
+class TransacaoGatewaySerializer(serializers.ModelSerializer):
+    """Serializer para Transação Gateway"""
+    pagamento_id = serializers.IntegerField(source='pagamento.id', read_only=True)
+    
+    class Meta:
+        model = TransacaoGateway
+        fields = [
+            'id', 'pagamento', 'pagamento_id', 'tipo_evento',
+            'payload', 'gateway_response', 'criado_em'
+        ]
+        read_only_fields = ['id', 'criado_em']
+
+
+class CheckoutCreateSerializer(serializers.Serializer):
+    """Serializer para criação de pedido + pagamento via checkout"""
+    cliente = serializers.DictField(
+        child=serializers.CharField(),
+        help_text="Dados do cliente: nome, whatsapp, email"
+    )
+    itens = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="Lista de itens: [{'produto_id': 123, 'quantidade': 2}]"
+    )
+    entrega = serializers.DictField(
+        required=False,
+        help_text="Dados de entrega: tipo, keeper_id, endereco"
+    )
+    pagamento = serializers.DictField(
+        help_text="Dados de pagamento: metodo, gateway"
+    )
+    campanha = serializers.CharField(required=False, allow_blank=True, help_text="Código da campanha")
+    evento_id = serializers.IntegerField(required=False, allow_null=True, help_text="ID do evento")
+    
+    def validate_cliente(self, value):
+        """Valida dados do cliente"""
+        required_fields = ['nome', 'whatsapp']
+        for field in required_fields:
+            if field not in value:
+                raise serializers.ValidationError(f"Campo '{field}' é obrigatório em cliente")
+        return value
+    
+    def validate_itens(self, value):
+        """Valida itens do pedido"""
+        if not value:
+            raise serializers.ValidationError("Pedido deve ter pelo menos um item")
+        for item in value:
+            if 'produto_id' not in item or 'quantidade' not in item:
+                raise serializers.ValidationError("Cada item deve ter 'produto_id' e 'quantidade'")
+            if item['quantidade'] <= 0:
+                raise serializers.ValidationError("Quantidade deve ser maior que zero")
+        return value
+    
+    def validate_pagamento(self, value):
+        """Valida dados de pagamento"""
+        if 'metodo' not in value:
+            raise serializers.ValidationError("Campo 'metodo' é obrigatório em pagamento")
+        if 'gateway' not in value:
+            raise serializers.ValidationError("Campo 'gateway' é obrigatório em pagamento")
+        return value
+
+
+# ============================================================================
 # ÁGORA - SERIALIZERS
 # ============================================================================
 
@@ -363,6 +479,125 @@ class PublicacaoAgoraAnalyticsSerializer(serializers.Serializer):
     total_compartilhar = serializers.IntegerField()
     total_view_time = serializers.IntegerField()
     criado_em = serializers.DateTimeField()
+
+
+# ============================================================================
+# SISTEMA DE PAGAMENTOS - SERIALIZERS
+# ============================================================================
+
+class ItemPedidoSerializer(serializers.ModelSerializer):
+    """Serializer para Item de Pedido"""
+    produto_nome = serializers.CharField(source='produto.nome', read_only=True)
+    subtotal = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ItemPedido
+        fields = [
+            'id', 'produto', 'produto_nome', 'quantidade',
+            'preco_unitario', 'descricao', 'moeda', 'subtotal'
+        ]
+        read_only_fields = ['id', 'subtotal']
+    
+    def get_subtotal(self, obj):
+        return obj.subtotal()
+
+
+class PedidoSerializer(serializers.ModelSerializer):
+    """Serializer para Pedido"""
+    itens = ItemPedidoSerializer(many=True, read_only=True)
+    pagamento = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Pedido
+        fields = [
+            'id', 'codigo', 'cliente_nome', 'cliente_whatsapp', 'cliente_email',
+            'valor_subtotal', 'valor_frete', 'valor_taxas', 'valor_total', 'moeda',
+            'status', 'metodo_pagamento', 'evento', 'criado_em', 'atualizado_em',
+            'itens', 'pagamento'
+        ]
+        read_only_fields = ['id', 'codigo', 'criado_em', 'atualizado_em']
+    
+    def get_pagamento(self, obj):
+        """Retorna dados do pagamento se existir"""
+        if hasattr(obj, 'pagamento'):
+            return PagamentoSerializer(obj.pagamento).data
+        return None
+
+
+class PagamentoSerializer(serializers.ModelSerializer):
+    """Serializer para Pagamento"""
+    pedido_codigo = serializers.CharField(source='pedido.codigo', read_only=True)
+    
+    class Meta:
+        model = Pagamento
+        fields = [
+            'id', 'pedido', 'pedido_codigo', 'metodo', 'valor', 'moeda', 'status',
+            'gateway', 'gateway_payment_id', 'gateway_checkout_url',
+            'gateway_qr_code', 'gateway_qr_code_base64',
+            'criado_em', 'atualizado_em', 'confirmado_em'
+        ]
+        read_only_fields = ['id', 'criado_em', 'atualizado_em', 'confirmado_em']
+
+
+class TransacaoGatewaySerializer(serializers.ModelSerializer):
+    """Serializer para Transação Gateway"""
+    pagamento_id = serializers.IntegerField(source='pagamento.id', read_only=True)
+    
+    class Meta:
+        model = TransacaoGateway
+        fields = [
+            'id', 'pagamento', 'pagamento_id', 'tipo_evento',
+            'payload', 'gateway_response', 'criado_em'
+        ]
+        read_only_fields = ['id', 'criado_em']
+
+
+class CheckoutCreateSerializer(serializers.Serializer):
+    """Serializer para criação de pedido + pagamento via checkout"""
+    cliente = serializers.DictField(
+        child=serializers.CharField(),
+        help_text="Dados do cliente: nome, whatsapp, email"
+    )
+    itens = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="Lista de itens: [{'produto_id': 123, 'quantidade': 2}]"
+    )
+    entrega = serializers.DictField(
+        required=False,
+        help_text="Dados de entrega: tipo, keeper_id, endereco"
+    )
+    pagamento = serializers.DictField(
+        help_text="Dados de pagamento: metodo, gateway"
+    )
+    campanha = serializers.CharField(required=False, allow_blank=True, help_text="Código da campanha")
+    evento_id = serializers.IntegerField(required=False, allow_null=True, help_text="ID do evento")
+    
+    def validate_cliente(self, value):
+        """Valida dados do cliente"""
+        required_fields = ['nome', 'whatsapp']
+        for field in required_fields:
+            if field not in value:
+                raise serializers.ValidationError(f"Campo '{field}' é obrigatório em cliente")
+        return value
+    
+    def validate_itens(self, value):
+        """Valida itens do pedido"""
+        if not value:
+            raise serializers.ValidationError("Pedido deve ter pelo menos um item")
+        for item in value:
+            if 'produto_id' not in item or 'quantidade' not in item:
+                raise serializers.ValidationError("Cada item deve ter 'produto_id' e 'quantidade'")
+            if item['quantidade'] <= 0:
+                raise serializers.ValidationError("Quantidade deve ser maior que zero")
+        return value
+    
+    def validate_pagamento(self, value):
+        """Valida dados de pagamento"""
+        if 'metodo' not in value:
+            raise serializers.ValidationError("Campo 'metodo' é obrigatório em pagamento")
+        if 'gateway' not in value:
+            raise serializers.ValidationError("Campo 'gateway' é obrigatório em pagamento")
+        return value
 
 
 
