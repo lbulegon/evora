@@ -82,10 +82,18 @@ def importar_produtos_de_evento(modeladmin, request, queryset):
 
 @admin.register(Empresa)
 class EmpresaAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'cidade', 'estado', 'pais', 'cnpj', 'email', 'telefone', 'ativo', 'criada_em']
-    list_filter = ['pais', 'estado', 'ativo', 'criada_em']
+    list_display = ['nome', 'cidade', 'estado', 'pais', 'tem_cnpj', 'email', 'telefone', 'ativo', 'criada_em']
+    list_filter = ['pais', 'estado', 'ativo', 'criada_em', 'cidade']
     search_fields = ['nome', 'cnpj', 'email', 'cidade', 'estado']
     readonly_fields = ['criada_em', 'atualizado_em']
+    
+    def tem_cnpj(self, obj):
+        """Indica se a empresa tem CNPJ (empresas do Paraguai/Brasil) ou é estabelecimento (Orlando/USA)"""
+        if obj.cnpj:
+            return "Sim (Paraguai/Brasil)"
+        return "Não (Orlando/USA)"
+    tem_cnpj.short_description = 'Tipo'
+    tem_cnpj.admin_order_field = 'cnpj'
     
     fieldsets = (
         ('Identificação', {
