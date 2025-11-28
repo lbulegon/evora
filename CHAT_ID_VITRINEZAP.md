@@ -372,3 +372,5 @@ send_message("5511999999999@c.us", "Olá do VitrineZap!")
 **O sistema já está preparado para capturar e usar Chat IDs automaticamente!** 🚀
 
 
+
+

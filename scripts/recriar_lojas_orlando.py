@@ -160,3 +160,5 @@ def recriar_lojas_orlando():
 if __name__ == '__main__':
     recriar_lojas_orlando()
 
+
+

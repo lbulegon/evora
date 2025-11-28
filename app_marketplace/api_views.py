@@ -436,3 +436,5 @@ def resolver_operacao(request):
         return Response({'error': str(e)}, status=500)
 
 
+
+

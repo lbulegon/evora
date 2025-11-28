@@ -112,28 +112,30 @@ def clientes(request):
 def personal_shoppers(request):
     """
     Lista de Personal Shoppers disponíveis.
-    Para clientes: não mostra shoppers que foram bloqueados (deixados de seguir).
+    Para clientes: mostra apenas os shoppers que está seguindo.
     Para outros usuários: mostra todos os shoppers ativos.
     """
-    # Base: todos os shoppers ativos
-    shoppers = PersonalShopper.objects.filter(ativo=True).select_related('user')
-    
-    # Se for cliente, filtrar os que ele bloqueou (deixou de seguir)
+    # Se for cliente, mostrar apenas os shoppers que ele está seguindo
     if request.user.is_authenticated and request.user.is_cliente:
         try:
             cliente = request.user.cliente
-            # Obter IDs dos shoppers bloqueados por este cliente
-            shoppers_bloqueados = RelacionamentoClienteShopper.objects.filter(
+            # Obter IDs dos shoppers que o cliente está seguindo
+            shoppers_seguindo = RelacionamentoClienteShopper.objects.filter(
                 cliente=cliente,
-                status=RelacionamentoClienteShopper.Status.BLOQUEADO
+                status=RelacionamentoClienteShopper.Status.SEGUINDO
             ).values_list('personal_shopper_id', flat=True)
             
-            # Excluir os shoppers bloqueados da lista
-            if shoppers_bloqueados:
-                shoppers = shoppers.exclude(id__in=shoppers_bloqueados)
+            # Filtrar apenas os shoppers que o cliente está seguindo e que estão ativos
+            shoppers = PersonalShopper.objects.filter(
+                id__in=shoppers_seguindo,
+                ativo=True
+            ).select_related('user')
         except Cliente.DoesNotExist:
-            # Se não tem perfil cliente, mostrar todos
-            pass
+            # Se não tem perfil cliente, mostrar todos os shoppers ativos
+            shoppers = PersonalShopper.objects.filter(ativo=True).select_related('user')
+    else:
+        # Para usuários não clientes, mostrar todos os shoppers ativos
+        shoppers = PersonalShopper.objects.filter(ativo=True).select_related('user')
     
     return render(request, 'app_marketplace/personal_shoppers.html', {'shoppers': shoppers})
 

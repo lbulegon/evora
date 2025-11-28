@@ -89,3 +89,5 @@ bash start.sh
 ⏳ **AGUARDANDO REDEPLOY NO RAILWAY**
 
 
+
+

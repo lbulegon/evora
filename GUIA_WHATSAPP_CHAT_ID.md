@@ -267,3 +267,5 @@ Grupo: 120363123456789012@g.us
 **Dica**: O Chat ID é sempre retornado quando você recebe uma mensagem, então a forma mais fácil é configurar um webhook e deixar que os usuários enviem uma mensagem primeiro! 📱
 
 
+
+

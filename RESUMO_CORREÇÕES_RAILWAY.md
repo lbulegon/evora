@@ -113,3 +113,5 @@ Configurado logging específico para Railway com formatação adequada.
 **Status**: ✅ **PRONTO PARA DEPLOY**
 
 
+
+

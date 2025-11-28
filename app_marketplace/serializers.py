@@ -238,3 +238,5 @@ class ScoreAgenteSerializer(serializers.Serializer):
     valor_total = serializers.FloatField()
 
 
+
+
