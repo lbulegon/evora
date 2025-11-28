@@ -15,6 +15,7 @@ urlpatterns = [
     path('evento/<int:evento_id>/solicitar/', views.solicitar_evento, name='solicitar_evento'),
     path('clientes/', views.clientes, name='clientes'),
     path('personal_shoppers/', views.personal_shoppers, name='personal_shoppers'),
+    path('escolher_shoppers/', views.escolher_shoppers, name='escolher_shoppers'),
     path('pedidos/', views.pedidos, name='pedidos'),
     
     # WhatsApp Integration
