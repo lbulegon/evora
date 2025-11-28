@@ -29,7 +29,13 @@ import os
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-8j^$b4kv512@8mlg=koq)5iu8#fpqz#=ot8ost*)g^eyexvq!b')
-IS_RAILWAY = os.getenv('RAILWAY_ENVIRONMENT') is not None
+# Detectar Railway por múltiplas variáveis (Railway sempre define PORT e pode definir outras)
+IS_RAILWAY = (
+    os.getenv('RAILWAY_ENVIRONMENT') is not None or
+    os.getenv('RAILWAY_PROJECT_ID') is not None or
+    os.getenv('RAILWAY_SERVICE_ID') is not None or
+    (os.getenv('PORT') is not None and os.getenv('PGHOST') is not None)
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = not IS_RAILWAY  # False no Railway, True local
