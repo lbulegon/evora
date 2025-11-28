@@ -150,33 +150,21 @@ WSGI_APPLICATION = 'setup.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-'''
-DATABASES = {
-    'default': {
-        'ENGINE'  : 'django.db.backends.postgresql',
-        'NAME'    : 'railway',                                  # Nome do banco de dados
-        'USER'    : 'postgres',                               # Nome de usuário
-        'PASSWORD': 'dtzlYwfACCJRCJcZPQpnlKEZgnxKqzMM',       # Senha
-        'HOST'    : 'yamanote.proxy.rlwy.net',                 # Host do banco de dados (use o IP ou hostname se for remoto)
-        'PORT'    : '47941',                                  # Porta padrão do PostgreSQL
-    }
-
-
- }
-'''
-
-
 # Configuração do banco baseada no ambiente
 if IS_RAILWAY:
-    # Railway - usar variáveis de ambiente
+    # Railway - usar variáveis de ambiente ou valores padrão do Railway
+    # String de conexão: postgresql://postgres:dtzlYwfACCJRCJcZPQpnlKEZgnxKqzMM@yamanote.proxy.rlwy.net:47941/railway
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': os.getenv('PGDATABASE', 'railway'),
             'USER': os.getenv('PGUSER', 'postgres'),
-            'PASSWORD': os.getenv('PGPASSWORD', ''),
-            'HOST': os.getenv('PGHOST', 'localhost'),
-            'PORT': os.getenv('PGPORT', '5432'),
+            'PASSWORD': os.getenv('PGPASSWORD', 'dtzlYwfACCJRCJcZPQpnlKEZgnxKqzMM'),
+            'HOST': os.getenv('PGHOST', 'yamanote.proxy.rlwy.net'),
+            'PORT': os.getenv('PGPORT', '47941'),
+            'OPTIONS': {
+                'connect_timeout': 10,
+            },
         }
     }
 else:
