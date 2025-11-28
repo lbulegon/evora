@@ -20,6 +20,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.cache import never_cache
 
+@csrf_exempt
 @never_cache
 def health_check(request):
     """View para healthcheck do Railway"""
@@ -27,7 +28,7 @@ def health_check(request):
         'status': 'ok',
         'message': 'VitrineZap is running',
         'version': '1.0.0'
-    })
+    }, status=200)
 
 # Customizar a página inicial do admin para aceitar healthcheck
 admin.site.site_header = "VitrineZap Admin"
