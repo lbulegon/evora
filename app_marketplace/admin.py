@@ -40,7 +40,11 @@ from .models import (
     EstoqueItem,
     Oferta,
     TrustlineKeeper,
-    RoleStats
+    RoleStats,
+    # Modelos Oficiais - Reestruturação
+    CarteiraCliente,
+    LigacaoMesh,
+    LiquidacaoFinanceira
 )
 
 # Ação para importar produtos de um evento para outro
@@ -85,14 +89,53 @@ class EmpresaAdmin(admin.ModelAdmin):
 
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ['user', 'telefone', 'criado_em']
-    search_fields = ['user__username', 'user__first_name', 'user__last_name']
+    list_display = ['user', 'wallet', 'telefone', 'criado_em']
+    list_filter = ['wallet', 'criado_em']
+    search_fields = ['user__username', 'user__first_name', 'user__last_name', 'telefone']
+    autocomplete_fields = ['wallet', 'user']
+    readonly_fields = ['criado_em', 'atualizado_em', 'owner_carteira']
+    
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('user', 'wallet', 'owner_carteira')
+        }),
+        ('Contato', {
+            'fields': ('telefone', 'contato')
+        }),
+        ('Metadados', {
+            'fields': ('metadados',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
 
 @admin.register(PersonalShopper)
 class PersonalShopperAdmin(admin.ModelAdmin):
-    list_display = ['user', 'empresa', 'ativo', 'criado_em']
-    list_filter = ['ativo', 'empresa']
-    search_fields = ['user__username', 'user__first_name', 'user__last_name']
+    list_display = ['user', 'nome', 'ativo', 'criado_em']
+    list_filter = ['ativo', 'criado_em']
+    search_fields = ['user__username', 'user__first_name', 'user__last_name', 'nome']
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('user', 'nome', 'bio', 'ativo')
+        }),
+        ('Redes Sociais', {
+            'fields': ('facebook', 'instagram', 'tiktok', 'twitter', 'linkedin', 'pinterest', 'youtube'),
+            'classes': ('collapse',)
+        }),
+        ('Empresa (Opcional)', {
+            'fields': ('empresa',),
+            'classes': ('collapse',),
+            'description': 'Campo opcional - Personal Shopper não precisa estar vinculado a uma empresa'
+        }),
+        ('Informações', {
+            'fields': ('criado_em',),
+            'classes': ('collapse',)
+        }),
+    )
+    readonly_fields = ['criado_em']
 
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
@@ -185,11 +228,40 @@ class EventoAdmin(admin.ModelAdmin):
 
 @admin.register(Pedido)
 class PedidoAdmin(admin.ModelAdmin):
-    list_display = ('id', 'cliente', 'status', 'valor_total', 'criado_em')
-    list_filter = ('status', 'metodo_pagamento', 'criado_em')
-    search_fields = ('cliente__user__username', 'codigo_rastreamento')
+    list_display = ('id', 'cliente', 'tipo_cliente', 'shopper', 'keeper', 'status', 'valor_total', 'criado_em')
+    list_filter = ('status', 'tipo_cliente', 'metodo_pagamento', 'criado_em')
+    search_fields = ('cliente__user__username', 'codigo_rastreamento', 'shopper__username', 'keeper__username')
     readonly_fields = ('criado_em', 'atualizado_em', 'valor_total')
-    autocomplete_fields = ['cliente']
+    autocomplete_fields = ['cliente', 'carteira_cliente', 'shopper', 'keeper']
+    
+    fieldsets = (
+        ('Cliente e Carteira', {
+            'fields': ('cliente', 'carteira_cliente', 'tipo_cliente')
+        }),
+        ('Agentes', {
+            'fields': ('shopper', 'keeper')
+        }),
+        ('Preços (Modelo Oficial)', {
+            'fields': ('preco_base', 'preco_final', 'valor_total'),
+            'description': 'P_base = custo, P_final = valor pago pelo cliente'
+        }),
+        ('Entrega', {
+            'fields': ('endereco_entrega',)
+        }),
+        ('Pagamento', {
+            'fields': ('metodo_pagamento', 'cupom', 'status')
+        }),
+        ('Rastreamento', {
+            'fields': ('codigo_rastreamento',)
+        }),
+        ('Observações', {
+            'fields': ('observacoes', 'is_revisado', 'is_prioritario')
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
 
     def save_model(self, request, obj, form, change):
         if change:
@@ -799,3 +871,125 @@ class RoleStatsAdmin(admin.ModelAdmin):
             stats.atualizar_scores()
         self.message_user(request, f"Scores atualizados para {queryset.count()} agentes.")
     atualizar_scores.short_description = "Atualizar scores dos agentes selecionados"
+
+
+# ============================================================================
+# ADMIN - MODELOS OFICIAIS (REESTRUTURAÇÃO)
+# ============================================================================
+
+class ClienteInline(admin.TabularInline):
+    """Inline para mostrar clientes de uma carteira"""
+    model = Cliente
+    extra = 0
+    fields = ['user', 'telefone', 'criado_em']
+    readonly_fields = ['criado_em']
+
+
+@admin.register(CarteiraCliente)
+class CarteiraClienteAdmin(admin.ModelAdmin):
+    list_display = ['nome_exibicao', 'owner', 'total_clientes', 'criado_em']
+    list_filter = ['criado_em', 'owner']
+    search_fields = ['nome_exibicao', 'owner__username', 'owner__first_name', 'owner__last_name']
+    readonly_fields = ['criado_em', 'atualizado_em', 'total_clientes']
+    autocomplete_fields = ['owner']
+    inlines = [ClienteInline]
+    
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('owner', 'nome_exibicao')
+        }),
+        ('Estatísticas', {
+            'fields': ('total_clientes',)
+        }),
+        ('Metadados', {
+            'fields': ('metadados',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def total_clientes(self, obj):
+        return obj.clientes.count()
+    total_clientes.short_description = 'Total de Clientes'
+
+
+@admin.register(LigacaoMesh)
+class LigacaoMeshAdmin(admin.ModelAdmin):
+    list_display = ['agente_a', 'agente_b', 'tipo', 'ativo', 'aceito_em', 'criado_em']
+    list_filter = ['tipo', 'ativo', 'criado_em', 'aceito_em']
+    search_fields = ['agente_a__username', 'agente_b__username']
+    readonly_fields = ['criado_em', 'atualizado_em']
+    autocomplete_fields = ['agente_a', 'agente_b']
+    
+    fieldsets = (
+        ('Agentes', {
+            'fields': ('agente_a', 'agente_b')
+        }),
+        ('Tipo e Status', {
+            'fields': ('tipo', 'ativo', 'aceito_em')
+        }),
+        ('Configuração Financeira', {
+            'fields': ('config_financeira',),
+            'description': 'JSON com taxa_evora, venda_clientes_shopper e venda_clientes_keeper'
+        }),
+        ('Metadados', {
+            'fields': ('metadados',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def save_model(self, request, obj, form, change):
+        # Validar config_financeira antes de salvar
+        obj.clean()
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(LiquidacaoFinanceira)
+class LiquidacaoFinanceiraAdmin(admin.ModelAdmin):
+    list_display = ['pedido', 'valor_margem', 'valor_evora', 'valor_shopper', 'valor_keeper', 'status', 'criado_em']
+    list_filter = ['status', 'criado_em', 'liquidado_em']
+    search_fields = ['pedido__id', 'pedido__cliente__user__username']
+    readonly_fields = ['criado_em', 'atualizado_em', 'valor_margem', 'valor_evora', 'valor_shopper', 'valor_keeper']
+    autocomplete_fields = ['pedido']
+    
+    fieldsets = (
+        ('Pedido', {
+            'fields': ('pedido',)
+        }),
+        ('Valores', {
+            'fields': ('valor_margem', 'valor_evora', 'valor_shopper', 'valor_keeper')
+        }),
+        ('Status', {
+            'fields': ('status', 'liquidado_em')
+        }),
+        ('Detalhes', {
+            'fields': ('detalhes',),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    actions = ['marcar_como_liquidada']
+    
+    def marcar_como_liquidada(self, request, queryset):
+        """Marca liquidações como liquidadas"""
+        from django.utils import timezone
+        atualizadas = 0
+        for liquidacao in queryset:
+            liquidacao.status = LiquidacaoFinanceira.StatusLiquidacao.LIQUIDADA
+            if not liquidacao.liquidado_em:
+                liquidacao.liquidado_em = timezone.now()
+            liquidacao.save()
+            atualizadas += 1
+        self.message_user(request, f"{atualizadas} liquidação(ões) marcada(s) como liquidada(s).")
+    marcar_como_liquidada.short_description = "Marcar como liquidada"

@@ -37,14 +37,29 @@ class Categoria(models.Model):
 
 
 class Produto(models.Model):
-    empresa      = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='produtos')
-    nome         = models.CharField(max_length=100)
-    descricao    = models.TextField()
-    preco        = models.DecimalField(max_digits=10, decimal_places=2)
-    categoria    = models.ForeignKey(Categoria, on_delete=models.SET_NULL, null=True, blank=True, related_name='produtos')
-    imagem       = models.ImageField(upload_to='produtos/', blank=True, null=True)
-    criado_em    = models.DateTimeField(auto_now_add=True)
-    ativo        = models.BooleanField(default=True)
+    """
+    Produto do sistema.
+    Adaptado para incluir criado_por (Shopper que criou o produto).
+    """
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='produtos')
+    nome = models.CharField(max_length=100)
+    descricao = models.TextField()
+    preco = models.DecimalField(max_digits=10, decimal_places=2)
+    categoria = models.ForeignKey(Categoria, on_delete=models.SET_NULL, null=True, blank=True, related_name='produtos')
+    imagem = models.ImageField(upload_to='produtos/', blank=True, null=True)
+    
+    # NOVO CAMPO - Modelo Oficial
+    criado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='produtos_criados',
+        help_text="Shopper que criou este produto"
+    )
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    ativo = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = 'Produto'
@@ -60,13 +75,43 @@ class Produto(models.Model):
 # ============================================================================
 
 class Cliente(models.Model):
-    user      = models.OneToOneField(User, on_delete=models.CASCADE, related_name='cliente')
-    telefone  = models.CharField(max_length=20, blank=True)
+    """
+    Cliente do sistema.
+    Pode pertencer a uma CarteiraCliente (novo modelo oficial) ou manter relação direta com User (compatibilidade).
+    """
+    # Nova estrutura: Carteira de Clientes
+    wallet = models.ForeignKey(
+        'CarteiraCliente', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='clientes',
+        help_text="Carteira à qual este cliente pertence (novo modelo oficial)"
+    )
+    
+    # Estrutura antiga (mantida para compatibilidade)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='cliente')
+    telefone = models.CharField(max_length=20, blank=True)
+    
+    # Novos campos
+    contato = models.JSONField(
+        default=dict, 
+        blank=True,
+        help_text="Informações de contato (telefone, email, WhatsApp, etc.)"
+    )
+    metadados = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Metadados adicionais do cliente"
+    )
+    
     criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
+        ordering = ['-criado_em']
 
     def personal_shoppers(self):
         """Retorna personal shoppers que este cliente segue"""
@@ -74,6 +119,13 @@ class Cliente(models.Model):
             relacionamento_clienteshopper__cliente=self,
             relacionamento_clienteshopper__status='seguindo'
         )
+    
+    @property
+    def owner_carteira(self):
+        """Retorna o owner da carteira, se existir"""
+        if self.wallet:
+            return self.wallet.owner
+        return None
 
     def __str__(self):
         return self.user.get_full_name() or self.user.username
@@ -340,7 +392,10 @@ class CupomDesconto(models.Model):
 
 
 class Pedido(models.Model):
-    """Pedido de produtos ou serviços"""
+    """
+    Pedido de produtos ou serviços.
+    Adaptado para o modelo oficial com tipo_cliente e carteira_cliente.
+    """
     
     class Status(models.TextChoices):
         PENDENTE      = 'pendente', 'Pendente'
@@ -356,12 +411,68 @@ class Pedido(models.Model):
         CARTAO_DEBITO  = 'cartao_debito', 'Cartão de Débito'
         BOLETO         = 'boleto', 'Boleto'
         DINHEIRO       = 'dinheiro', 'Dinheiro'
-
-    cliente             = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='pedidos')
-    endereco_entrega    = models.ForeignKey(EnderecoEntrega, on_delete=models.CASCADE)
-    cupom               = models.ForeignKey(CupomDesconto, null=True, blank=True, on_delete=models.SET_NULL)
     
-    criado_em           = models.DateTimeField(auto_now_add=True)
+    class TipoCliente(models.TextChoices):
+        DO_SHOPPER = 'do_shopper', 'Cliente do Shopper'
+        DO_KEEPER = 'do_keeper', 'Cliente do Keeper'
+
+    # Campos principais
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='pedidos')
+    endereco_entrega = models.ForeignKey(EnderecoEntrega, on_delete=models.CASCADE)
+    cupom = models.ForeignKey(CupomDesconto, null=True, blank=True, on_delete=models.SET_NULL)
+    
+    # NOVOS CAMPOS - Modelo Oficial
+    carteira_cliente = models.ForeignKey(
+        'CarteiraCliente',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pedidos',
+        help_text="Carteira à qual o cliente pertence"
+    )
+    tipo_cliente = models.CharField(
+        max_length=20,
+        choices=TipoCliente.choices,
+        null=True,
+        blank=True,
+        help_text="Tipo de cliente: do_shopper ou do_keeper"
+    )
+    
+    # Agentes envolvidos
+    shopper = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pedidos_como_shopper',
+        help_text="Shopper que criou/vendeu o pedido"
+    )
+    keeper = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pedidos_como_keeper',
+        help_text="Keeper que fará a entrega (null se tipo_cliente='do_shopper')"
+    )
+    
+    # Preços (modelo oficial)
+    preco_base = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Preço base (custo) - P_base"
+    )
+    preco_final = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Preço final pago pelo cliente - P_final"
+    )
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em       = models.DateTimeField(auto_now=True)
     status              = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
     metodo_pagamento    = models.CharField(max_length=20, choices=MetodoPagamento.choices, blank=True, null=True)
@@ -388,6 +499,80 @@ class Pedido(models.Model):
         """Salva o pedido recalculando o total"""
         self.valor_total = self.calcular_total()
         self.save()
+    
+    def determinar_tipo_cliente(self, shopper_user):
+        """
+        Determina automaticamente o tipo_cliente e keeper baseado na carteira.
+        
+        Regra oficial (DEFINIÇÃO DEFINITIVA):
+        - Se cliente pertence à carteira do Shopper: 
+          → tipo_cliente = "do_shopper", keeper = null
+          → Shopper entrega para seus próprios clientes
+        
+        - Se cliente pertence à carteira do Keeper:
+          → tipo_cliente = "do_keeper", keeper = wallet.owner
+          → REQUER LigacaoMesh ativa entre shopper e keeper
+          → Keeper entrega para seus próprios clientes
+        
+        IMPORTANTE: Não é possível vender para cliente do Keeper sem LigacaoMesh ativa.
+        """
+        if not self.carteira_cliente:
+            # Se não tem carteira, tentar determinar pela carteira do cliente
+            if self.cliente.wallet:
+                self.carteira_cliente = self.cliente.wallet
+            else:
+                # Fallback: considerar como cliente do shopper
+                self.tipo_cliente = self.TipoCliente.DO_SHOPPER
+                self.keeper = None
+                return
+        
+        # Determinar tipo baseado no owner da carteira
+        wallet_owner = self.carteira_cliente.owner
+        
+        if wallet_owner == shopper_user:
+            # Cliente do Shopper - Shopper entrega diretamente
+            self.tipo_cliente = self.TipoCliente.DO_SHOPPER
+            self.keeper = None
+        else:
+            # Cliente do Keeper - VERIFICAR SE EXISTE LIGAÇÃO MESH ATIVA
+            # Conforme definição oficial: Keeper só participa se houver mesh configurada
+            from django.db.models import Q
+            
+            mesh = LigacaoMesh.objects.filter(
+                ativo=True
+            ).filter(
+                (Q(agente_a=shopper_user, agente_b=wallet_owner)) |
+                (Q(agente_a=wallet_owner, agente_b=shopper_user))
+            ).first()
+            
+            if mesh:
+                # Mesh existe e está ativa - pode vender para cliente do Keeper
+                self.tipo_cliente = self.TipoCliente.DO_KEEPER
+                self.keeper = wallet_owner
+            else:
+                # Sem mesh ativa - NÃO pode vender para cliente do Keeper
+                # Levantar exceção conforme regra de negócio
+                raise ValidationError(
+                    f"Não existe LigacaoMesh ativa entre {shopper_user.username} "
+                    f"e {wallet_owner.username}. "
+                    f"Para vender para clientes do Keeper, é necessário estabelecer "
+                    f"uma LigacaoMesh (forte ou fraca) entre os agentes."
+                )
+    
+    def atualizar_precos(self):
+        """
+        Atualiza preco_base e preco_final baseado nos itens do pedido.
+        preco_base = soma dos custos dos produtos
+        preco_final = valor_total (já calculado com cupons)
+        """
+        # Preço base = soma dos preços base dos produtos (se disponível)
+        # Por enquanto, usa o preço do produto como base
+        if not self.preco_base:
+            self.preco_base = sum(item.produto.preco * item.quantidade for item in self.itens.all())
+        
+        # Preço final = valor_total (já calculado)
+        if not self.preco_final:
+            self.preco_final = self.valor_total
 
     def __str__(self):
         return f"Pedido #{self.id} - {self.cliente.user.username} - {self.get_status_display()}"
@@ -1202,6 +1387,154 @@ class RoleStats(models.Model):
 # - comissao_shopper (DecimalField)
 # - comissao_keeper (DecimalField)
 # - comissao_indicacao (DecimalField, default=0)
+
+
+# ============================================================================
+# MODELOS OFICIAIS - PROMPT VITRINEZAP/ÉVORA/KMN
+# Baseado no PROMPT OFICIAL do sistema
+# ============================================================================
+
+class CarteiraCliente(models.Model):
+    """
+    Carteira de clientes de um agente (Shopper ou Keeper).
+    Cada agente pode ter uma ou mais carteiras de clientes.
+    """
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='carteiras_cliente')
+    nome_exibicao = models.CharField(max_length=200, help_text="Nome para exibição da carteira")
+    metadados = models.JSONField(default=dict, blank=True, help_text="Metadados adicionais da carteira")
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Carteira de Clientes'
+        verbose_name_plural = 'Carteiras de Clientes'
+        ordering = ['-criado_em']
+    
+    def __str__(self):
+        return f"{self.nome_exibicao} ({self.owner.username})"
+    
+    def total_clientes(self):
+        """Retorna o total de clientes nesta carteira"""
+        return self.clientes.count()
+
+
+class LigacaoMesh(models.Model):
+    """
+    Ligação Mesh entre dois agentes (Shopper/Keeper).
+    Substitui o modelo TrustlineKeeper com tipos "forte" e "fraca".
+    """
+    class TipoMesh(models.TextChoices):
+        FORTE = 'forte', 'Mesh Forte'
+        FRACA = 'fraca', 'Mesh Fraca'
+    
+    agente_a = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ligacoes_mesh_como_a')
+    agente_b = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ligacoes_mesh_como_b')
+    tipo = models.CharField(max_length=10, choices=TipoMesh.choices, default=TipoMesh.FRACA)
+    ativo = models.BooleanField(default=True)
+    
+    # Configuração financeira em JSON
+    # Formato:
+    # {
+    #   "taxa_evora": 0.10,
+    #   "venda_clientes_shopper": {"alpha_s": 1.0},
+    #   "venda_clientes_keeper": {"alpha_s": 0.60, "alpha_k": 0.40}
+    # }
+    config_financeira = models.JSONField(
+        default=dict,
+        help_text="Configuração financeira da ligação mesh"
+    )
+    
+    # Metadados adicionais
+    metadados = models.JSONField(default=dict, blank=True)
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    aceito_em = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = 'Ligação Mesh'
+        verbose_name_plural = 'Ligações Mesh'
+        unique_together = ('agente_a', 'agente_b')
+        ordering = ['-aceito_em', '-criado_em']
+    
+    def clean(self):
+        if self.agente_a == self.agente_b:
+            raise ValidationError("Um agente não pode ter ligação mesh consigo mesmo")
+        
+        # Validar config_financeira
+        if not self.config_financeira:
+            # Configuração padrão
+            self.config_financeira = {
+                "taxa_evora": 0.10,
+                "venda_clientes_shopper": {"alpha_s": 1.0},
+                "venda_clientes_keeper": {"alpha_s": 0.60, "alpha_k": 0.40}
+            }
+        else:
+            # Validar estrutura
+            if "taxa_evora" not in self.config_financeira:
+                self.config_financeira["taxa_evora"] = 0.10
+            
+            if "venda_clientes_shopper" not in self.config_financeira:
+                self.config_financeira["venda_clientes_shopper"] = {"alpha_s": 1.0}
+            
+            if "venda_clientes_keeper" not in self.config_financeira:
+                self.config_financeira["venda_clientes_keeper"] = {"alpha_s": 0.60, "alpha_k": 0.40}
+            
+            # Validar soma dos alphas
+            keeper_config = self.config_financeira.get("venda_clientes_keeper", {})
+            alpha_s = keeper_config.get("alpha_s", 0.60)
+            alpha_k = keeper_config.get("alpha_k", 0.40)
+            if abs(alpha_s + alpha_k - 1.0) > 0.01:  # Tolerância para decimais
+                raise ValidationError("A soma de alpha_s e alpha_k deve ser 1.0")
+    
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        tipo_str = "Forte" if self.tipo == self.TipoMesh.FORTE else "Fraca"
+        return f"{self.agente_a.username} ↔ {self.agente_b.username} ({tipo_str})"
+
+
+class LiquidacaoFinanceira(models.Model):
+    """
+    Liquidação financeira de um pedido.
+    Calcula e armazena a distribuição de valores entre Évora, Shopper e Keeper.
+    """
+    pedido = models.OneToOneField('Pedido', on_delete=models.CASCADE, related_name='liquidacao')
+    
+    # Valores calculados
+    valor_margem = models.DecimalField(max_digits=12, decimal_places=2, help_text="Margem total (P_final - P_base)")
+    valor_evora = models.DecimalField(max_digits=12, decimal_places=2, help_text="Valor recebido pela Évora")
+    valor_shopper = models.DecimalField(max_digits=12, decimal_places=2, help_text="Valor recebido pelo Shopper")
+    valor_keeper = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Valor recebido pelo Keeper")
+    
+    # Detalhes do cálculo (JSON)
+    detalhes = models.JSONField(
+        default=dict,
+        help_text="Detalhes do cálculo (taxas, percentuais, etc.)"
+    )
+    
+    # Status
+    class StatusLiquidacao(models.TextChoices):
+        PENDENTE = 'pendente', 'Pendente'
+        CALCULADA = 'calculada', 'Calculada'
+        LIQUIDADA = 'liquidada', 'Liquidada'
+        CANCELADA = 'cancelada', 'Cancelada'
+    
+    status = models.CharField(max_length=20, choices=StatusLiquidacao.choices, default=StatusLiquidacao.PENDENTE)
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    liquidado_em = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = 'Liquidação Financeira'
+        verbose_name_plural = 'Liquidações Financeiras'
+        ordering = ['-criado_em']
+    
+    def __str__(self):
+        return f"Liquidação Pedido #{self.pedido.id} - R$ {self.valor_margem}"
 
 
 # ============================================================================
