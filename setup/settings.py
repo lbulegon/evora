@@ -119,6 +119,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'app_marketplace.middleware.RailwayHealthCheckMiddleware',  # Primeiro para interceptar healthchecks
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # WhiteNoise para servir arquivos estáticos
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -215,6 +216,15 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para Railway
 
+# Static files directories (para desenvolvimento)
+STATICFILES_DIRS = [BASE_DIR / "app_marketplace" / "static"]
+
+# WhiteNoise para servir arquivos estáticos em produção (Railway)
+if IS_RAILWAY:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+else:
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -222,10 +232,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Templates
 TEMPLATES[0]['DIRS'] = [BASE_DIR / "app_marketplace" / "templates"]
-
-# Static
-STATICFILES_DIRS = [BASE_DIR / "app_marketplace" / "static"]
-STATIC_URL = '/static/'
 
 LOGIN_REDIRECT_URL = '/home/'
 
