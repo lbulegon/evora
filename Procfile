@@ -1,1 +1,1 @@
-web: /app/.venv/bin/python manage.py migrate --noinput && /app/.venv/bin/gunicorn setup.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --max-requests 1000 --log-level info --access-logfile - --error-logfile -
+web: python manage.py migrate --noinput && gunicorn setup.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --max-requests 1000 --log-level info --access-logfile - --error-logfile -
