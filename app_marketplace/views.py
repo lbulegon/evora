@@ -9,7 +9,8 @@ from .models import (
     Evento,
     Cliente,
     PersonalShopper,
-    RelacionamentoClienteShopper
+    RelacionamentoClienteShopper,
+    Pedido
 )
 
 
@@ -220,5 +221,39 @@ def escolher_shoppers(request):
     return render(request, 'app_marketplace/escolher_shoppers.html', context)
 
 
+@login_required
 def pedidos(request):
-    return render(request, 'app_marketplace/pedidos.html')
+    """
+    Lista de pedidos/compras do cliente logado.
+    Apenas clientes podem ver seus próprios pedidos.
+    """
+    # Verificar se é cliente
+    if not request.user.is_cliente:
+        messages.error(request, 'Esta página é apenas para clientes.')
+        return redirect('home')
+    
+    try:
+        cliente = request.user.cliente
+    except Cliente.DoesNotExist:
+        messages.error(request, 'Perfil de cliente não encontrado.')
+        return redirect('home')
+    
+    # Buscar apenas pedidos deste cliente
+    pedidos = Pedido.objects.filter(cliente=cliente).select_related(
+        'cliente',
+        'shopper',
+        'personal_shopper'
+    ).order_by('-criado_em')
+    
+    # Filtros opcionais
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        pedidos = pedidos.filter(status=status_filter)
+    
+    context = {
+        'pedidos': pedidos,
+        'status_filter': status_filter,
+        'status_choices': Pedido.Status.choices,
+    }
+    
+    return render(request, 'app_marketplace/pedidos.html', context)
