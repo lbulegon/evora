@@ -21,7 +21,7 @@ def migrar_estabelecimentos_para_empresas(apps, schema_editor):
         empresa = Empresa.objects.create(
             nome=est.nome,
             cnpj=None,  # Estabelecimentos não têm CNPJ
-            email='',  # Estabelecimento não tinha email obrigatório
+            email=f"contato@{est.nome.lower().replace(' ', '').replace("'", '').replace('.', '')}.com" if est.nome else 'contato@empresa.com',  # Email obrigatório
             telefone=est.telefone or '',
             website=est.website or '',
             endereco=est.endereco or '',
@@ -38,12 +38,19 @@ def migrar_estabelecimentos_para_empresas(apps, schema_editor):
         )
         
         # Atualizar ForeignKeys usando apps.get_model para evitar import direto
-        WhatsappProduct = apps.get_model('app_marketplace', 'WhatsappProduct')
-        EstoqueItem = apps.get_model('app_marketplace', 'EstoqueItem')
+        try:
+            WhatsappProduct = apps.get_model('app_marketplace', 'WhatsappProduct')
+            if WhatsappProduct.objects.filter(estabelecimento_id=est.id).exists():
+                WhatsappProduct.objects.filter(estabelecimento_id=est.id).update(estabelecimento_id=empresa.id)
+        except Exception as e:
+            print(f"  AVISO: Erro ao atualizar WhatsappProduct: {e}")
         
-        # Atualizar referências
-        WhatsappProduct.objects.filter(estabelecimento_id=est.id).update(estabelecimento_id=empresa.id)
-        EstoqueItem.objects.filter(estabelecimento_id=est.id).update(estabelecimento_id=empresa.id)
+        try:
+            EstoqueItem = apps.get_model('app_marketplace', 'EstoqueItem')
+            if EstoqueItem.objects.filter(estabelecimento_id=est.id).exists():
+                EstoqueItem.objects.filter(estabelecimento_id=est.id).update(estabelecimento_id=empresa.id)
+        except Exception as e:
+            print(f"  AVISO: Erro ao atualizar EstoqueItem: {e}")
         
         print(f"  OK Migrado: {est.nome} ({est.cidade}/{est.estado})")
     
