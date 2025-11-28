@@ -109,8 +109,31 @@ def clientes(request):
     return render(request, 'app_marketplace/clientes.html')
 
 def personal_shoppers(request):
-    """Lista de Personal Shoppers disponíveis"""
+    """
+    Lista de Personal Shoppers disponíveis.
+    Para clientes: não mostra shoppers que foram bloqueados (deixados de seguir).
+    Para outros usuários: mostra todos os shoppers ativos.
+    """
+    # Base: todos os shoppers ativos
     shoppers = PersonalShopper.objects.filter(ativo=True).select_related('user')
+    
+    # Se for cliente, filtrar os que ele bloqueou (deixou de seguir)
+    if request.user.is_authenticated and request.user.is_cliente:
+        try:
+            cliente = request.user.cliente
+            # Obter IDs dos shoppers bloqueados por este cliente
+            shoppers_bloqueados = RelacionamentoClienteShopper.objects.filter(
+                cliente=cliente,
+                status=RelacionamentoClienteShopper.Status.BLOQUEADO
+            ).values_list('personal_shopper_id', flat=True)
+            
+            # Excluir os shoppers bloqueados da lista
+            if shoppers_bloqueados:
+                shoppers = shoppers.exclude(id__in=shoppers_bloqueados)
+        except Cliente.DoesNotExist:
+            # Se não tem perfil cliente, mostrar todos
+            pass
+    
     return render(request, 'app_marketplace/personal_shoppers.html', {'shoppers': shoppers})
 
 
@@ -157,15 +180,23 @@ def escolher_shoppers(request):
                 messages.success(request, f'Você agora está seguindo {shopper.user.get_full_name() or shopper.user.username}!')
             
             elif acao == 'deixar_seguir':
-                # Atualizar relacionamento
+                # Atualizar relacionamento para bloqueado
                 relacao = RelacionamentoClienteShopper.objects.filter(
                     cliente=cliente,
                     personal_shopper=shopper
                 ).first()
                 if relacao:
-                    relacao.status = 'bloqueado'  # ou 'inativo' dependendo da lógica
+                    relacao.status = RelacionamentoClienteShopper.Status.BLOQUEADO
                     relacao.save()
-                    messages.info(request, f'Você deixou de seguir {shopper.user.get_full_name() or shopper.user.username}.')
+                    messages.info(request, f'Você deixou de seguir {shopper.user.get_full_name() or shopper.user.username}. O shopper não aparecerá mais na sua lista.')
+                else:
+                    # Se não existe relacionamento, criar como bloqueado
+                    RelacionamentoClienteShopper.objects.create(
+                        cliente=cliente,
+                        personal_shopper=shopper,
+                        status=RelacionamentoClienteShopper.Status.BLOQUEADO
+                    )
+                    messages.info(request, f'Você deixou de seguir {shopper.user.get_full_name() or shopper.user.username}. O shopper não aparecerá mais na sua lista.')
             
             return redirect('escolher_shoppers')
             
