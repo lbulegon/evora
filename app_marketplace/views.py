@@ -241,8 +241,7 @@ def pedidos(request):
     # Buscar apenas pedidos deste cliente
     pedidos = Pedido.objects.filter(cliente=cliente).select_related(
         'cliente',
-        'shopper',
-        'personal_shopper'
+        'shopper'
     ).order_by('-criado_em')
     
     # Filtros opcionais
