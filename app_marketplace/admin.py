@@ -12,7 +12,6 @@ from .models import (
     PersonalShopper, 
     Evento, 
     RelacionamentoClienteShopper, 
-    Estabelecimento,
     CupomDesconto,
     # Novos modelos
     AddressKeeper,
@@ -30,7 +29,6 @@ from .models import (
     WhatsappMessage,
     WhatsappProduct,
     WhatsappOrder,
-    Estabelecimento,
     GroupLinkRequest,
     ShopperOnboardingToken,
     AddressKeeperOnboardingToken,
@@ -84,8 +82,29 @@ def importar_produtos_de_evento(modeladmin, request, queryset):
 
 @admin.register(Empresa)
 class EmpresaAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'cnpj', 'email', 'telefone', 'criada_em']
-    search_fields = ['nome', 'cnpj', 'email']
+    list_display = ['nome', 'cidade', 'estado', 'pais', 'cnpj', 'email', 'telefone', 'ativo', 'criada_em']
+    list_filter = ['pais', 'estado', 'ativo', 'criada_em']
+    search_fields = ['nome', 'cnpj', 'email', 'cidade', 'estado']
+    readonly_fields = ['criada_em', 'atualizado_em']
+    
+    fieldsets = (
+        ('Identificação', {
+            'fields': ('nome', 'cnpj')
+        }),
+        ('Contato', {
+            'fields': ('email', 'telefone', 'website')
+        }),
+        ('Localização', {
+            'fields': ('endereco', 'cidade', 'estado', 'pais', 'latitude', 'longitude')
+        }),
+        ('Operacional', {
+            'fields': ('horario_funcionamento', 'categorias', 'ativo')
+        }),
+        ('Timestamps', {
+            'fields': ('criada_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        }),
+    )
 
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
@@ -184,11 +203,6 @@ class ProdutoEventoAdmin(admin.ModelAdmin):
     list_display = ['evento', 'produto', 'importado_de']
     list_filter = ['evento']    
 
-@admin.register(Estabelecimento)
-class EstabelecimentoAdmin(admin.ModelAdmin):
-    search_fields = ['nome']
-    list_display = ['nome', 'endereco', 'telefone']
-    ordering = ['nome']
 
 
 class ProdutoEventoInline(admin.TabularInline):
@@ -209,9 +223,6 @@ class EventoForm(forms.ModelForm):
         if 'clientes' in self.fields:
             self.fields['clientes'].queryset = Cliente.objects.all()
             self.fields['clientes'].help_text = ''
-        if 'estabelecimentos' in self.fields:
-            self.fields['estabelecimentos'].queryset = Estabelecimento.objects.all()
-            self.fields['estabelecimentos'].help_text = ''
 
 
 @admin.register(Evento)

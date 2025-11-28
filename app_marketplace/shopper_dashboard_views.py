@@ -19,7 +19,7 @@ from decimal import Decimal
 from .models import (
     PersonalShopper, WhatsappGroup, WhatsappParticipant, 
     WhatsappMessage, WhatsappProduct, WhatsappOrder,
-    Cliente, Produto, Categoria, Estabelecimento
+    Cliente, Produto, Categoria, Empresa
 )
 from .whatsapp_views import send_message, send_reaction
 
@@ -310,7 +310,7 @@ def shopper_products(request):
     products = WhatsappProduct.objects.filter(group__owner=request.user).order_by('-created_at')
     
     # Estabelecimentos disponíveis (base geral)
-    estabelecimentos = Estabelecimento.objects.filter(ativo=True).order_by('nome')
+    estabelecimentos = Empresa.objects.filter(ativo=True).order_by('nome')
     
     # Filtros
     search = request.GET.get('search', '')
@@ -600,7 +600,7 @@ def create_product(request):
         estabelecimento_id = data.get('estabelecimento_id')
         estabelecimento = None
         if estabelecimento_id:
-            estabelecimento = get_object_or_404(Estabelecimento, id=estabelecimento_id)
+            estabelecimento = get_object_or_404(Empresa, id=estabelecimento_id)
         
         # Criar produto
         product = WhatsappProduct.objects.create(

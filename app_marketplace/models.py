@@ -10,17 +10,46 @@ from django.core.exceptions import ValidationError
 # ============================================================================
 
 class Empresa(models.Model):
-    nome      = models.CharField(max_length=100)
-    cnpj      = models.CharField(max_length=18, unique=True)
+    """
+    Empresa/Estabelecimento - Representa lojas/comércios em qualquer localização.
+    Pode ser usado para lojas de Orlando (USA), Paraguai, Brasil, etc.
+    """
+    # Identificação básica
+    nome      = models.CharField(max_length=200, help_text="Nome da empresa/loja")
+    cnpj      = models.CharField(max_length=18, unique=True, null=True, blank=True, help_text="CNPJ (opcional - para empresas brasileiras)")
     email     = models.EmailField()
     telefone  = models.CharField(max_length=20, blank=True)
+    website   = models.URLField(blank=True, help_text="Site da empresa/loja")
+    
+    # Localização física (para estabelecimentos físicos)
+    endereco  = models.TextField(blank=True, help_text="Endereço completo")
+    cidade    = models.CharField(max_length=100, blank=True, help_text="Ex: Orlando, Ciudad del Este")
+    estado    = models.CharField(max_length=50, blank=True, help_text="Ex: FL, Alto Paraná")
+    pais      = models.CharField(max_length=50, default='Brasil', help_text="País onde está localizada")
+    
+    # Coordenadas geográficas (opcional)
+    latitude  = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    
+    # Informações operacionais
+    horario_funcionamento = models.TextField(blank=True, help_text="Ex: Seg-Sex: 9h-18h, Sáb: 9h-14h")
+    categorias = models.JSONField(default=list, blank=True, help_text="Categorias de produtos vendidos")
+    
+    # Status
+    ativo = models.BooleanField(default=True)
+    
+    # Timestamps
     criada_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Empresa'
-        verbose_name_plural = 'Empresas'
+        verbose_name = 'Empresa/Estabelecimento'
+        verbose_name_plural = 'Empresas/Estabelecimentos'
+        ordering = ['nome']
 
     def __str__(self):
+        if self.cidade:
+            return f"{self.nome} - {self.cidade}/{self.estado}"
         return self.nome
 
 
@@ -962,40 +991,6 @@ class WhatsappMessage(models.Model):
         return f"{self.sender.name}: {self.content[:50]}..."
 
 
-class Estabelecimento(models.Model):
-    """Estabelecimento onde o produto pode ser encontrado"""
-    nome = models.CharField(max_length=200, help_text="Nome do estabelecimento")
-    endereco = models.TextField(help_text="Endereço completo", default="")
-    cidade = models.CharField(max_length=100, default="Orlando")
-    estado = models.CharField(max_length=50, default="FL")
-    pais = models.CharField(max_length=50, default='USA')
-    
-    # Coordenadas (opcional)
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    
-    # Informações de contato
-    telefone = models.CharField(max_length=20, blank=True)
-    website = models.URLField(blank=True)
-    
-    # Horários de funcionamento
-    horario_funcionamento = models.TextField(blank=True, help_text="Ex: Seg-Sex: 9h-18h, Sáb: 9h-14h")
-    
-    # Categorias de produtos que vende
-    categorias = models.JSONField(default=list, help_text="Categorias de produtos vendidos")
-    
-    # Status
-    ativo = models.BooleanField(default=True)
-    criado_em = models.DateTimeField(auto_now_add=True)
-    atualizado_em = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        verbose_name = 'Estabelecimento'
-        verbose_name_plural = 'Estabelecimentos'
-        ordering = ['nome']
-    
-    def __str__(self):
-        return f"{self.nome} - {self.cidade}/{self.estado}"
 
 
 class WhatsappProduct(models.Model):
@@ -1013,7 +1008,7 @@ class WhatsappProduct(models.Model):
     category = models.CharField(max_length=100, blank=True)
     
     # LOCALIZAÇÃO DO PRODUTO - ONDE ENCONTRAR
-    estabelecimento = models.ForeignKey(Estabelecimento, on_delete=models.CASCADE, related_name='produtos', help_text="Onde o produto pode ser encontrado", null=True, blank=True)
+    estabelecimento = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='produtos_whatsapp', help_text="Empresa/Estabelecimento onde o produto pode ser encontrado", null=True, blank=True)
     localizacao_especifica = models.CharField(max_length=200, blank=True, help_text="Ex: Corredor 3, Prateleira A, Seção de Perfumes")
     codigo_barras = models.CharField(max_length=50, blank=True, help_text="Código de barras do produto")
     sku_loja = models.CharField(max_length=50, blank=True, help_text="SKU ou código interno da loja")
@@ -1205,7 +1200,7 @@ class EstoqueItem(models.Model):
     quantidade_reservada = models.PositiveIntegerField(default=0)
     
     # Localização física
-    estabelecimento = models.ForeignKey(Estabelecimento, on_delete=models.SET_NULL, null=True, blank=True, related_name='estoque_items')
+    estabelecimento = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True, related_name='estoque_items', help_text="Empresa/Estabelecimento onde o estoque está localizado")
     localizacao_especifica = models.CharField(max_length=200, blank=True, help_text="Ex: Prateleira A3, Corredor 5")
     
     # Preços
