@@ -173,6 +173,9 @@
                     <div>
                         <h3>R$ {{ total_revenue|floatformat:2 }}</h3>
                         <p>Receita Total</p>
+                        {% if monthly_revenue %}
+                        <small style="opacity: 0.8;">R$ {{ monthly_revenue|floatformat:2 }} este mês</small>
+                        {% endif %}
                     </div>
                     <div class="icon">
                         <i class="fas fa-dollar-sign"></i>
@@ -199,6 +202,7 @@
                     <div>
                         <h3>{{ total_products }}</h3>
                         <p>Produtos</p>
+                        <small style="opacity: 0.8;">{{ available_products }} disponíveis</small>
                     </div>
                     <div class="icon">
                         <i class="fas fa-box"></i>
@@ -212,6 +216,7 @@
                     <div>
                         <h3>{{ total_groups }}</h3>
                         <p>Grupos WhatsApp</p>
+                        <small style="opacity: 0.8;">{{ active_groups }} ativos</small>
                     </div>
                     <div class="icon">
                         <i class="fab fa-whatsapp"></i>
@@ -267,14 +272,22 @@
                                 <h6 class="mb-1">{{ group.name }}</h6>
                                 <small class="text-muted">
                                     {{ group.participant_count }} participantes • 
-                                    {{ group.message_count }} mensagens • 
-                                    {{ group.order_count }} pedidos
+                                    {{ group.message_count|default:0 }} mensagens • 
+                                    {{ group.order_count|default:0 }} pedidos
                                 </small>
                             </div>
                             <div class="text-end">
+                                {% if group.active %}
                                 <span class="badge bg-success">Ativo</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inativo</span>
+                                {% endif %}
                                 <br>
+                                {% if group.last_activity %}
                                 <small class="text-muted">{{ group.last_activity|timesince }} atrás</small>
+                                {% else %}
+                                <small class="text-muted">Sem atividade</small>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="mt-2">
@@ -363,6 +376,50 @@
         </div>
     </div>
 
+    <!-- Estatísticas Adicionais -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="activity-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-users text-info"></i>
+                    Participantes
+                </h5>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-primary">{{ total_participants }}</h4>
+                        <small class="text-muted">Total</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">+{{ new_participants }}</h4>
+                        <small class="text-muted">Novos (30 dias)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="activity-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-shopping-bag text-warning"></i>
+                    Status dos Pedidos
+                </h5>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h5 class="text-warning">{{ pending_orders }}</h5>
+                        <small class="text-muted">Pendentes</small>
+                    </div>
+                    <div class="col-4">
+                        <h5 class="text-success">{{ paid_orders }}</h5>
+                        <small class="text-muted">Pagos</small>
+                    </div>
+                    <div class="col-4">
+                        <h5 class="text-info">{{ delivered_orders }}</h5>
+                        <small class="text-muted">Entregues</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Gráfico de Crescimento -->
     <div class="row mt-4">
         <div class="col-12">
@@ -371,9 +428,13 @@
                     <i class="fas fa-chart-line text-info"></i>
                     Crescimento Mensal
                 </h5>
+                {% if monthly_growth %}
                 <div class="chart-container">
                     <canvas id="growthChart"></canvas>
                 </div>
+                {% else %}
+                <p class="text-muted text-center py-4">Não há dados suficientes para exibir o gráfico.</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -381,51 +442,77 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
     // Gráfico de crescimento mensal
-    const growthData = {{ monthly_growth|safe }};
+    const growthData = {{ monthly_growth_json|safe }};
     
-    const ctx = document.getElementById('growthChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: growthData.map(item => item.month),
-            datasets: [{
-                label: 'Pedidos',
-                data: growthData.map(item => item.orders),
-                borderColor: '#007bff',
-                backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                tension: 0.4
-            }, {
-                label: 'Receita (R$)',
-                data: growthData.map(item => item.revenue),
-                borderColor: '#28a745',
-                backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                tension: 0.4,
-                yAxisID: 'y1'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
+    const ctx = document.getElementById('growthChart');
+    if (ctx && growthData) {
+        const data = JSON.parse(growthData);
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(item => item.month),
+                datasets: [{
+                    label: 'Pedidos',
+                    data: data.map(item => item.orders),
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }, {
+                    label: 'Receita (R$)',
+                    data: data.map(item => item.revenue),
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
                 },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    grid: {
-                        drawOnChartArea: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
                     },
+                    tooltip: {
+                        enabled: true
+                    }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Pedidos'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Receita (R$)'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 
     // Auto-refresh das estatísticas a cada 30 segundos
     setInterval(function() {

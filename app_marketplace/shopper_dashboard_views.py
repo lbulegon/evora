@@ -129,6 +129,9 @@ def shopper_dashboard(request):
     
     monthly_growth.reverse()  # Ordem cronológica
     
+    # Converter monthly_growth para JSON para o gráfico
+    monthly_growth_json = json.dumps(monthly_growth)
+    
     context = {
         'shopper': shopper,
         'total_groups': total_groups,
@@ -149,6 +152,7 @@ def shopper_dashboard(request):
         'recent_orders': recent_orders,
         'recent_messages': recent_messages,
         'monthly_growth': monthly_growth,
+        'monthly_growth_json': monthly_growth_json,
         'start_date': start_date,
         'end_date': end_date,
     }
