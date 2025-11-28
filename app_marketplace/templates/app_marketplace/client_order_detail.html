@@ -1,0 +1,129 @@
+{% extends 'app_marketplace/base.html' %}
+
+{% block title %}Pedido #{{ pedido.id }} - ÉVORA Connect{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="fas fa-shopping-cart"></i> Pedido #{{ pedido.id }}</h1>
+            <p class="text-muted">Criado em {{ pedido.criado_em|date:"d/m/Y H:i" }}</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-box"></i> Itens do Pedido</h4>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Quantidade</th>
+                                <th>Preço Unit.</th>
+                                <th>Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in itens %}
+                            <tr>
+                                <td>{{ item.produto.nome }}</td>
+                                <td>{{ item.quantidade }}</td>
+                                <td>R$ {{ item.preco_unitario|floatformat:2 }}</td>
+                                <td>R$ {{ item.subtotal|floatformat:2 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Nenhum item encontrado</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="3">Total</th>
+                                <th>R$ {{ pedido.valor_total|floatformat:2 }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            {% if pedido.observacoes %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-sticky-note"></i> Observações</h4>
+                </div>
+                <div class="card-body">
+                    <p>{{ pedido.observacoes }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-info-circle"></i> Informações</h4>
+                </div>
+                <div class="card-body">
+                    <p><strong>Status:</strong> 
+                        <span class="badge bg-{{ pedido.status }}">{{ pedido.get_status_display }}</span>
+                    </p>
+                    <p><strong>Método de Pagamento:</strong> 
+                        {{ pedido.get_metodo_pagamento_display|default:"Não informado" }}
+                    </p>
+                    <p><strong>Valor Total:</strong> R$ {{ pedido.valor_total|floatformat:2 }}</p>
+                    {% if pedido.codigo_rastreamento %}
+                    <p><strong>Código de Rastreamento:</strong> {{ pedido.codigo_rastreamento }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-map-marker-alt"></i> Endereço de Entrega</h4>
+                </div>
+                <div class="card-body">
+                    <p>{{ pedido.endereco_entrega.rua }}, {{ pedido.endereco_entrega.numero }}</p>
+                    {% if pedido.endereco_entrega.complemento %}
+                    <p>{{ pedido.endereco_entrega.complemento }}</p>
+                    {% endif %}
+                    <p>{{ pedido.endereco_entrega.bairro }}</p>
+                    <p>{{ pedido.endereco_entrega.cidade }}/{{ pedido.endereco_entrega.estado }}</p>
+                    <p>CEP: {{ pedido.endereco_entrega.cep }}</p>
+                </div>
+            </div>
+
+            {% if pagamentos %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-credit-card"></i> Pagamentos</h4>
+                </div>
+                <div class="card-body">
+                    {% for pagamento in pagamentos %}
+                    <div class="mb-3">
+                        <p><strong>{{ pagamento.get_metodo_display }}</strong></p>
+                        <p>R$ {{ pagamento.valor_total|floatformat:2 }}</p>
+                        <p><span class="badge bg-{{ pagamento.status }}">{{ pagamento.get_status_display }}</span></p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <a href="{% url 'client_dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

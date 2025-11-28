@@ -1,0 +1,168 @@
+{% extends 'app_marketplace/base.html' %}
+
+{% block title %}Pacote {{ pacote.codigo_publico }} - ÉVORA Connect{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="fas fa-box"></i> Pacote {{ pacote.codigo_publico }}</h1>
+            <p class="text-muted">Criado em {{ pacote.criado_em|date:"d/m/Y H:i" }}</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-info-circle"></i> Informações do Pacote</h4>
+                </div>
+                <div class="card-body">
+                    <p><strong>Status:</strong> 
+                        <span class="badge bg-{{ pacote.status }}">{{ pacote.get_status_display }}</span>
+                    </p>
+                    {% if pacote.descricao %}
+                    <p><strong>Descrição:</strong> {{ pacote.descricao }}</p>
+                    {% endif %}
+                    {% if pacote.valor_declarado %}
+                    <p><strong>Valor Declarado:</strong> R$ {{ pacote.valor_declarado|floatformat:2 }}</p>
+                    {% endif %}
+                    {% if pacote.peso_kg %}
+                    <p><strong>Peso:</strong> {{ pacote.peso_kg }} kg</p>
+                    {% endif %}
+                    {% if pacote.dimensoes_cm %}
+                    <p><strong>Dimensões:</strong> {{ pacote.dimensoes_cm }} cm</p>
+                    {% endif %}
+                    {% if pacote.dias_em_guarda > 0 %}
+                    <p><strong>Dias em Guarda:</strong> {{ pacote.dias_em_guarda }} dias</p>
+                    {% endif %}
+                    {% if pacote.custo_guarda_estimado > 0 %}
+                    <p><strong>Custo de Guarda Estimado:</strong> R$ {{ pacote.custo_guarda_estimado|floatformat:2 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if movimentos %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-history"></i> Histórico de Movimentações</h4>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for movimento in movimentos %}
+                        <div class="timeline-item mb-3">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <strong>{{ movimento.get_status_display }}</strong>
+                                    {% if movimento.mensagem %}
+                                    <p class="mb-0">{{ movimento.mensagem }}</p>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ movimento.criado_em|date:"d/m/Y H:i" }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if fotos %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-images"></i> Fotos do Pacote</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for foto in fotos %}
+                        <div class="col-md-4 mb-3">
+                            <img src="{{ foto.imagem.url }}" class="img-fluid rounded" alt="Foto do pacote">
+                            {% if foto.legenda %}
+                            <p class="text-muted mt-2">{{ foto.legenda }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-4">
+            {% if pacote.keeper %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-user"></i> Keeper</h4>
+                </div>
+                <div class="card-body">
+                    <p><strong>{{ pacote.keeper.user.username }}</strong></p>
+                    <p>{{ pacote.keeper.apelido_local }}</p>
+                    <p>{{ pacote.keeper.cidade }}/{{ pacote.keeper.estado }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if pacote.personal_shopper %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-shopping-bag"></i> Personal Shopper</h4>
+                </div>
+                <div class="card-body">
+                    <p><strong>{{ pacote.personal_shopper.user.username }}</strong></p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if pedidos_relacionados %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4><i class="fas fa-shopping-cart"></i> Pedidos Relacionados</h4>
+                </div>
+                <div class="card-body">
+                    {% for relacao in pedidos_relacionados %}
+                    <p>
+                        <a href="{% url 'client_order_detail' relacao.pedido.id %}">
+                            Pedido #{{ relacao.pedido.id }}
+                        </a>
+                        {% if relacao.finalidade %}
+                        <br><small class="text-muted">{{ relacao.finalidade }}</small>
+                        {% endif %}
+                    </p>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <a href="{% url 'client_dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .timeline-item {
+        position: relative;
+        padding-left: 2rem;
+        border-left: 2px solid #007bff;
+        margin-bottom: 1rem;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        top: 5px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #007bff;
+    }
+</style>
+{% endblock %}
+
+

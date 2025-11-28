@@ -1,0 +1,126 @@
+{% extends 'app_marketplace/base.html' %}
+
+{% block title %}Meus Pacotes - ÉVORA Connect{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="fas fa-box"></i> Meus Pacotes</h1>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <input type="text" name="search" class="form-control" placeholder="Buscar por código ou descrição..." value="{{ search }}">
+                        </div>
+                        <div class="col-md-3">
+                            <select name="status" class="form-select">
+                                <option value="">Todos os status</option>
+                                {% for status_code, status_label in status_choices %}
+                                <option value="{{ status_code }}" {% if status == status_code %}selected{% endif %}>
+                                    {{ status_label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Filtrar
+                            </button>
+                            <a href="{% url 'client_packages' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Limpar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Pacotes -->
+    <div class="row">
+        <div class="col-12">
+            {% if page_obj %}
+            {% for pacote in page_obj %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <h5>{{ pacote.codigo_publico }}</h5>
+                            <small class="text-muted">{{ pacote.criado_em|date:"d/m/Y H:i" }}</small>
+                        </div>
+                        <div class="col-md-3">
+                            <p class="mb-0"><strong>Status:</strong></p>
+                            <span class="badge bg-{{ pacote.status }}">{{ pacote.get_status_display }}</span>
+                        </div>
+                        <div class="col-md-3">
+                            {% if pacote.dias_em_guarda > 0 %}
+                            <p class="mb-0"><strong>Dias em Guarda:</strong> {{ pacote.dias_em_guarda }}</p>
+                            {% endif %}
+                            {% if pacote.descricao %}
+                            <p class="mb-0"><small class="text-muted">{{ pacote.descricao|truncatewords:10 }}</small></p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-3 text-end">
+                            <a href="{% url 'client_package_detail' pacote.id %}" class="btn btn-primary">
+                                <i class="fas fa-eye"></i> Ver Detalhes
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Paginação -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="Paginação">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}">Primeira</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}">Anterior</a>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}">Próxima</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}">Última</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> Nenhum pacote encontrado.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <a href="{% url 'client_dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+

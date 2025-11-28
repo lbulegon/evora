@@ -1,0 +1,337 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Administração - ÉVORA Connect{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stats-card h3 {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 0;
+    }
+    
+    .stats-card p {
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
+        font-size: 0.9rem;
+    }
+    
+    .stats-card .icon {
+        font-size: 2rem;
+        opacity: 0.7;
+    }
+    
+    .users-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .revenue-card {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    
+    .orders-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .packages-card {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .activity-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .order-item, .package-item {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border-left: 4px solid #007bff;
+        transition: all 0.3s ease;
+    }
+    
+    .order-item:hover, .package-item:hover {
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transform: translateX(5px);
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .badge-pendente { background: #ffc107; color: #000; }
+    .badge-pago { background: #28a745; color: white; }
+    .badge-enviado { background: #17a2b8; color: white; }
+    .badge-entregue { background: #6c757d; color: white; }
+    .badge-cancelado { background: #dc3545; color: white; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-4">
+                <i class="fas fa-tachometer-alt"></i> Dashboard Administração
+            </h1>
+            <p class="text-muted">Visão geral do sistema ÉVORA Connect</p>
+        </div>
+    </div>
+
+    <!-- Estatísticas Principais -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card users-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3>{{ total_usuarios }}</h3>
+                        <p><i class="fas fa-users icon"></i> Total de Usuários</p>
+                        <small>+{{ novos_clientes|add:novos_shoppers|add:novos_keepers }} este mês</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stats-card revenue-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3>R$ {{ receita_total|floatformat:2 }}</h3>
+                        <p><i class="fas fa-dollar-sign icon"></i> Receita Total</p>
+                        <small>R$ {{ receita_mensal|floatformat:2 }} este mês</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stats-card orders-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3>{{ total_pedidos|add:total_whatsapp_orders }}</h3>
+                        <p><i class="fas fa-shopping-cart icon"></i> Total de Pedidos</p>
+                        <small>{{ pedidos_pendentes }} pendentes</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stats-card packages-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3>{{ total_pacotes }}</h3>
+                        <p><i class="fas fa-box icon"></i> Total de Pacotes</p>
+                        <small>{{ pacotes_em_guarda }} em guarda</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas Detalhadas -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="activity-card">
+                <h4><i class="fas fa-users"></i> Usuários</h4>
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <p><strong>Clientes:</strong> {{ total_clientes }}</p>
+                        <p><strong>Shoppers:</strong> {{ total_shoppers }}</p>
+                        <p><strong>Keepers:</strong> {{ total_keepers }}</p>
+                    </div>
+                    <div class="col-6">
+                        <p><small class="text-muted">Novos este mês:</small></p>
+                        <p><small>Clientes: +{{ novos_clientes }}</small></p>
+                        <p><small>Shoppers: +{{ novos_shoppers }}</small></p>
+                        <p><small>Keepers: +{{ novos_keepers }}</small></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="activity-card">
+                <h4><i class="fas fa-shopping-cart"></i> Pedidos</h4>
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <p><strong>Total:</strong> {{ total_pedidos }}</p>
+                        <p><strong>Pendentes:</strong> {{ pedidos_pendentes }}</p>
+                        <p><strong>Pagos:</strong> {{ pedidos_pagos }}</p>
+                        <p><strong>Enviados:</strong> {{ pedidos_enviados }}</p>
+                        <p><strong>Entregues:</strong> {{ pedidos_entregues }}</p>
+                    </div>
+                    <div class="col-6">
+                        <p><strong>WhatsApp:</strong> {{ total_whatsapp_orders }}</p>
+                        <p><strong>Receita WhatsApp:</strong> R$ {{ whatsapp_receita|floatformat:2 }}</p>
+                        <p><strong>Cancelados:</strong> {{ pedidos_cancelados }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pacotes e Grupos -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="activity-card">
+                <h4><i class="fas fa-box"></i> Pacotes</h4>
+                <hr>
+                <p><strong>Total:</strong> {{ total_pacotes }}</p>
+                <p><strong>Em Guarda:</strong> {{ pacotes_em_guarda }}</p>
+                <p><strong>Enviados:</strong> {{ pacotes_enviados }}</p>
+                <p><strong>Entregues:</strong> {{ pacotes_entregues }}</p>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="activity-card">
+                <h4><i class="fab fa-whatsapp"></i> Grupos WhatsApp</h4>
+                <hr>
+                <p><strong>Total:</strong> {{ total_grupos }}</p>
+                <p><strong>Ativos:</strong> {{ grupos_ativos }}</p>
+                <p><strong>Participantes:</strong> {{ total_participantes }}</p>
+                <p><strong>Produtos:</strong> {{ total_produtos_whatsapp }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Performers -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="activity-card">
+                <h4><i class="fas fa-star"></i> Top Shoppers</h4>
+                <hr>
+                {% for shopper in top_shoppers %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span>{{ shopper.user.username }}</span>
+                    <span class="badge bg-success">R$ {{ shopper.total_receita|default:0|floatformat:2 }}</span>
+                </div>
+                {% empty %}
+                <p class="text-muted">Nenhum shopper encontrado</p>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="activity-card">
+                <h4><i class="fas fa-star"></i> Top Keepers</h4>
+                <hr>
+                {% for keeper in top_keepers %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span>{{ keeper.user.username }}</span>
+                    <span class="badge bg-info">{{ keeper.total_pacotes }} pacotes</span>
+                </div>
+                {% empty %}
+                <p class="text-muted">Nenhum keeper encontrado</p>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="activity-card">
+                <h4><i class="fas fa-star"></i> Top Clientes</h4>
+                <hr>
+                {% for cliente in top_clientes %}
+                <div class="d-flex justify-content-between mb-2">
+                    <span>{{ cliente.user.username }}</span>
+                    <span class="badge bg-primary">R$ {{ cliente.total_gasto|default:0|floatformat:2 }}</span>
+                </div>
+                {% empty %}
+                <p class="text-muted">Nenhum cliente encontrado</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Atividades Recentes -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="activity-card">
+                <h4><i class="fas fa-clock"></i> Pedidos Recentes</h4>
+                <hr>
+                {% for pedido in pedidos_recentes %}
+                <div class="order-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Pedido #{{ pedido.id }}</strong>
+                            <br>
+                            <small class="text-muted">{{ pedido.cliente.user.username }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="status-badge badge-{{ pedido.status }}">{{ pedido.get_status_display }}</span>
+                            <br>
+                            <small>R$ {{ pedido.valor_total|floatformat:2 }}</small>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted">Nenhum pedido recente</p>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="activity-card">
+                <h4><i class="fas fa-box"></i> Pacotes Recentes</h4>
+                <hr>
+                {% for pacote in pacotes_recentes %}
+                <div class="package-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ pacote.codigo_publico }}</strong>
+                            <br>
+                            <small class="text-muted">{{ pacote.get_status_display }}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-secondary">{{ pacote.dias_em_guarda }} dias</span>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted">Nenhum pacote recente</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Link para Admin Django -->
+    <div class="row">
+        <div class="col-12">
+            <div class="activity-card">
+                <h4><i class="fas fa-cog"></i> Administração</h4>
+                <hr>
+                <a href="/admin/" class="btn btn-primary" target="_blank">
+                    <i class="fas fa-external-link-alt"></i> Acessar Admin Django
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
