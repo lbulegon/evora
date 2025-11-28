@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import Evento, Cliente
+from .models import Evento, Cliente, PublicacaoAgora
 
 class CadastroClienteForm(forms.ModelForm):
     """
@@ -38,3 +38,41 @@ class EventoAdminForm(forms.ModelForm):
     class Meta:
         model = Evento
         fields = '__all__'
+
+
+class PpaBulkUpdateForm(forms.Form):
+    """Formulário para atualização de PPA em lote"""
+    evento = forms.ModelChoiceField(
+        queryset=Evento.objects.all(),
+        required=False,
+        label='Evento/Campanha',
+        help_text='Filtrar por evento específico (opcional)'
+    )
+    mesh_type = forms.ChoiceField(
+        choices=[('', 'Todos')] + list(PublicacaoAgora.TipoMesh.choices),
+        required=False,
+        label='Tipo de Mesh',
+        help_text='Filtrar por tipo de mesh (opcional)'
+    )
+    ppa_value = forms.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        min_value=0.0,
+        max_value=1.0,
+        label='Valor PPA',
+        help_text='Valor PPA (0.0 a 1.0)'
+    )
+    apply_mode = forms.ChoiceField(
+        choices=[
+            ('set', 'Definir (substituir valor)'),
+            ('increment', 'Incrementar (+valor)'),
+            ('decrement', 'Decrementar (-valor)'),
+        ],
+        label='Modo de Aplicação',
+        help_text='Como aplicar o valor PPA'
+    )
+    only_zero = forms.BooleanField(
+        required=False,
+        label='Apenas PPA = 0',
+        help_text='Aplicar apenas em publicações com PPA = 0.0'
+    )

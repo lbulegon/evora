@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Sum
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator
@@ -1551,3 +1552,199 @@ User.add_to_class('is_cliente', property(lambda u: hasattr(u, 'cliente')))
 User.add_to_class('is_shopper', property(lambda u: hasattr(u, 'personalshopper')))
 User.add_to_class('is_address_keeper', property(lambda u: hasattr(u, 'address_keeper')))
 User.add_to_class('is_agente', property(lambda u: hasattr(u, 'agente')))
+
+
+# ============================================================================
+# ÁGORA - FEED SOCIAL DO ÉVORA
+# ============================================================================
+
+class PublicacaoAgora(models.Model):
+    """
+    Publicação no feed Ágora (estilo TikTok/Kwai).
+    Cada publicação pode conter vídeo, foto, produto vinculado, oferta, etc.
+    """
+    
+    class TipoConteudo(models.TextChoices):
+        VIDEO = 'video', 'Vídeo'
+        IMAGEM = 'imagem', 'Imagem'
+        PRODUTO = 'produto', 'Produto'
+        TEXTO = 'texto', 'Texto'
+    
+    class TipoMesh(models.TextChoices):
+        MALL = 'mall', 'Mall (Produto direto)'
+        MESH_FORTE = 'mesh_forte', 'Mesh Forte (KMN)'
+        MESH_FRACA = 'mesh_fraca', 'Mesh Fraca (KMN)'
+    
+    # Autor da publicação (Shopper ou Keeper)
+    autor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='publicacoes_agora',
+        help_text="Shopper ou Keeper que criou a publicação"
+    )
+    
+    # Conteúdo da publicação
+    tipo_conteudo = models.CharField(
+        max_length=20,
+        choices=TipoConteudo.choices,
+        default=TipoConteudo.PRODUTO
+    )
+    video_url = models.URLField(blank=True, null=True, help_text="URL do vídeo")
+    imagem_url = models.URLField(blank=True, null=True, help_text="URL da imagem")
+    legenda = models.TextField(blank=True, help_text="Legenda/descrição da publicação")
+    
+    # Produto vinculado (opcional)
+    produto = models.ForeignKey(
+        Produto,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='publicacoes_agora',
+        help_text="Produto vinculado à publicação"
+    )
+    
+    # Oferta personalizada (preço modificado pelo Shopper)
+    preco_oferta = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Preço personalizado da oferta (se diferente do produto)"
+    )
+    
+    # Contexto KMN
+    mesh_type = models.CharField(
+        max_length=20,
+        choices=TipoMesh.choices,
+        default=TipoMesh.MALL,
+        help_text="Tipo de mesh KMN"
+    )
+    
+    # Evento/Campanha/Viagem vinculada
+    evento = models.ForeignKey(
+        Evento,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='publicacoes_agora',
+        help_text="Evento/Campanha/Viagem relacionada"
+    )
+    
+    # Algoritmo de recomendação
+    spark_score = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0.0,
+        help_text="SparkScore Comercial (0-100) - score de relevância"
+    )
+    ppa = models.DecimalField(
+        max_digits=3,
+        decimal_places=2,
+        default=0.0,
+        help_text="PPA (Potencial Prévio de Ação) 0.0-1.0"
+    )
+    
+    # Status
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Publicação Ágora'
+        verbose_name_plural = 'Publicações Ágora'
+        ordering = ['-spark_score', '-criado_em']
+        indexes = [
+            models.Index(fields=['-spark_score', '-criado_em']),
+            models.Index(fields=['ativo', '-spark_score']),
+            models.Index(fields=['evento', '-spark_score']),
+        ]
+    
+    def __str__(self):
+        autor_nome = self.autor.get_full_name() or self.autor.username
+        produto_nome = self.produto.nome if self.produto else "Sem produto"
+        return f"{autor_nome} - {produto_nome}"
+    
+    @property
+    def total_views(self):
+        """Total de visualizações"""
+        return self.engajamentos.filter(tipo='view').count()
+    
+    @property
+    def total_likes(self):
+        """Total de likes"""
+        return self.engajamentos.filter(tipo='like').count()
+    
+    @property
+    def total_add_carrinho(self):
+        """Total de adições ao carrinho"""
+        return self.engajamentos.filter(tipo='add_carrinho').count()
+    
+    @property
+    def total_compartilhar(self):
+        """Total de compartilhamentos"""
+        return self.engajamentos.filter(tipo='compartilhar').count()
+    
+    @property
+    def total_view_time(self):
+        """Tempo total de visualização em segundos"""
+        result = self.engajamentos.filter(tipo='view').aggregate(
+            total=Sum('view_time_segundos')
+        )
+        return result['total'] or 0
+
+
+class EngajamentoAgora(models.Model):
+    """
+    Engajamento/interação do usuário com uma publicação do Ágora.
+    """
+    
+    class TipoEngajamento(models.TextChoices):
+        VIEW = 'view', 'Visualização'
+        LIKE = 'like', 'Like'
+        ADD_CARRINHO = 'add_carrinho', 'Adicionar ao Carrinho'
+        COMPARTILHAR = 'compartilhar', 'Compartilhar'
+        VER_DETALHES = 'ver_detalhes', 'Ver Detalhes'
+    
+    publicacao = models.ForeignKey(
+        PublicacaoAgora,
+        on_delete=models.CASCADE,
+        related_name='engajamentos'
+    )
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='engajamentos_agora',
+        null=True,
+        blank=True,
+        help_text="Usuário que interagiu (null para anônimos)"
+    )
+    tipo = models.CharField(
+        max_length=20,
+        choices=TipoEngajamento.choices
+    )
+    
+    # Para visualizações: tempo assistido
+    view_time_segundos = models.IntegerField(
+        default=0,
+        help_text="Tempo de visualização em segundos (apenas para tipo 'view')"
+    )
+    
+    # Metadados
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    metadados = models.JSONField(default=dict, blank=True)
+    
+    criado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Engajamento Ágora'
+        verbose_name_plural = 'Engajamentos Ágora'
+        ordering = ['-criado_em']
+        indexes = [
+            models.Index(fields=['publicacao', 'tipo']),
+            models.Index(fields=['usuario', '-criado_em']),
+        ]
+    
+    def __str__(self):
+        usuario_str = self.usuario.username if self.usuario else "Anônimo"
+        return f"{usuario_str} - {self.get_tipo_display()} - {self.publicacao}"

@@ -5,7 +5,8 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
     Agente, Cliente, ClienteRelacao, Produto, EstoqueItem,
-    Oferta, TrustlineKeeper, RoleStats, Pedido
+    Oferta, TrustlineKeeper, RoleStats, Pedido,
+    PublicacaoAgora, EngajamentoAgora
 )
 
 
@@ -236,6 +237,132 @@ class ScoreAgenteSerializer(serializers.Serializer):
     dual_role_score = serializers.FloatField()
     total_pedidos = serializers.IntegerField()
     valor_total = serializers.FloatField()
+
+
+# ============================================================================
+# ÁGORA - SERIALIZERS
+# ============================================================================
+
+class PublicacaoAgoraSerializer(serializers.ModelSerializer):
+    """Serializer para Publicação do Ágora"""
+    autor_id = serializers.IntegerField(source='autor.id', read_only=True)
+    autor_nome = serializers.CharField(source='autor.get_full_name', read_only=True)
+    autor_username = serializers.CharField(source='autor.username', read_only=True)
+    
+    produto_id = serializers.IntegerField(source='produto.id', read_only=True)
+    produto_nome = serializers.CharField(source='produto.nome', read_only=True)
+    produto_imagem = serializers.ImageField(source='produto.imagem', read_only=True)
+    
+    evento_id = serializers.IntegerField(source='evento.id', read_only=True, allow_null=True)
+    evento_titulo = serializers.CharField(source='evento.titulo', read_only=True, allow_null=True)
+    
+    # Estatísticas de engajamento
+    total_views = serializers.IntegerField(read_only=True)
+    total_likes = serializers.IntegerField(read_only=True)
+    total_add_carrinho = serializers.IntegerField(read_only=True)
+    total_compartilhar = serializers.IntegerField(read_only=True)
+    total_view_time = serializers.IntegerField(read_only=True)
+    
+    # Preço exibido (oferta ou produto)
+    preco_exibicao = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PublicacaoAgora
+        fields = [
+            'id', 'autor_id', 'autor_nome', 'autor_username',
+            'tipo_conteudo', 'video_url', 'imagem_url', 'legenda',
+            'produto_id', 'produto_nome', 'produto_imagem',
+            'preco_oferta', 'preco_exibicao',
+            'mesh_type', 'evento_id', 'evento_titulo',
+            'spark_score', 'ppa',
+            'total_views', 'total_likes', 'total_add_carrinho',
+            'total_compartilhar', 'total_view_time',
+            'ativo', 'criado_em', 'atualizado_em'
+        ]
+        read_only_fields = ['id', 'spark_score', 'criado_em', 'atualizado_em']
+    
+    def get_preco_exibicao(self, obj):
+        """Retorna o preço a ser exibido (oferta ou produto)"""
+        if obj.preco_oferta:
+            return obj.preco_oferta
+        if obj.produto:
+            return obj.produto.preco
+        return None
+
+
+class PublicacaoAgoraCreateSerializer(serializers.ModelSerializer):
+    """Serializer para criação de publicação no Ágora"""
+    
+    class Meta:
+        model = PublicacaoAgora
+        fields = [
+            'tipo_conteudo', 'video_url', 'imagem_url', 'legenda',
+            'produto', 'preco_oferta', 'mesh_type', 'evento', 'ppa'
+        ]
+    
+    def validate(self, data):
+        """Validação: deve ter vídeo OU imagem OU produto"""
+        video_url = data.get('video_url')
+        imagem_url = data.get('imagem_url')
+        produto = data.get('produto')
+        
+        if not any([video_url, imagem_url, produto]):
+            raise serializers.ValidationError(
+                "A publicação deve ter pelo menos: vídeo, imagem ou produto vinculado"
+            )
+        return data
+
+
+class EngajamentoAgoraSerializer(serializers.ModelSerializer):
+    """Serializer para Engajamento do Ágora"""
+    usuario_id = serializers.IntegerField(source='usuario.id', read_only=True, allow_null=True)
+    usuario_username = serializers.CharField(source='usuario.username', read_only=True, allow_null=True)
+    publicacao_id = serializers.IntegerField(source='publicacao.id', read_only=True)
+    
+    class Meta:
+        model = EngajamentoAgora
+        fields = [
+            'id', 'publicacao_id', 'usuario_id', 'usuario_username',
+            'tipo', 'view_time_segundos', 'criado_em'
+        ]
+        read_only_fields = ['id', 'criado_em']
+
+
+class EngajamentoAgoraCreateSerializer(serializers.ModelSerializer):
+    """Serializer para criação de engajamento"""
+    
+    class Meta:
+        model = EngajamentoAgora
+        fields = ['publicacao', 'tipo', 'view_time_segundos']
+    
+    def validate(self, data):
+        """Validação: view_time_segundos apenas para tipo 'view'"""
+        if data.get('tipo') != 'view' and data.get('view_time_segundos', 0) > 0:
+            raise serializers.ValidationError(
+                "view_time_segundos só é válido para tipo 'view'"
+            )
+        return data
+
+
+class PublicacaoAgoraAnalyticsSerializer(serializers.Serializer):
+    """Serializer para analytics do Ágora (ranking)"""
+    id = serializers.IntegerField()
+    autor_id = serializers.IntegerField()
+    autor_nome = serializers.CharField()
+    produto_id = serializers.IntegerField(allow_null=True)
+    produto_nome = serializers.CharField(allow_null=True)
+    produto_imagem = serializers.ImageField(allow_null=True)
+    video_url = serializers.URLField(allow_null=True)
+    imagem_url = serializers.URLField(allow_null=True)
+    spark_score = serializers.DecimalField(max_digits=5, decimal_places=2)
+    ppa = serializers.DecimalField(max_digits=3, decimal_places=2)
+    mesh_type = serializers.CharField()
+    total_views = serializers.IntegerField()
+    total_likes = serializers.IntegerField()
+    total_add_carrinho = serializers.IntegerField()
+    total_compartilhar = serializers.IntegerField()
+    total_view_time = serializers.IntegerField()
+    criado_em = serializers.DateTimeField()
 
 
 

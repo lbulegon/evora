@@ -55,6 +55,9 @@ urlpatterns = [
     # API KMN
     path('api/kmn/', include('app_marketplace.api_urls')),
     
+    # API ÁGORA
+    path('api/agora/', include('app_marketplace.agora_urls')),
+    
     # KMN Frontend
     path('kmn/', kmn_views.kmn_dashboard, name='kmn_dashboard'),
     path('kmn/clientes/', kmn_views.kmn_clientes, name='kmn_clientes'),

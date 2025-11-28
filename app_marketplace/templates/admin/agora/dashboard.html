@@ -1,0 +1,141 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Dashboard Ágora{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .dashboard-container {
+        padding: 20px;
+    }
+    .chart-container {
+        margin: 30px 0;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .chart-title {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 15px;
+        color: #333;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <h1>📊 Dashboard Ágora - Analytics</h1>
+    <p>Análise de performance das publicações do feed Ágora</p>
+    
+    <div class="chart-container">
+        <div class="chart-title">Top 10 Publicações por Spark Score</div>
+        <canvas id="chartSparkScore"></canvas>
+    </div>
+    
+    <div class="chart-container">
+        <div class="chart-title">Distribuição por Tipo de Mesh</div>
+        <canvas id="chartMeshType"></canvas>
+    </div>
+    
+    <div class="chart-container">
+        <div class="chart-title">Top 10 Engajamentos (Likes vs Add Carrinho vs Compartilhar)</div>
+        <canvas id="chartEngajamentos"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const analyticsData = {{ analytics_data|safe }};
+    
+    // Gráfico 1: Top 10 por Spark Score (bar horizontal)
+    const top10Spark = analyticsData.slice(0, 10);
+    const ctx1 = document.getElementById('chartSparkScore').getContext('2d');
+    new Chart(ctx1, {
+        type: 'bar',
+        data: {
+            labels: top10Spark.map(item => item.produto_nome || `Pub #${item.id}`),
+            datasets: [{
+                label: 'Spark Score',
+                data: top10Spark.map(item => parseFloat(item.spark_score)),
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+    
+    // Gráfico 2: Distribuição por Mesh Type (pie)
+    const meshCounts = {};
+    analyticsData.forEach(item => {
+        meshCounts[item.mesh_type] = (meshCounts[item.mesh_type] || 0) + 1;
+    });
+    
+    const ctx2 = document.getElementById('chartMeshType').getContext('2d');
+    new Chart(ctx2, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(meshCounts),
+            datasets: [{
+                data: Object.values(meshCounts),
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.6)',
+                    'rgba(54, 162, 235, 0.6)',
+                    'rgba(255, 206, 86, 0.6)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true
+        }
+    });
+    
+    // Gráfico 3: Top 10 Engajamentos (bar)
+    const top10Eng = analyticsData.slice(0, 10);
+    const ctx3 = document.getElementById('chartEngajamentos').getContext('2d');
+    new Chart(ctx3, {
+        type: 'bar',
+        data: {
+            labels: top10Eng.map(item => item.produto_nome || `Pub #${item.id}`),
+            datasets: [
+                {
+                    label: 'Likes',
+                    data: top10Eng.map(item => item.total_likes || 0),
+                    backgroundColor: 'rgba(255, 99, 132, 0.6)'
+                },
+                {
+                    label: 'Add Carrinho',
+                    data: top10Eng.map(item => item.total_add_carrinho || 0),
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)'
+                },
+                {
+                    label: 'Compartilhar',
+                    data: top10Eng.map(item => item.total_compartilhar || 0),
+                    backgroundColor: 'rgba(255, 206, 86, 0.6)'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
+

@@ -42,7 +42,10 @@ from .models import (
     # Modelos Oficiais - Reestruturação
     CarteiraCliente,
     LigacaoMesh,
-    LiquidacaoFinanceira
+    LiquidacaoFinanceira,
+    # Modelos ÁGORA
+    PublicacaoAgora,
+    EngajamentoAgora
 )
 
 # Ação para importar produtos de um evento para outro
@@ -1012,3 +1015,187 @@ class LiquidacaoFinanceiraAdmin(admin.ModelAdmin):
             atualizadas += 1
         self.message_user(request, f"{atualizadas} liquidação(ões) marcada(s) como liquidada(s).")
     marcar_como_liquidada.short_description = "Marcar como liquidada"
+
+
+# ============================================================================
+# ÁGORA - ADMIN
+# ============================================================================
+
+@admin.register(PublicacaoAgora)
+class PublicacaoAgoraAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 'autor', 'produto', 'tipo_conteudo', 'mesh_type',
+        'spark_score_admin', 'ppa', 'total_views_admin', 'total_likes_admin',
+        'total_add_carrinho_admin', 'ativo', 'criado_em'
+    ]
+    list_filter = ['tipo_conteudo', 'mesh_type', 'ativo', 'evento', 'criado_em']
+    search_fields = ['legenda', 'autor__username', 'produto__nome', 'evento__titulo']
+    readonly_fields = ['spark_score', 'criado_em', 'atualizado_em']
+    
+    fieldsets = (
+        ('Conteúdo', {
+            'fields': ('autor', 'tipo_conteudo', 'video_url', 'imagem_url', 'legenda')
+        }),
+        ('Produto e Oferta', {
+            'fields': ('produto', 'preco_oferta')
+        }),
+        ('Contexto', {
+            'fields': ('mesh_type', 'evento')
+        }),
+        ('Algoritmo', {
+            'fields': ('spark_score', 'ppa')
+        }),
+        ('Status', {
+            'fields': ('ativo',)
+        }),
+        ('Timestamps', {
+            'fields': ('criado_em', 'atualizado_em'),
+            'classes': ('collapse',)
+        })
+    )
+    
+    def get_queryset(self, request):
+        """Anotar estatísticas para exibição"""
+        qs = super().get_queryset(request)
+        from django.db.models import Count, Sum, Q
+        return qs.annotate(
+            _total_views=Count('engajamentos', filter=Q(engajamentos__tipo='view')),
+            _total_likes=Count('engajamentos', filter=Q(engajamentos__tipo='like')),
+            _total_add_carrinho=Count('engajamentos', filter=Q(engajamentos__tipo='add_carrinho')),
+        )
+    
+    def spark_score_admin(self, obj):
+        return f"{obj.spark_score:.2f}"
+    spark_score_admin.short_description = 'Spark Score'
+    spark_score_admin.admin_order_field = 'spark_score'
+    
+    def total_views_admin(self, obj):
+        return getattr(obj, '_total_views', 0)
+    total_views_admin.short_description = 'Views'
+    total_views_admin.admin_order_field = '_total_views'
+    
+    def total_likes_admin(self, obj):
+        return getattr(obj, '_total_likes', 0)
+    total_likes_admin.short_description = 'Likes'
+    total_likes_admin.admin_order_field = '_total_likes'
+    
+    def total_add_carrinho_admin(self, obj):
+        return getattr(obj, '_total_add_carrinho', 0)
+    total_add_carrinho_admin.short_description = 'Add Carrinho'
+    total_add_carrinho_admin.admin_order_field = '_total_add_carrinho'
+    
+    def get_urls(self):
+        """Adicionar URLs customizadas para dashboard e PPA em lote"""
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('dashboard/', self.admin_site.admin_view(agora_dashboard_view), name='agora_dashboard'),
+            path('ppa-bulk/', self.admin_site.admin_view(ppa_bulk_update_view), name='agora_ppa_bulk'),
+        ]
+        return custom_urls + urls
+
+
+@admin.register(EngajamentoAgora)
+class EngajamentoAgoraAdmin(admin.ModelAdmin):
+    list_display = ['id', 'publicacao', 'usuario', 'tipo', 'view_time_segundos', 'criado_em']
+    list_filter = ['tipo', 'criado_em']
+    search_fields = ['publicacao__legenda', 'usuario__username']
+    readonly_fields = ['criado_em']
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('publicacao', 'usuario')
+
+
+# ============================================================================
+# ÁGORA - VIEWS ADMIN CUSTOMIZADAS
+# ============================================================================
+
+from django.shortcuts import render, redirect
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Q, F
+from django.db.models.functions import Greatest, Least
+from django.http import JsonResponse
+import json
+
+
+@staff_member_required
+def agora_dashboard_view(request):
+    """Dashboard de analytics do Ágora com Chart.js"""
+    # Buscar dados da API
+    import requests
+    from django.conf import settings
+    
+    try:
+        # Usar a própria API interna
+        from .agora_api_views import agora_analytics
+        from rest_framework.test import APIRequestFactory
+        
+        factory = APIRequestFactory()
+        api_request = factory.get('/api/agora/analytics/?limit=50')
+        api_request.user = request.user
+        
+        response = agora_analytics(api_request)
+        analytics_data = response.data if hasattr(response, 'data') else []
+    except Exception as e:
+        analytics_data = []
+        messages.error(request, f"Erro ao carregar analytics: {str(e)}")
+    
+    context = {
+        'title': 'Dashboard Ágora',
+        'analytics_data': json.dumps(analytics_data, default=str),
+    }
+    
+    return render(request, 'admin/agora/dashboard.html', context)
+
+
+@staff_member_required
+def ppa_bulk_update_view(request):
+    """View para atualização de PPA em lote"""
+    from .forms import PpaBulkUpdateForm
+    
+    if request.method == 'POST':
+        form = PpaBulkUpdateForm(request.POST)
+        if form.is_valid():
+            # Montar queryset com filtros
+            qs = PublicacaoAgora.objects.filter(ativo=True)
+            
+            evento = form.cleaned_data.get('evento')
+            mesh_type = form.cleaned_data.get('mesh_type')
+            only_zero = form.cleaned_data.get('only_zero')
+            
+            if evento:
+                qs = qs.filter(evento=evento)
+            if mesh_type:
+                qs = qs.filter(mesh_type=mesh_type)
+            if only_zero:
+                qs = qs.filter(ppa=0.0)
+            
+            ppa_value = form.cleaned_data['ppa_value']
+            apply_mode = form.cleaned_data['apply_mode']
+            
+            atualizadas = 0
+            if apply_mode == 'set':
+                atualizadas = qs.update(ppa=ppa_value)
+            elif apply_mode == 'increment':
+                atualizadas = qs.update(
+                    ppa=Least(1.0, Greatest(0.0, F('ppa') + ppa_value))
+                )
+            elif apply_mode == 'decrement':
+                atualizadas = qs.update(
+                    ppa=Least(1.0, Greatest(0.0, F('ppa') - ppa_value))
+                )
+            
+            messages.success(
+                request,
+                f"PPA atualizado em {atualizadas} publicação(ões) usando modo '{apply_mode}'."
+            )
+            return redirect('admin:app_marketplace_publicacaoagora_changelist')
+    else:
+        form = PpaBulkUpdateForm()
+    
+    context = {
+        'title': 'Atualizar PPA em Lote',
+        'form': form,
+    }
+    
+    return render(request, 'admin/agora/ppa_bulk_update.html', context)
