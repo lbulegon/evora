@@ -40,7 +40,22 @@ def client_dashboard(request):
         return redirect('home')
     
     # ========== PEDIDOS ==========
-    pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em')
+    try:
+        pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em')
+    except Exception as e:
+        error_msg = str(e)
+        if 'valor_subtotal' in error_msg or 'does not exist' in error_msg.lower():
+            messages.error(
+                request,
+                "Erro no banco de dados: A migration precisa ser aplicada. "
+                "Execute: python manage.py migrate"
+            )
+            # Retorna um queryset vazio para evitar mais erros
+            pedidos = Pedido.objects.none()
+        else:
+            # Re-lança o erro se não for relacionado ao campo faltante
+            raise
+    
     total_pedidos = pedidos.count()
     
     # Pedidos por status
@@ -156,36 +171,6 @@ def client_dashboard(request):
         # Timeline
         'atividades': atividades,
     }
-    
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Erro no client_dashboard: {str(e)}", exc_info=True)
-        messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
-        # Retornar contexto mínimo em caso de erro
-        context = {
-            'cliente': cliente,
-            'total_pedidos': 0,
-            'pedidos_pendentes': 0,
-            'pedidos_pagos': 0,
-            'pedidos_enviados': 0,
-            'pedidos_entregues': 0,
-            'total_gasto': Decimal('0'),
-            'total_gasto_geral': Decimal('0'),
-            'pedidos_recentes': [],
-            'total_whatsapp_orders': 0,
-            'whatsapp_gasto': Decimal('0'),
-            'whatsapp_orders_recentes': [],
-            'total_pacotes': 0,
-            'pacotes_em_guarda': 0,
-            'pacotes_enviados': 0,
-            'pacotes_entregues': 0,
-            'pacotes_recentes': [],
-            'enderecos': [],
-            'total_enderecos': 0,
-            'pagamentos_pendentes': [],
-            'atividades': [],
-        }
     
     return render(request, 'app_marketplace/client_dashboard.html', context)
 
