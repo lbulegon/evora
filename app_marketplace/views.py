@@ -125,13 +125,26 @@ def solicitar_evento(request, evento_id):
 
 
 
+@login_required
 def clientes(request):
     """
-    Lista de clientes do sistema.
-    Busca clientes reais do banco de dados.
+    Lista de clientes.
+    
+    - Se for Shopper (request.user.is_shopper): mostra apenas clientes da(s)
+      carteira(s) do shopper (wallet.owner = request.user).
+    - Para outros perfis (admin, staff, etc.): mostra todos os clientes.
     """
-    # Buscar todos os clientes com seus dados do User
-    clientes = Cliente.objects.select_related('user').all().order_by('-criado_em')
+    # Shopper: filtrar apenas clientes da carteira do shopper
+    if getattr(request.user, 'is_shopper', False):
+        clientes = (
+            Cliente.objects
+            .select_related('user', 'wallet', 'wallet__owner')
+            .filter(wallet__owner=request.user)
+            .order_by('-criado_em')
+        )
+    else:
+        # Admin / outros usuários: ver todos
+        clientes = Cliente.objects.select_related('user').all().order_by('-criado_em')
     
     context = {
         'clientes': clientes,
