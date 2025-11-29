@@ -1,1 +1,1 @@
-web: gunicorn setup.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --max-requests 1000 --log-level info --access-logfile - --error-logfile -
+web: python manage.py collectstatic --noinput && gunicorn setup.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --max-requests 1000 --log-level info --access-logfile - --error-logfile -

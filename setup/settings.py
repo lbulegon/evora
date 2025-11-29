@@ -221,7 +221,8 @@ STATICFILES_DIRS = [BASE_DIR / "app_marketplace" / "static"]
 
 # WhiteNoise para servir arquivos estáticos em produção (Railway)
 if IS_RAILWAY:
-    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+    # Usar storage simples do WhiteNoise para evitar problemas com manifest
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 else:
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
