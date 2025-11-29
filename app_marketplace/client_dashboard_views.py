@@ -42,132 +42,132 @@ def client_dashboard(request):
     # Inicializar variáveis com valores padrão para evitar erros
     try:
         # ========== PEDIDOS ==========
-    # Usar defer para evitar buscar campos que podem não existir no banco
-    # Campos que podem não existir: codigo, carteira_cliente, tipo_cliente, etc.
-    pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em').defer('codigo', 'carteira_cliente', 'tipo_cliente')
-    total_pedidos = pedidos.count()
-    
-    # Pedidos por status (usando status corretos do modelo)
-    pedidos_pendentes = pedidos.filter(status__in=['criado', 'aguardando_pagamento']).count()
-    pedidos_pagos = pedidos.filter(status='pago').count()
-    pedidos_enviados = pedidos.filter(status='em_transporte').count()
-    pedidos_entregues = pedidos.filter(status='concluido').count()
-    
-    # Total gasto (pedidos pagos ou concluídos)
-    total_gasto = pedidos.filter(
-        status__in=['pago', 'em_preparacao', 'em_transporte', 'concluido']
-    ).aggregate(total=Sum('valor_total'))['total'] or Decimal('0')
-    
-    # ========== PEDIDOS WHATSAPP ==========
-    whatsapp_orders = WhatsappOrder.objects.filter(cliente=cliente).order_by('-created_at')
-    total_whatsapp_orders = whatsapp_orders.count()
-    
-    whatsapp_gasto = whatsapp_orders.filter(
-        status__in=['paid', 'purchased', 'shipped', 'delivered']
-    ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
-    
-    # Total gasto geral (pedidos + whatsapp)
-    total_gasto_geral = total_gasto + whatsapp_gasto
-    
-    # ========== PACOTES ==========
-    # Pacotes relacionados aos pedidos do cliente
-    pedido_ids = list(pedidos.values_list('id', flat=True))
-    
-    if pedido_ids:
-        pacotes_ids = PedidoPacote.objects.filter(
-            pedido_id__in=pedido_ids
-        ).values_list('pacote_id', flat=True)
-        pacotes = Pacote.objects.filter(id__in=pacotes_ids).order_by('-criado_em')
-    else:
-        # Se não há pedidos, buscar pacotes diretamente do cliente
-        pacotes = Pacote.objects.filter(cliente=cliente).order_by('-criado_em')
-    
-    total_pacotes = pacotes.count()
-    
-    pacotes_em_guarda = pacotes.filter(status='em_guarda').count()
-    pacotes_enviados = pacotes.filter(status='despachado').count()
-    pacotes_entregues = pacotes.filter(status='entregue').count()
-    
-    # ========== ENDEREÇOS ==========
-    enderecos = EnderecoEntrega.objects.filter(cliente=cliente).order_by('-padrao', 'apelido')
-    total_enderecos = enderecos.count()
-    
-    # ========== PAGAMENTOS PENDENTES ==========
-    pagamentos_pendentes = PagamentoIntent.objects.filter(
-        pedido__cliente=cliente,
-        status__in=['criado', 'pendente']
-    ).order_by('-criado_em')
-    
-    # ========== PEDIDOS RECENTES ==========
-    pedidos_recentes = pedidos[:5]
-    whatsapp_orders_recentes = whatsapp_orders[:5]
-    pacotes_recentes = pacotes[:5]
-    
-    # ========== TIMELINE DE ATIVIDADES ==========
-    # Combinar pedidos e pacotes recentes para timeline
-    atividades = []
-    
-    for pedido in pedidos[:10]:
-        atividades.append({
-            'tipo': 'pedido',
-            'objeto': pedido,
-            'data': pedido.criado_em,
-            'titulo': f"Pedido #{pedido.id}",
-            'status': pedido.get_status_display(),
-            'valor': pedido.valor_total
-        })
-    
-    for pacote in pacotes[:10]:
-        atividades.append({
-            'tipo': 'pacote',
-            'objeto': pacote,
-            'data': pacote.criado_em,
-            'titulo': f"Pacote {pacote.codigo_publico}",
-            'status': pacote.get_status_display()
-        })
-    
-    # Ordenar por data
-    try:
-        atividades.sort(key=lambda x: x['data'], reverse=True)
-        atividades = atividades[:10]
-    except Exception:
+        # Usar defer para evitar buscar campos que podem não existir no banco
+        # Campos que podem não existir: codigo, carteira_cliente, tipo_cliente, etc.
+        pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em').defer('codigo', 'carteira_cliente', 'tipo_cliente')
+        total_pedidos = pedidos.count()
+        
+        # Pedidos por status (usando status corretos do modelo)
+        pedidos_pendentes = pedidos.filter(status__in=['criado', 'aguardando_pagamento']).count()
+        pedidos_pagos = pedidos.filter(status='pago').count()
+        pedidos_enviados = pedidos.filter(status='em_transporte').count()
+        pedidos_entregues = pedidos.filter(status='concluido').count()
+        
+        # Total gasto (pedidos pagos ou concluídos)
+        total_gasto = pedidos.filter(
+            status__in=['pago', 'em_preparacao', 'em_transporte', 'concluido']
+        ).aggregate(total=Sum('valor_total'))['total'] or Decimal('0')
+        
+        # ========== PEDIDOS WHATSAPP ==========
+        whatsapp_orders = WhatsappOrder.objects.filter(cliente=cliente).order_by('-created_at')
+        total_whatsapp_orders = whatsapp_orders.count()
+        
+        whatsapp_gasto = whatsapp_orders.filter(
+            status__in=['paid', 'purchased', 'shipped', 'delivered']
+        ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+        
+        # Total gasto geral (pedidos + whatsapp)
+        total_gasto_geral = total_gasto + whatsapp_gasto
+        
+        # ========== PACOTES ==========
+        # Pacotes relacionados aos pedidos do cliente
+        pedido_ids = list(pedidos.values_list('id', flat=True))
+        
+        if pedido_ids:
+            pacotes_ids = PedidoPacote.objects.filter(
+                pedido_id__in=pedido_ids
+            ).values_list('pacote_id', flat=True)
+            pacotes = Pacote.objects.filter(id__in=pacotes_ids).order_by('-criado_em')
+        else:
+            # Se não há pedidos, buscar pacotes diretamente do cliente
+            pacotes = Pacote.objects.filter(cliente=cliente).order_by('-criado_em')
+        
+        total_pacotes = pacotes.count()
+        
+        pacotes_em_guarda = pacotes.filter(status='em_guarda').count()
+        pacotes_enviados = pacotes.filter(status='despachado').count()
+        pacotes_entregues = pacotes.filter(status='entregue').count()
+        
+        # ========== ENDEREÇOS ==========
+        enderecos = EnderecoEntrega.objects.filter(cliente=cliente).order_by('-padrao', 'apelido')
+        total_enderecos = enderecos.count()
+        
+        # ========== PAGAMENTOS PENDENTES ==========
+        pagamentos_pendentes = PagamentoIntent.objects.filter(
+            pedido__cliente=cliente,
+            status__in=['criado', 'pendente']
+        ).order_by('-criado_em')
+        
+        # ========== PEDIDOS RECENTES ==========
+        pedidos_recentes = pedidos[:5]
+        whatsapp_orders_recentes = whatsapp_orders[:5]
+        pacotes_recentes = pacotes[:5]
+        
+        # ========== TIMELINE DE ATIVIDADES ==========
+        # Combinar pedidos e pacotes recentes para timeline
         atividades = []
-    
-    context = {
-        'cliente': cliente,
         
-        # Pedidos
-        'total_pedidos': total_pedidos,
-        'pedidos_pendentes': pedidos_pendentes,
-        'pedidos_pagos': pedidos_pagos,
-        'pedidos_enviados': pedidos_enviados,
-        'pedidos_entregues': pedidos_entregues,
-        'total_gasto': total_gasto,
-        'total_gasto_geral': total_gasto_geral,
-        'pedidos_recentes': pedidos_recentes,
+        for pedido in pedidos[:10]:
+            atividades.append({
+                'tipo': 'pedido',
+                'objeto': pedido,
+                'data': pedido.criado_em,
+                'titulo': f"Pedido #{pedido.id}",
+                'status': pedido.get_status_display(),
+                'valor': pedido.valor_total
+            })
         
-        # WhatsApp Orders
-        'total_whatsapp_orders': total_whatsapp_orders,
-        'whatsapp_gasto': whatsapp_gasto,
-        'whatsapp_orders_recentes': whatsapp_orders_recentes,
+        for pacote in pacotes[:10]:
+            atividades.append({
+                'tipo': 'pacote',
+                'objeto': pacote,
+                'data': pacote.criado_em,
+                'titulo': f"Pacote {pacote.codigo_publico}",
+                'status': pacote.get_status_display()
+            })
         
-        # Pacotes
-        'total_pacotes': total_pacotes,
-        'pacotes_em_guarda': pacotes_em_guarda,
-        'pacotes_enviados': pacotes_enviados,
-        'pacotes_entregues': pacotes_entregues,
-        'pacotes_recentes': pacotes_recentes,
+        # Ordenar por data
+        try:
+            atividades.sort(key=lambda x: x['data'], reverse=True)
+            atividades = atividades[:10]
+        except Exception:
+            atividades = []
         
-        # Endereços
-        'enderecos': enderecos,
-        'total_enderecos': total_enderecos,
-        
-        # Pagamentos
-        'pagamentos_pendentes': pagamentos_pendentes,
-        
-        # Timeline
-        'atividades': atividades,
-    }
+        context = {
+            'cliente': cliente,
+            
+            # Pedidos
+            'total_pedidos': total_pedidos,
+            'pedidos_pendentes': pedidos_pendentes,
+            'pedidos_pagos': pedidos_pagos,
+            'pedidos_enviados': pedidos_enviados,
+            'pedidos_entregues': pedidos_entregues,
+            'total_gasto': total_gasto,
+            'total_gasto_geral': total_gasto_geral,
+            'pedidos_recentes': pedidos_recentes,
+            
+            # WhatsApp Orders
+            'total_whatsapp_orders': total_whatsapp_orders,
+            'whatsapp_gasto': whatsapp_gasto,
+            'whatsapp_orders_recentes': whatsapp_orders_recentes,
+            
+            # Pacotes
+            'total_pacotes': total_pacotes,
+            'pacotes_em_guarda': pacotes_em_guarda,
+            'pacotes_enviados': pacotes_enviados,
+            'pacotes_entregues': pacotes_entregues,
+            'pacotes_recentes': pacotes_recentes,
+            
+            # Endereços
+            'enderecos': enderecos,
+            'total_enderecos': total_enderecos,
+            
+            # Pagamentos
+            'pagamentos_pendentes': pagamentos_pendentes,
+            
+            # Timeline
+            'atividades': atividades,
+        }
     
     except Exception as e:
         import logging
