@@ -250,11 +250,12 @@ def update_group(request, group_id):
 @require_http_methods(["POST"])
 def add_participant(request, group_id):
     """Adicionar participante ao grupo"""
-    if not request.user.is_shopper:
+    if not (request.user.is_shopper or request.user.is_address_keeper):
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
-        group = get_object_or_404(WhatsappGroup, id=group_id, shopper=request.user.personalshopper)
+        # Verificar se o grupo pertence ao usuário (owner)
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
         data = json.loads(request.body)
         
         phone = data.get('phone')
@@ -263,15 +264,37 @@ def add_participant(request, group_id):
         if not phone:
             return JsonResponse({'error': 'Telefone é obrigatório'}, status=400)
         
+        # Limpar e formatar telefone
+        phone = phone.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+        if not phone.startswith('+'):
+            # Se não começar com +, assumir que é brasileiro
+            if phone.startswith('55'):
+                phone = '+' + phone
+            elif phone.startswith('0'):
+                phone = '+55' + phone[1:]
+            else:
+                phone = '+55' + phone
+        
         # Verificar se já existe
         if WhatsappParticipant.objects.filter(group=group, phone=phone).exists():
-            return JsonResponse({'error': 'Participante já cadastrado'}, status=400)
+            return JsonResponse({'error': 'Participante já cadastrado neste grupo'}, status=400)
+        
+        # Tentar vincular com cliente existente pelo telefone
+        cliente = None
+        try:
+            # Buscar cliente pelo telefone
+            cliente = Cliente.objects.filter(
+                telefone__icontains=phone.replace('+', '')
+            ).first()
+        except:
+            pass
         
         # Criar participante
         participant = WhatsappParticipant.objects.create(
             group=group,
             phone=phone,
-            name=name
+            name=name or phone,
+            cliente=cliente
         )
         
         return JsonResponse({
@@ -281,6 +304,7 @@ def add_participant(request, group_id):
                 'name': participant.name,
                 'phone': participant.phone,
                 'joined_at': participant.joined_at.isoformat(),
+                'is_cliente': participant.cliente is not None
             }
         })
         

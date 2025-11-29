@@ -291,34 +291,70 @@
 
                 <!-- Participantes -->
                 <div class="tab-pane fade" id="participants" role="tabpanel">
-                    <div class="activity-card">
+                    <!-- Formulário para Adicionar Participante -->
+                    <div class="activity-card mb-3">
                         <h5 class="mb-3">
-                            <i class="fas fa-users text-primary"></i>
-                            Participantes do Grupo ({{ participants.count }})
+                            <i class="fas fa-user-plus text-success"></i>
+                            Adicionar Novo Participante
                         </h5>
-                        {% if participants %}
-                            {% for participant in participants %}
-                            <div class="participant-item">
-                                <div>
-                                    <strong>{{ participant.name }}</strong>
-                                    {% if participant.is_admin %}
-                                    <span class="badge bg-warning ms-2">Admin</span>
-                                    {% endif %}
-                                    <br>
-                                    <small class="text-muted">{{ participant.phone }}</small>
-                                </div>
-                                <div class="text-end">
-                                    <small class="text-muted">Entrou {{ participant.joined_at|timesince }} atrás</small>
-                                    {% if participant.cliente %}
-                                    <br>
-                                    <span class="badge bg-success">Cliente Cadastrado</span>
-                                    {% endif %}
-                                </div>
+                        <form id="addParticipantForm" class="row g-3">
+                            {% csrf_token %}
+                            <div class="col-md-5">
+                                <label for="participant_phone" class="form-label">Telefone WhatsApp</label>
+                                <input type="text" class="form-control" id="participant_phone" 
+                                       placeholder="+5511999999999" required>
+                                <small class="form-text text-muted">Formato: +5511999999999</small>
                             </div>
-                            {% endfor %}
-                        {% else %}
-                            <p class="text-muted">Nenhum participante no grupo</p>
-                        {% endif %}
+                            <div class="col-md-5">
+                                <label for="participant_name" class="form-label">Nome (opcional)</label>
+                                <input type="text" class="form-control" id="participant_name" 
+                                       placeholder="Nome do participante">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-plus"></i> Adicionar
+                                </button>
+                            </div>
+                        </form>
+                        <div id="addParticipantMessage" class="mt-2"></div>
+                    </div>
+
+                    <!-- Lista de Participantes -->
+                    <div class="activity-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-users text-primary"></i>
+                                Participantes do Grupo (<span id="participantCount">{{ participants.count }}</span>)
+                            </h5>
+                            <button class="btn btn-sm btn-outline-primary" onclick="refreshParticipants()">
+                                <i class="fas fa-sync-alt"></i> Atualizar
+                            </button>
+                        </div>
+                        <div id="participantsList">
+                            {% if participants %}
+                                {% for participant in participants %}
+                                <div class="participant-item" data-participant-id="{{ participant.id }}">
+                                    <div>
+                                        <strong>{{ participant.name|default:participant.phone }}</strong>
+                                        {% if participant.is_admin %}
+                                        <span class="badge bg-warning ms-2">Admin</span>
+                                        {% endif %}
+                                        <br>
+                                        <small class="text-muted">{{ participant.phone }}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <small class="text-muted">Entrou {{ participant.joined_at|timesince }} atrás</small>
+                                        {% if participant.cliente %}
+                                        <br>
+                                        <span class="badge bg-success">Cliente Cadastrado</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted">Nenhum participante no grupo</p>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
 
@@ -473,6 +509,100 @@
     function sendMessage() {
         // Implementar envio de mensagem
         console.log('Enviando mensagem para o grupo...');
+    }
+
+    // Adicionar participante via AJAX
+    document.getElementById('addParticipantForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const phone = document.getElementById('participant_phone').value.trim();
+        const name = document.getElementById('participant_name').value.trim();
+        const messageDiv = document.getElementById('addParticipantMessage');
+        const form = this;
+        
+        if (!phone) {
+            messageDiv.innerHTML = '<div class="alert alert-danger">Telefone é obrigatório!</div>';
+            return;
+        }
+        
+        // Desabilitar formulário
+        form.querySelector('button[type="submit"]').disabled = true;
+        messageDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Adicionando participante...</div>';
+        
+        try {
+            // Obter CSRF token
+            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            const response = await fetch(`{% url 'api_add_participant' group.id %}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({
+                    phone: phone,
+                    name: name
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                messageDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check"></i> Participante adicionado com sucesso!</div>';
+                form.reset();
+                
+                // Adicionar participante à lista
+                addParticipantToList(data.participant);
+                
+                // Atualizar contador
+                updateParticipantCount();
+                
+                // Limpar mensagem após 3 segundos
+                setTimeout(() => {
+                    messageDiv.innerHTML = '';
+                }, 3000);
+            } else {
+                messageDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> ${data.error || 'Erro ao adicionar participante'}</div>`;
+            }
+        } catch (error) {
+            messageDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> Erro: ${error.message}</div>`;
+        } finally {
+            form.querySelector('button[type="submit"]').disabled = false;
+        }
+    });
+    
+    function addParticipantToList(participant) {
+        const participantsList = document.getElementById('participantsList');
+        const emptyMessage = participantsList.querySelector('p.text-muted');
+        
+        if (emptyMessage) {
+            emptyMessage.remove();
+        }
+        
+        const participantItem = document.createElement('div');
+        participantItem.className = 'participant-item';
+        participantItem.setAttribute('data-participant-id', participant.id);
+        participantItem.innerHTML = `
+            <div>
+                <strong>${participant.name || participant.phone}</strong>
+                <br>
+                <small class="text-muted">${participant.phone}</small>
+            </div>
+            <div class="text-end">
+                <small class="text-muted">Agora</small>
+            </div>
+        `;
+        
+        participantsList.insertBefore(participantItem, participantsList.firstChild);
+    }
+    
+    function updateParticipantCount() {
+        const count = document.querySelectorAll('#participantsList .participant-item').length;
+        document.getElementById('participantCount').textContent = count;
+    }
+    
+    function refreshParticipants() {
+        location.reload();
     }
 </script>
 {% endblock %}
