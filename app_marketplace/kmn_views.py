@@ -306,18 +306,24 @@ def kmn_trustlines(request):
         ).select_related('agente_a__user', 'agente_b__user').order_by('-aceito_em', '-criado_em')
         
         # Agentes disponíveis para criar trustlines
+        # IMPORTANTE: Um agente pode ter múltiplas trustlines com diferentes agentes
+        # Apenas não pode ter múltiplas trustlines com o MESMO agente
         agentes_disponiveis = Agente.objects.filter(
             verificado_kmn=True
         ).exclude(id=agente.id).select_related('user')
         
-        # Excluir agentes que já têm trustline
+        # Excluir apenas agentes que já têm trustline ATIVA ou PENDENTE com este agente
+        # Permitir múltiplas trustlines com diferentes agentes
         trustline_agente_ids = []
         for tl in trustlines:
-            if tl.agente_a == agente:
-                trustline_agente_ids.append(tl.agente_b.id)
-            else:
-                trustline_agente_ids.append(tl.agente_a.id)
+            # Só excluir se a trustline estiver ativa ou pendente (não cancelada/suspensa)
+            if tl.status in [TrustlineKeeper.StatusTrustline.ATIVA, TrustlineKeeper.StatusTrustline.PENDENTE]:
+                if tl.agente_a == agente:
+                    trustline_agente_ids.append(tl.agente_b.id)
+                else:
+                    trustline_agente_ids.append(tl.agente_a.id)
         
+        # Excluir apenas os agentes que já têm trustline ativa/pendente
         agentes_disponiveis = agentes_disponiveis.exclude(id__in=trustline_agente_ids)
     except Exception as e:
         messages.error(request, f"Erro ao carregar trustlines: {str(e)}")
