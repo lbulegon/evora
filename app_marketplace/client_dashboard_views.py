@@ -35,23 +35,27 @@ def client_dashboard(request):
     
     try:
         cliente = request.user.cliente
-    except Cliente.DoesNotExist:
+    except (Cliente.DoesNotExist, AttributeError):
         messages.error(request, "Perfil de cliente não encontrado.")
         return redirect('home')
     
-    # ========== PEDIDOS ==========
-    pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em')
+    # Inicializar variáveis com valores padrão para evitar erros
+    try:
+        # ========== PEDIDOS ==========
+    # Usar defer para evitar buscar campos que podem não existir no banco
+    # Campos que podem não existir: codigo, carteira_cliente, tipo_cliente, etc.
+    pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em').defer('codigo', 'carteira_cliente', 'tipo_cliente')
     total_pedidos = pedidos.count()
     
-    # Pedidos por status
-    pedidos_pendentes = pedidos.filter(status='pendente').count()
+    # Pedidos por status (usando status corretos do modelo)
+    pedidos_pendentes = pedidos.filter(status__in=['criado', 'aguardando_pagamento']).count()
     pedidos_pagos = pedidos.filter(status='pago').count()
-    pedidos_enviados = pedidos.filter(status='enviado').count()
-    pedidos_entregues = pedidos.filter(status='entregue').count()
+    pedidos_enviados = pedidos.filter(status='em_transporte').count()
+    pedidos_entregues = pedidos.filter(status='concluido').count()
     
-    # Total gasto
+    # Total gasto (pedidos pagos ou concluídos)
     total_gasto = pedidos.filter(
-        status__in=['pago', 'enviado', 'entregue']
+        status__in=['pago', 'em_preparacao', 'em_transporte', 'concluido']
     ).aggregate(total=Sum('valor_total'))['total'] or Decimal('0')
     
     # ========== PEDIDOS WHATSAPP ==========
@@ -67,16 +71,21 @@ def client_dashboard(request):
     
     # ========== PACOTES ==========
     # Pacotes relacionados aos pedidos do cliente
-    pedido_ids = pedidos.values_list('id', flat=True)
-    pacotes_ids = PedidoPacote.objects.filter(
-        pedido_id__in=pedido_ids
-    ).values_list('pacote_id', flat=True)
+    pedido_ids = list(pedidos.values_list('id', flat=True))
     
-    pacotes = Pacote.objects.filter(id__in=pacotes_ids).order_by('-criado_em')
+    if pedido_ids:
+        pacotes_ids = PedidoPacote.objects.filter(
+            pedido_id__in=pedido_ids
+        ).values_list('pacote_id', flat=True)
+        pacotes = Pacote.objects.filter(id__in=pacotes_ids).order_by('-criado_em')
+    else:
+        # Se não há pedidos, buscar pacotes diretamente do cliente
+        pacotes = Pacote.objects.filter(cliente=cliente).order_by('-criado_em')
+    
     total_pacotes = pacotes.count()
     
     pacotes_em_guarda = pacotes.filter(status='em_guarda').count()
-    pacotes_enviados = pacotes.filter(status='enviado').count()
+    pacotes_enviados = pacotes.filter(status='despachado').count()
     pacotes_entregues = pacotes.filter(status='entregue').count()
     
     # ========== ENDEREÇOS ==========
@@ -118,8 +127,11 @@ def client_dashboard(request):
         })
     
     # Ordenar por data
-    atividades.sort(key=lambda x: x['data'], reverse=True)
-    atividades = atividades[:10]
+    try:
+        atividades.sort(key=lambda x: x['data'], reverse=True)
+        atividades = atividades[:10]
+    except Exception:
+        atividades = []
     
     context = {
         'cliente': cliente,
@@ -156,6 +168,36 @@ def client_dashboard(request):
         # Timeline
         'atividades': atividades,
     }
+    
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Erro no client_dashboard: {str(e)}", exc_info=True)
+        messages.error(request, f"Erro ao carregar dashboard: {str(e)}")
+        # Retornar contexto mínimo em caso de erro
+        context = {
+            'cliente': cliente,
+            'total_pedidos': 0,
+            'pedidos_pendentes': 0,
+            'pedidos_pagos': 0,
+            'pedidos_enviados': 0,
+            'pedidos_entregues': 0,
+            'total_gasto': Decimal('0'),
+            'total_gasto_geral': Decimal('0'),
+            'pedidos_recentes': [],
+            'total_whatsapp_orders': 0,
+            'whatsapp_gasto': Decimal('0'),
+            'whatsapp_orders_recentes': [],
+            'total_pacotes': 0,
+            'pacotes_em_guarda': 0,
+            'pacotes_enviados': 0,
+            'pacotes_entregues': 0,
+            'pacotes_recentes': [],
+            'enderecos': [],
+            'total_enderecos': 0,
+            'pagamentos_pendentes': [],
+            'atividades': [],
+        }
     
     return render(request, 'app_marketplace/client_dashboard.html', context)
 
