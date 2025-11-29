@@ -20,7 +20,8 @@ from .models import (
     WhatsappMessage, WhatsappProduct, WhatsappOrder,
     Cliente, Produto, Categoria, Agente, ClienteRelacao,
     RelacionamentoClienteShopper, TrustlineKeeper,
-    ParticipantPermissionRequest, CarteiraCliente
+    ParticipantPermissionRequest, CarteiraCliente,
+    PostScreenshot
 )
 from .whatsapp_views import send_message, send_reaction
 
@@ -630,12 +631,12 @@ def respond_permission_request(request, permission_id):
 
 @login_required
 def products_list(request, group_id):
-    """Lista produtos de um grupo"""
-    if not request.user.is_shopper:
-        messages.error(request, "Acesso restrito a Personal Shoppers.")
+    """Lista posts/produtos de um grupo (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        messages.error(request, "Acesso restrito.")
         return redirect('home')
     
-    group = get_object_or_404(WhatsappGroup, id=group_id, shopper=request.user.personalshopper)
+    group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
     products = group.products.all().order_by('-created_at')
     
     # Filtros
@@ -681,32 +682,77 @@ def products_list(request, group_id):
 @login_required
 @require_http_methods(["POST"])
 def create_product(request, group_id):
-    """Criar produto no grupo"""
-    if not request.user.is_shopper:
+    """Criar post/produto no grupo (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
-        group = get_object_or_404(WhatsappGroup, id=group_id, shopper=request.user.personalshopper)
-        data = json.loads(request.body)
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
         
-        # Dados obrigatórios
-        name = data.get('name')
+        # Se for FormData (upload de imagem)
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            name = request.POST.get('name')
+            description = request.POST.get('description', '')
+            price = request.POST.get('price')
+            currency = request.POST.get('currency', 'USD')
+            brand = request.POST.get('brand', '')
+            category = request.POST.get('category', '')
+            is_available = request.POST.get('is_available', 'true') == 'true'
+            is_featured = request.POST.get('is_featured', 'false') == 'true'
+            
+            # Processar imagens
+            image_urls = []
+            if 'images' in request.FILES:
+                from django.core.files.storage import default_storage
+                from django.core.files.base import ContentFile
+                import os
+                from datetime import datetime
+                
+                for image_file in request.FILES.getlist('images'):
+                    # Salvar imagem
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f"posts/{group.id}/{timestamp}_{image_file.name}"
+                    path = default_storage.save(filename, ContentFile(image_file.read()))
+                    image_urls.append(default_storage.url(path))
+        else:
+            # JSON
+            data = json.loads(request.body)
+            name = data.get('name')
+            description = data.get('description', '')
+            price = data.get('price')
+            currency = data.get('currency', 'USD')
+            brand = data.get('brand', '')
+            category = data.get('category', '')
+            image_urls = data.get('image_urls', [])
+            is_available = data.get('is_available', True)
+            is_featured = data.get('is_featured', False)
+        
         if not name:
-            return JsonResponse({'error': 'Nome do produto é obrigatório'}, status=400)
+            return JsonResponse({'error': 'Nome do post é obrigatório'}, status=400)
         
-        # Criar produto
+        # Buscar ou criar participante para o owner
+        participant, _ = WhatsappParticipant.objects.get_or_create(
+            group=group,
+            phone=request.user.username if not hasattr(request.user, 'cliente') else (request.user.cliente.telefone or request.user.username),
+            defaults={
+                'name': request.user.get_full_name() or request.user.username,
+                'is_admin': True
+            }
+        )
+        
+        # Criar produto/post
         product = WhatsappProduct.objects.create(
             group=group,
             name=name,
-            description=data.get('description', ''),
-            price=Decimal(data.get('price', 0)) if data.get('price') else None,
-            currency=data.get('currency', 'USD'),
-            brand=data.get('brand', ''),
-            category=data.get('category', ''),
-            image_urls=data.get('image_urls', []),
-            is_available=data.get('is_available', True),
-            is_featured=data.get('is_featured', False),
-            posted_by=group.participants.first()  # Usar primeiro participante como exemplo
+            description=description,
+            price=Decimal(price) if price else None,
+            currency=currency,
+            brand=brand,
+            category=category,
+            image_urls=image_urls,
+            is_available=is_available,
+            is_featured=is_featured,
+            posted_by=participant
         )
         
         return JsonResponse({
@@ -714,14 +760,227 @@ def create_product(request, group_id):
             'product': {
                 'id': product.id,
                 'name': product.name,
+                'description': product.description,
                 'price': str(product.price) if product.price else None,
                 'currency': product.currency,
                 'brand': product.brand,
                 'category': product.category,
+                'image_urls': product.image_urls,
                 'is_available': product.is_available,
+                'is_featured': product.is_featured,
                 'created_at': product.created_at.isoformat(),
             }
         })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def get_product(request, group_id, product_id):
+    """Buscar produto específico (para edição)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        
+        return JsonResponse({
+            'success': True,
+            'product': {
+                'id': product.id,
+                'name': product.name,
+                'description': product.description,
+                'price': str(product.price) if product.price else None,
+                'currency': product.currency,
+                'brand': product.brand,
+                'category': product.category,
+                'image_urls': product.image_urls,
+                'is_available': product.is_available,
+                'is_featured': product.is_featured,
+                'created_at': product.created_at.isoformat(),
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["PUT", "PATCH"])
+def update_product(request, group_id, product_id):
+    """Atualizar post/produto (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        
+        data = json.loads(request.body)
+        
+        # Atualizar campos
+        if 'name' in data:
+            product.name = data['name']
+        if 'description' in data:
+            product.description = data.get('description', '')
+        if 'price' in data:
+            product.price = Decimal(data['price']) if data['price'] else None
+        if 'currency' in data:
+            product.currency = data['currency']
+        if 'brand' in data:
+            product.brand = data.get('brand', '')
+        if 'category' in data:
+            product.category = data.get('category', '')
+        if 'image_urls' in data:
+            product.image_urls = data['image_urls']
+        if 'is_available' in data:
+            product.is_available = data['is_available']
+        if 'is_featured' in data:
+            product.is_featured = data['is_featured']
+        
+        product.save()
+        
+        return JsonResponse({
+            'success': True,
+            'product': {
+                'id': product.id,
+                'name': product.name,
+                'description': product.description,
+                'price': str(product.price) if product.price else None,
+                'currency': product.currency,
+                'image_urls': product.image_urls,
+                'is_available': product.is_available,
+                'is_featured': product.is_featured,
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["DELETE"])
+def delete_product(request, group_id, product_id):
+    """Deletar post/produto (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        
+        product.delete()
+        
+        return JsonResponse({'success': True, 'message': 'Post deletado com sucesso'})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ============================================================================
+# CAPTURA DE IMAGENS (MVP)
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def capture_post_screenshot(request, group_id, product_id):
+    """Capturar screenshot de um post (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        
+        # Se for upload de imagem
+        if 'screenshot' in request.FILES:
+            screenshot_file = request.FILES['screenshot']
+            
+            # Criar screenshot
+            screenshot = PostScreenshot.objects.create(
+                post=product,
+                group=group,
+                screenshot_file=screenshot_file,
+                captured_by=request.user,
+                notes=request.POST.get('notes', '')
+            )
+            
+            # Obter dimensões se possível
+            try:
+                from PIL import Image
+                img = Image.open(screenshot.screenshot_file)
+                screenshot.width = img.width
+                screenshot.height = img.height
+                screenshot.file_size = screenshot.screenshot_file.size
+                screenshot.save()
+            except:
+                pass
+            
+            return JsonResponse({
+                'success': True,
+                'screenshot': {
+                    'id': screenshot.id,
+                    'url': screenshot.screenshot_file.url,
+                    'captured_at': screenshot.captured_at.isoformat(),
+                    'width': screenshot.width,
+                    'height': screenshot.height,
+                }
+            })
+        else:
+            return JsonResponse({'error': 'Arquivo de screenshot é obrigatório'}, status=400)
+            
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def get_post_screenshots(request, group_id, product_id):
+    """Listar screenshots de um post (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        
+        screenshots = PostScreenshot.objects.filter(post=product).order_by('-captured_at')
+        
+        screenshots_data = [{
+            'id': s.id,
+            'url': s.screenshot_file.url,
+            'captured_at': s.captured_at.isoformat(),
+            'captured_by': s.captured_by.get_full_name() or s.captured_by.username if s.captured_by else None,
+            'width': s.width,
+            'height': s.height,
+            'file_size': s.file_size,
+            'notes': s.notes,
+        } for s in screenshots]
+        
+        return JsonResponse({
+            'success': True,
+            'screenshots': screenshots_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["DELETE"])
+def delete_screenshot(request, group_id, product_id, screenshot_id):
+    """Deletar screenshot (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        screenshot = get_object_or_404(PostScreenshot, id=screenshot_id, post=product)
+        
+        screenshot.delete()
+        
+        return JsonResponse({'success': True, 'message': 'Screenshot deletado com sucesso'})
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

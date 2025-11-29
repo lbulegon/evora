@@ -13,8 +13,13 @@ from decimal import Decimal
 
 from .models import (
     Cliente, Pedido, Pacote, PedidoPacote, EnderecoEntrega,
-    WhatsappOrder, PagamentoIntent, MovimentoPacote, FotoPacote
+    WhatsappOrder, PagamentoIntent, MovimentoPacote, FotoPacote,
+    WhatsappGroup, WhatsappProduct, WhatsappParticipant
 )
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+import json
+from decimal import Decimal
 
 
 # ============================================================================
@@ -277,6 +282,135 @@ def client_orders(request):
 # ============================================================================
 # LISTA DE PACOTES
 # ============================================================================
+
+@login_required
+def client_products(request):
+    """Lista de produtos disponíveis para o cliente (MVP)"""
+    if not request.user.is_cliente:
+        messages.error(request, "Acesso restrito a clientes.")
+        return redirect('home')
+    
+    try:
+        cliente = request.user.cliente
+    except Cliente.DoesNotExist:
+        messages.error(request, "Perfil de cliente não encontrado.")
+        return redirect('home')
+    
+    # Buscar grupos onde o cliente é participante
+    participant_groups = WhatsappParticipant.objects.filter(
+        cliente=cliente
+    ).values_list('group_id', flat=True)
+    
+    # Buscar produtos dos grupos
+    products = WhatsappProduct.objects.filter(
+        group_id__in=participant_groups,
+        is_available=True
+    ).order_by('-is_featured', '-created_at')
+    
+    # Filtros
+    search = request.GET.get('search', '')
+    category = request.GET.get('category', '')
+    group_id = request.GET.get('group', '')
+    
+    if search:
+        products = products.filter(
+            Q(name__icontains=search) | 
+            Q(description__icontains=search) |
+            Q(brand__icontains=search)
+        )
+    
+    if category:
+        products = products.filter(category=category)
+    
+    if group_id:
+        products = products.filter(group_id=group_id)
+    
+    # Grupos disponíveis
+    groups = WhatsappGroup.objects.filter(id__in=participant_groups).order_by('name')
+    
+    # Paginação
+    paginator = Paginator(products, 12)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Categorias disponíveis
+    categories = products.values_list('category', flat=True).distinct().exclude(category='')
+    
+    context = {
+        'page_obj': page_obj,
+        'groups': groups,
+        'search': search,
+        'category': category,
+        'group_id': group_id,
+        'categories': categories,
+    }
+    
+    return render(request, 'app_marketplace/client_products.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def create_whatsapp_order(request):
+    """Criar pedido via WhatsApp (MVP)"""
+    if not request.user.is_cliente:
+        return JsonResponse({'error': 'Acesso restrito a clientes'}, status=403)
+    
+    try:
+        cliente = request.user.cliente
+        data = json.loads(request.body)
+        
+        product_id = data.get('product_id')
+        quantity = int(data.get('quantity', 1))
+        
+        if not product_id:
+            return JsonResponse({'error': 'Produto é obrigatório'}, status=400)
+        
+        product = get_object_or_404(WhatsappProduct, id=product_id, is_available=True)
+        
+        # Buscar participante do cliente no grupo
+        participant = WhatsappParticipant.objects.filter(
+            group=product.group,
+            cliente=cliente
+        ).first()
+        
+        if not participant:
+            return JsonResponse({'error': 'Cliente não é participante deste grupo'}, status=403)
+        
+        # Calcular total
+        total = (product.price or Decimal('0')) * quantity
+        
+        # Criar pedido
+        order = WhatsappOrder.objects.create(
+            group=product.group,
+            customer=participant,
+            cliente=cliente,
+            order_number=f"WH{timezone.now().strftime('%Y%m%d%H%M%S')}",
+            status='pending',
+            total_amount=total,
+            currency=product.currency,
+            products=[{
+                'product_id': product.id,
+                'name': product.name,
+                'price': str(product.price) if product.price else '0',
+                'quantity': quantity
+            }],
+            payment_status='pending'
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'order': {
+                'id': order.id,
+                'order_number': order.order_number,
+                'total_amount': str(order.total_amount),
+                'currency': order.currency,
+                'status': order.status,
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 @login_required
 def client_packages(request):

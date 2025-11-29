@@ -176,7 +176,12 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{% url 'client_orders' %}">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'client_products' %}active{% endif %}" href="{% url 'client_products' %}">
+                                    <i class="fas fa-shopping-bag"></i> Produtos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'client_orders' %}active{% endif %}" href="{% url 'client_orders' %}">
                                     <i class="fas fa-shopping-cart"></i> Meus Pedidos
                                 </a>
                             </li>

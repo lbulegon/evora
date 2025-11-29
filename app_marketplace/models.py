@@ -1345,6 +1345,47 @@ class WhatsappProduct(models.Model):
         return f"{self.name} - {self.group.name}"
 
 
+class PostScreenshot(models.Model):
+    """
+    Captura de screenshot de um post do WhatsApp.
+    MVP: Sistema de captura de imagens dos posts.
+    """
+    post = models.ForeignKey(WhatsappProduct, on_delete=models.CASCADE, related_name='screenshots')
+    group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='post_screenshots')
+    
+    # Imagem capturada
+    screenshot_file = models.ImageField(
+        upload_to='screenshots/posts/%Y/%m/%d/',
+        help_text="Screenshot do post"
+    )
+    
+    # Metadados
+    captured_at = models.DateTimeField(auto_now_add=True)
+    captured_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='captured_screenshots',
+        help_text="Usuário que capturou a imagem"
+    )
+    
+    # Informações da captura
+    width = models.PositiveIntegerField(null=True, blank=True, help_text="Largura da imagem em pixels")
+    height = models.PositiveIntegerField(null=True, blank=True, help_text="Altura da imagem em pixels")
+    file_size = models.PositiveIntegerField(null=True, blank=True, help_text="Tamanho do arquivo em bytes")
+    
+    # Notas opcionais
+    notes = models.TextField(blank=True, help_text="Notas sobre a captura")
+    
+    class Meta:
+        verbose_name = 'Screenshot de Post'
+        verbose_name_plural = 'Screenshots de Posts'
+        ordering = ['-captured_at']
+    
+    def __str__(self):
+        return f"Screenshot de {self.post.name} - {self.captured_at.strftime('%d/%m/%Y %H:%M')}"
+
+
 class WhatsappOrder(models.Model):
     """Pedido criado via WhatsApp"""
     STATUS_CHOICES = [
