@@ -126,7 +126,18 @@ def solicitar_evento(request, evento_id):
 
 
 def clientes(request):
-    return render(request, 'app_marketplace/clientes.html')
+    """
+    Lista de clientes do sistema.
+    Busca clientes reais do banco de dados.
+    """
+    # Buscar todos os clientes com seus dados do User
+    clientes = Cliente.objects.select_related('user').all().order_by('-criado_em')
+    
+    context = {
+        'clientes': clientes,
+    }
+    
+    return render(request, 'app_marketplace/clientes.html', context)
 
 def personal_shoppers(request):
     """
