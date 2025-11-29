@@ -16,9 +16,14 @@ class RailwayHealthCheckMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # O healthcheck do Railway está configurado para /health/
-        # Não precisamos interceptar /admin/ - deixar funcionar normalmente
-        # Este middleware pode ser usado para outros healthchecks se necessário
+        # Interceptar healthcheck do Railway para resposta rápida
+        if request.path == '/health/':
+            from django.http import JsonResponse
+            return JsonResponse({
+                'status': 'ok',
+                'message': 'ÉVORA Connect is running',
+                'version': '1.0.0'
+            }, status=200)
         
         # Para outros requests, continuar normalmente
         response = self.get_response(request)
