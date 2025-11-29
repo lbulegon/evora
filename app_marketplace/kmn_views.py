@@ -533,7 +533,44 @@ def ajax_aceitar_trustline(request):
             })
         else:
             return JsonResponse({'error': 'Trustline não está pendente'}, status=400)
-            
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def ajax_encerrar_trustline(request):
+    """Encerrar/Cancelar trustline via AJAX"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido'}, status=405)
+    
+    try:
+        agente = request.user.agente
+        data = json.loads(request.body)
+        
+        trustline = get_object_or_404(
+            TrustlineKeeper,
+            id=data['trustline_id']
+        )
+        
+        # Verificar se o usuário é um dos agentes
+        if agente not in [trustline.agente_a, trustline.agente_b]:
+            return JsonResponse({'error': 'Não autorizado'}, status=403)
+        
+        # Verificar se a trustline pode ser encerrada (deve estar ativa ou pendente)
+        if trustline.status not in [TrustlineKeeper.StatusTrustline.ATIVA, TrustlineKeeper.StatusTrustline.PENDENTE]:
+            return JsonResponse({'error': 'Trustline já está encerrada'}, status=400)
+        
+        # Encerrar a trustline (marcar como cancelada)
+        trustline.status = TrustlineKeeper.StatusTrustline.CANCELADA
+        trustline.save()
+        
+        return JsonResponse({
+            'success': True,
+            'status': trustline.get_status_display(),
+            'message': 'Trustline encerrada com sucesso'
+        })
+        
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 

@@ -73,4 +73,5 @@ urlpatterns = [
     path('ajax/kmn/criar-oferta/', kmn_views.ajax_criar_oferta, name='ajax_criar_oferta'),
     path('ajax/kmn/atualizar-estoque/', kmn_views.ajax_atualizar_estoque, name='ajax_atualizar_estoque'),
     path('ajax/kmn/aceitar-trustline/', kmn_views.ajax_aceitar_trustline, name='ajax_aceitar_trustline'),
+    path('ajax/kmn/encerrar-trustline/', kmn_views.ajax_encerrar_trustline, name='ajax_encerrar_trustline'),
 ]

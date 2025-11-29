@@ -90,6 +90,11 @@
                                                     <i class="fas fa-check"></i> Aceitar
                                                 </button>
                                             {% endif %}
+                                            {% if trustline.status == 'ativa' or trustline.status == 'pendente' %}
+                                                <button class="btn btn-sm btn-danger ms-1" onclick="encerrarTrustline({{ trustline.id }})" title="Encerrar trustline">
+                                                    <i class="fas fa-times"></i> Encerrar
+                                                </button>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -182,6 +187,34 @@ function aceitarTrustline(trustlineId) {
         .catch(error => {
             console.error('Erro:', error);
             alert('Erro ao aceitar trustline');
+        });
+    }
+}
+
+function encerrarTrustline(trustlineId) {
+    if (confirm('Tem certeza que deseja encerrar esta trustline? Esta ação não pode ser desfeita.')) {
+        fetch('{% url "ajax_encerrar_trustline" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                trustline_id: trustlineId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Trustline encerrada com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro ao encerrar trustline: ' + (data.error || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao encerrar trustline');
         });
     }
 }
