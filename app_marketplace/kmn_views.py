@@ -246,6 +246,59 @@ def kmn_trustlines(request):
         messages.error(request, f"Erro ao acessar perfil de agente: {str(e)}")
         return redirect('home')
     
+    # Tratar criação de trustline via GET (parâmetro ?criar=id)
+    criar_agente_id = request.GET.get('criar')
+    if criar_agente_id:
+        try:
+            agente_b = get_object_or_404(Agente, id=criar_agente_id, verificado_kmn=True)
+            
+            # Verificar se não está tentando criar trustline consigo mesmo
+            if agente_b.id == agente.id:
+                messages.error(request, "Você não pode criar uma trustline consigo mesmo.")
+            else:
+                # Verificar se já existe trustline entre os dois agentes
+                trustline_existente = TrustlineKeeper.objects.filter(
+                    (Q(agente_a=agente) & Q(agente_b=agente_b)) |
+                    (Q(agente_a=agente_b) & Q(agente_b=agente))
+                ).first()
+                
+                if trustline_existente:
+                    messages.warning(
+                        request, 
+                        f"Já existe uma trustline com {agente_b.user.get_full_name() or agente_b.user.username}."
+                    )
+                else:
+                    # Criar nova trustline pendente
+                    try:
+                        nova_trustline = TrustlineKeeper.objects.create(
+                            agente_a=agente,
+                            agente_b=agente_b,
+                            nivel_confianca_a_para_b=50.0,  # Valor padrão
+                            nivel_confianca_b_para_a=50.0,  # Valor padrão
+                            perc_shopper=60.0,  # Valor padrão
+                            perc_keeper=40.0,   # Valor padrão
+                            status=TrustlineKeeper.StatusTrustline.PENDENTE
+                        )
+                        messages.success(
+                            request, 
+                            f"Trustline criada com sucesso! Aguardando aprovação de {agente_b.user.get_full_name() or agente_b.user.username}."
+                        )
+                        # Redirecionar para remover o parâmetro da URL
+                        return redirect('kmn_trustlines')
+                    except Exception as e:
+                        # Tratar erros de constraint ou validação
+                        if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
+                            messages.warning(
+                                request, 
+                                f"Já existe uma trustline com {agente_b.user.get_full_name() or agente_b.user.username}."
+                            )
+                        else:
+                            messages.error(request, f"Erro ao criar trustline: {str(e)}")
+        except Agente.DoesNotExist:
+            messages.error(request, "Agente não encontrado ou não verificado.")
+        except Exception as e:
+            messages.error(request, f"Erro ao criar trustline: {str(e)}")
+    
     # Trustlines do agente
     try:
         trustlines = TrustlineKeeper.objects.filter(
