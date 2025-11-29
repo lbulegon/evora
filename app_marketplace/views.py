@@ -5,6 +5,7 @@ from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
+import logging
 from .models import (
     Evento,
     Cliente,
@@ -12,6 +13,8 @@ from .models import (
     RelacionamentoClienteShopper,
     Pedido
 )
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -240,21 +243,36 @@ def pedidos(request):
         messages.error(request, 'Perfil de cliente não encontrado.')
         return redirect('home')
     
-    # Buscar apenas pedidos deste cliente
-    pedidos = Pedido.objects.filter(cliente=cliente).select_related(
-        'cliente',
-        'shopper'
-    ).order_by('-criado_em')
+    try:
+        # Buscar apenas pedidos deste cliente
+        pedidos_queryset = Pedido.objects.filter(cliente=cliente).select_related(
+            'cliente',
+            'shopper'
+        ).order_by('-criado_em')
+        
+        # Filtros opcionais
+        status_filter = request.GET.get('status', '')
+        if status_filter:
+            pedidos_queryset = pedidos_queryset.filter(status=status_filter)
+        
+        # Obter status choices de forma segura
+        try:
+            status_choices = Pedido.Status.choices
+        except AttributeError:
+            # Fallback caso Status não tenha choices definidas
+            status_choices = []
+        
+        context = {
+            'pedidos': pedidos_queryset,
+            'status_filter': status_filter,
+            'status_choices': status_choices,
+        }
+        
+        return render(request, 'app_marketplace/pedidos.html', context)
     
-    # Filtros opcionais
-    status_filter = request.GET.get('status', '')
-    if status_filter:
-        pedidos = pedidos.filter(status=status_filter)
-    
-    context = {
-        'pedidos': pedidos,
-        'status_filter': status_filter,
-        'status_choices': Pedido.Status.choices,
-    }
-    
-    return render(request, 'app_marketplace/pedidos.html', context)
+    except Exception as e:
+        # Log do erro para debug
+        logger.error(f"Erro na view pedidos: {str(e)}", exc_info=True)
+        
+        messages.error(request, 'Ocorreu um erro ao carregar seus pedidos. Por favor, tente novamente.')
+        return redirect('home')
