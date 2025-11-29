@@ -239,29 +239,37 @@ def kmn_trustlines(request):
     """Gestão de trustlines KMN"""
     try:
         agente = request.user.agente
-    except:
+    except AttributeError:
         messages.error(request, "Acesso restrito a agentes KMN.")
+        return redirect('home')
+    except Exception as e:
+        messages.error(request, f"Erro ao acessar perfil de agente: {str(e)}")
         return redirect('home')
     
     # Trustlines do agente
-    trustlines = TrustlineKeeper.objects.filter(
-        Q(agente_a=agente) | Q(agente_b=agente)
-    ).order_by('-aceito_em', '-criado_em')
-    
-    # Agentes disponíveis para criar trustlines
-    agentes_disponiveis = Agente.objects.filter(
-        verificado_kmn=True
-    ).exclude(id=agente.id)
-    
-    # Excluir agentes que já têm trustline
-    trustline_agente_ids = []
-    for tl in trustlines:
-        if tl.agente_a == agente:
-            trustline_agente_ids.append(tl.agente_b.id)
-        else:
-            trustline_agente_ids.append(tl.agente_a.id)
-    
-    agentes_disponiveis = agentes_disponiveis.exclude(id__in=trustline_agente_ids)
+    try:
+        trustlines = TrustlineKeeper.objects.filter(
+            Q(agente_a=agente) | Q(agente_b=agente)
+        ).select_related('agente_a__user', 'agente_b__user').order_by('-aceito_em', '-criado_em')
+        
+        # Agentes disponíveis para criar trustlines
+        agentes_disponiveis = Agente.objects.filter(
+            verificado_kmn=True
+        ).exclude(id=agente.id).select_related('user')
+        
+        # Excluir agentes que já têm trustline
+        trustline_agente_ids = []
+        for tl in trustlines:
+            if tl.agente_a == agente:
+                trustline_agente_ids.append(tl.agente_b.id)
+            else:
+                trustline_agente_ids.append(tl.agente_a.id)
+        
+        agentes_disponiveis = agentes_disponiveis.exclude(id__in=trustline_agente_ids)
+    except Exception as e:
+        messages.error(request, f"Erro ao carregar trustlines: {str(e)}")
+        trustlines = TrustlineKeeper.objects.none()
+        agentes_disponiveis = Agente.objects.none()
     
     context = {
         'agente': agente,
