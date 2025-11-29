@@ -1,29 +1,325 @@
 {% extends 'app_marketplace/base.html' %}
-{% block title %}Feed de Compras{% endblock %}
+{% load static %}
+
+{% block title %}Home - ÉVORA Connect{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 3rem 0;
+        margin-bottom: 3rem;
+        border-radius: 0 0 2rem 2rem;
+    }
+    
+    .evento-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: none;
+        border-radius: 1rem;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+    
+    .evento-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+    }
+    
+    .evento-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        position: relative;
+    }
+    
+    .evento-body {
+        padding: 1.5rem;
+    }
+    
+    .evento-footer {
+        background-color: #f8f9fa;
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #e9ecef;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .shopper-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+    
+    .status-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 2rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    
+    .evento-icon {
+        font-size: 3rem;
+        opacity: 0.8;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #6c757d;
+    }
+    
+    .empty-state-icon {
+        font-size: 5rem;
+        opacity: 0.3;
+        margin-bottom: 1rem;
+    }
+    
+    .stats-card {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        margin-bottom: 2rem;
+    }
+    
+    .stats-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #667eea;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-  <div class="row justify-content-center">
-    <div class="col-md-8">
-      <!-- Feed de Eventos -->
-      {% for evento in eventos %}
-        <div class="card mb-4 shadow-sm border-0">
-          <div class="card-body">
-            <h5 class="card-title">{{ evento.titulo }}</h5>
-            <p class="card-text text-muted">{{ evento.descricao }}</p>
-            <div class="d-flex justify-content-between">
-             <small class="text-muted">por {{ evento.personal_shopper.user.username }}</small>
-              <form method="post" action="{% url 'solicitar_evento' evento.id %}">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-primary">Solicitar participação</button>
-              </form>
+<!-- Hero Section -->
+<div class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8 mx-auto text-center">
+                <h1 class="display-4 fw-bold mb-3">
+                    <i class="fas fa-calendar-alt me-3"></i>
+                    Bem-vindo ao ÉVORA Connect
+                </h1>
+                <p class="lead mb-4">
+                    Descubra eventos exclusivos e ofertas especiais dos seus Personal Shoppers favoritos
+                </p>
+                {% if user.is_cliente %}
+                <div class="d-flex gap-3 justify-content-center flex-wrap">
+                    <a href="{% url 'personal_shoppers' %}" class="btn btn-light btn-lg">
+                        <i class="fas fa-user-tie me-2"></i>Explorar Shoppers
+                    </a>
+                    <a href="{% url 'pedidos' %}" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-shopping-cart me-2"></i>Minhas Compras
+                    </a>
+                </div>
+                {% endif %}
             </div>
-          </div>
         </div>
-      {% empty %}
-        <p class="text-muted text-center">Nenhum evento publicado ainda.</p>
-      {% endfor %}
     </div>
-  </div>
 </div>
+
+<div class="container">
+    <!-- Estatísticas Rápidas -->
+    {% if eventos %}
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stats-card text-center">
+                <div class="stats-number">{{ total_eventos|default:eventos|length }}</div>
+                <div class="text-muted">Eventos Disponíveis</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card text-center">
+                <div class="stats-number">{{ eventos_ativos_count|default:0 }}</div>
+                <div class="text-muted">Eventos Ativos</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card text-center">
+                <div class="stats-number">{{ shoppers_unicos|default:0 }}</div>
+                <div class="text-muted">Shoppers Participando</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Título da Seção -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="fw-bold">
+                <i class="fas fa-fire text-danger me-2"></i>
+                Eventos em Destaque
+            </h2>
+            <p class="text-muted">Participe dos eventos exclusivos organizados pelos Personal Shoppers</p>
+        </div>
+    </div>
+
+    <!-- Grid de Eventos -->
+    <div class="row">
+        {% for evento in eventos %}
+        <div class="col-lg-6 col-xl-4">
+            <div class="card evento-card shadow-sm">
+                <!-- Header do Card -->
+                <div class="evento-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <i class="fas fa-calendar-check evento-icon"></i>
+                        </div>
+                        <span class="badge bg-light text-dark status-badge">
+                            {% if evento.status == 'ativo' %}
+                                <i class="fas fa-circle text-success me-1" style="font-size: 0.5rem;"></i> Ativo
+                            {% elif evento.status == 'encerrado' %}
+                                <i class="fas fa-circle text-secondary me-1" style="font-size: 0.5rem;"></i> Encerrado
+                            {% else %}
+                                <i class="fas fa-circle text-warning me-1" style="font-size: 0.5rem;"></i> Privado
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Body do Card -->
+                <div class="evento-body">
+                    <h4 class="fw-bold mb-3">{{ evento.titulo }}</h4>
+                    
+                    {% if evento.descricao %}
+                    <p class="text-muted mb-3" style="min-height: 60px;">
+                        {{ evento.descricao|truncatewords:20 }}
+                    </p>
+                    {% else %}
+                    <p class="text-muted mb-3" style="min-height: 60px;">
+                        <em>Sem descrição disponível</em>
+                    </p>
+                    {% endif %}
+
+                    <!-- Informações de Data -->
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-calendar-alt text-primary me-2"></i>
+                            <small class="text-muted">
+                                <strong>Início:</strong> {{ evento.data_inicio|date:"d/m/Y H:i" }}
+                            </small>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-calendar-times text-danger me-2"></i>
+                            <small class="text-muted">
+                                <strong>Fim:</strong> {{ evento.data_fim|date:"d/m/Y H:i" }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer do Card -->
+                <div class="evento-footer">
+                    <div class="d-flex align-items-center">
+                        <div class="shopper-avatar me-2">
+                            {{ evento.personal_shopper.user.first_name|first|default:evento.personal_shopper.user.username|first|upper }}
+                        </div>
+                        <div>
+                            <div class="fw-semibold small">
+                                {{ evento.personal_shopper.user.get_full_name|default:evento.personal_shopper.user.username }}
+                            </div>
+                            <small class="text-muted">Personal Shopper</small>
+                        </div>
+                    </div>
+                    
+                    {% if evento.status == 'ativo' %}
+                    <form method="post" action="{% url 'solicitar_evento' evento.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-hand-paper me-1"></i>
+                            Participar
+                        </button>
+                    </form>
+                    {% else %}
+                    <button type="button" class="btn btn-secondary btn-sm" disabled>
+                        <i class="fas fa-lock me-1"></i>
+                        Indisponível
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="fas fa-calendar-times"></i>
+                </div>
+                <h3 class="fw-bold mb-3">Nenhum evento disponível</h3>
+                <p class="text-muted mb-4">
+                    Ainda não há eventos publicados. Fique atento para novidades!
+                </p>
+                {% if user.is_cliente %}
+                <a href="{% url 'personal_shoppers' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-user-tie me-2"></i>
+                    Explorar Personal Shoppers
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Ações Rápidas (apenas para clientes) -->
+    {% if user.is_cliente and eventos %}
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card bg-light border-0">
+                <div class="card-body p-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5 class="fw-bold mb-2">
+                                <i class="fas fa-lightbulb text-warning me-2"></i>
+                                Não encontrou o que procura?
+                            </h5>
+                            <p class="text-muted mb-0">
+                                Explore nossos Personal Shoppers e descubra produtos exclusivos e ofertas personalizadas.
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                            <a href="{% url 'personal_shoppers' %}" class="btn btn-primary btn-lg">
+                                <i class="fas fa-search me-2"></i>
+                                Buscar Shoppers
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Adicionar animação suave ao scroll
+    document.addEventListener('DOMContentLoaded', function() {
+        const cards = document.querySelectorAll('.evento-card');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, { threshold: 0.1 });
+        
+        cards.forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            observer.observe(card);
+        });
+    });
+</script>
 {% endblock %}

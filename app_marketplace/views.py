@@ -27,8 +27,24 @@ def home_view(request):
         return redirect('whatsapp_dashboard')
     
     # Dashboard geral para outros usuários
-    eventos = Evento.objects.all().order_by('-criado_em') # ordena por mais recente
-    return render(request, 'app_marketplace/home.html', {'eventos': eventos})
+    # Buscar eventos ativos primeiro, depois os outros
+    eventos_ativos = Evento.objects.filter(status=Evento.Status.ATIVO).order_by('-data_inicio', '-criado_em')
+    eventos_outros = Evento.objects.exclude(status=Evento.Status.ATIVO).order_by('-criado_em')
+    eventos = list(eventos_ativos) + list(eventos_outros)
+    
+    # Estatísticas
+    total_eventos = len(eventos)
+    eventos_ativos_count = eventos_ativos.count()
+    shoppers_unicos = len(set(e.personal_shopper_id for e in eventos if e.personal_shopper_id))
+    
+    context = {
+        'eventos': eventos,
+        'total_eventos': total_eventos,
+        'eventos_ativos_count': eventos_ativos_count,
+        'shoppers_unicos': shoppers_unicos,
+    }
+    
+    return render(request, 'app_marketplace/home.html', context)
 
 def index(request):
     return render(request, 'app_marketplace/index.html')
