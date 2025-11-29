@@ -3,7 +3,12 @@ from . import views
 from . import whatsapp_views
 from . import whatsapp_dashboard_views
 from . import shopper_dashboard_views
+<<<<<<< Updated upstream
 from . import kmn_views
+=======
+from . import admin_dashboard_views
+from . import client_dashboard_views
+>>>>>>> Stashed changes
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -48,6 +53,16 @@ urlpatterns = [
     path('shopper/products/', shopper_dashboard_views.shopper_products, name='shopper_products'),
     path('shopper/orders/', shopper_dashboard_views.shopper_orders, name='shopper_orders'),
     path('shopper/analytics/', shopper_dashboard_views.shopper_analytics, name='shopper_analytics'),
+    
+    # Dashboard de Administração
+    path('admin/dashboard/', admin_dashboard_views.admin_dashboard, name='admin_dashboard'),
+    
+    # Dashboard do Cliente
+    path('client/dashboard/', client_dashboard_views.client_dashboard, name='client_dashboard'),
+    path('client/orders/', client_dashboard_views.client_orders, name='client_orders'),
+    path('client/orders/<int:pedido_id>/', client_dashboard_views.client_order_detail, name='client_order_detail'),
+    path('client/packages/', client_dashboard_views.client_packages, name='client_packages'),
+    path('client/packages/<int:pacote_id>/', client_dashboard_views.client_package_detail, name='client_package_detail'),
     
     # Helper para Chat ID WhatsApp (comentado temporariamente)
     # path('shopper/chat-id-helper/', shopper_dashboard_views.chat_id_helper, name='chat_id_helper'),

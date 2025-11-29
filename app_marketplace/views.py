@@ -20,11 +20,15 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def home_view(request):
-    # Redirecionar Shoppers para dashboard específico
-    if request.user.is_shopper:
+    # Redirecionar usuários para seus dashboards específicos
+    if request.user.is_superuser:
+        return redirect('admin_dashboard')
+    elif request.user.is_shopper:
         return redirect('shopper_dashboard')
     elif request.user.is_address_keeper:
         return redirect('whatsapp_dashboard')
+    elif request.user.is_cliente:
+        return redirect('client_dashboard')
     
     # Dashboard geral para outros usuários
     # Buscar eventos ativos primeiro, depois os outros

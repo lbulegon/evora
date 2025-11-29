@@ -25,8 +25,23 @@
                 
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
+<<<<<<< Updated upstream
                         <!-- Menu para Personal Shoppers -->
                         {% if user.is_shopper %}
+=======
+                        {% if user.is_superuser %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'admin_dashboard' %}">
+                                    <i class="fas fa-tachometer-alt"></i> Dashboard Admin
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/admin/" target="_blank">
+                                    <i class="fas fa-cog"></i> Admin Django
+                                </a>
+                            </li>
+                        {% elif user.is_shopper %}
+>>>>>>> Stashed changes
                             <li class="nav-item">
                                 <a class="nav-link {% if request.resolver_match.url_name == 'shopper_dashboard' %}active{% endif %}" href="{% url 'shopper_dashboard' %}">
                                     <i class="fas fa-tachometer-alt"></i> Dashboard
@@ -85,6 +100,7 @@
                                     <i class="fas fa-tachometer-alt"></i> Dashboard
                                 </a>
                             </li>
+<<<<<<< Updated upstream
                             <li class="nav-item">
                                 <a class="nav-link {% if 'whatsapp_groups' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'whatsapp_groups_list' %}">
                                     <i class="fab fa-whatsapp"></i> Grupos WhatsApp
@@ -217,6 +233,43 @@
                                 <i class="fas fa-user-plus"></i> Cadastrar
                             </a>
                         {% endif %}
+=======
+                        {% elif user.is_cliente %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'client_dashboard' %}">
+                                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'client_orders' %}">
+                                    <i class="fas fa-shopping-cart"></i> Meus Pedidos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'client_packages' %}">
+                                    <i class="fas fa-box"></i> Meus Pacotes
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                    
+                    <div class="navbar-nav">
+                        <span class="navbar-text me-3">
+                            Olá, {{ user.username }}!
+                            {% if user.is_superuser %}
+                                <span class="badge bg-danger">Admin</span>
+                            {% elif user.is_shopper %}
+                                <span class="badge bg-success">Shopper</span>
+                            {% elif user.is_keeper %}
+                                <span class="badge bg-info">Keeper</span>
+                            {% elif user.is_cliente %}
+                                <span class="badge bg-primary">Cliente</span>
+                            {% endif %}
+                        </span>
+                        <a class="btn btn-outline-light" href="{% url 'logout' %}">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+>>>>>>> Stashed changes
                     </div>
                 </div>
             {% else %}
