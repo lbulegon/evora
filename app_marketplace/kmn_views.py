@@ -107,218 +107,246 @@ def kmn_clientes(request):
     """
     try:
         agente = request.user.agente
-    except:
+    except AttributeError:
         messages.error(request, "Acesso restrito a agentes KMN.")
+        return redirect('home')
+    except Exception as e:
+        messages.error(request, f"Erro ao acessar perfil de agente: {str(e)}")
         return redirect('home')
     
     # Filtros
     search = request.GET.get('search', '')
     status_filter = request.GET.get('status', '')
     
-    # 1. IDs de clientes diretos do agente
-    cliente_ids_diretos = set()
-    
-    # Via ClienteRelacao
-    cliente_ids_diretos.update(
-        ClienteRelacao.objects.filter(agente=agente).values_list('cliente_id', flat=True)
-    )
-    
-    # Via RelacionamentoClienteShopper (se o agente tem personal_shopper)
-    if agente.personal_shopper:
+    try:
+        # 1. IDs de clientes diretos do agente
+        cliente_ids_diretos = set()
+        
+        # Via ClienteRelacao
         cliente_ids_diretos.update(
-            Cliente.objects.filter(
-                relacionamentoclienteshopper__personal_shopper=agente.personal_shopper,
-                relacionamentoclienteshopper__status=RelacionamentoClienteShopper.Status.SEGUINDO
-            ).values_list('id', flat=True)
-        )
-    
-    # 2. IDs de clientes via trustlines ATIVAS (emprestimo de carteira)
-    cliente_ids_via_trustline = set()
-    
-    # Buscar trustlines onde o agente é agente_a ou agente_b
-    trustlines_ativas = TrustlineKeeper.objects.filter(
-        Q(agente_a=agente) | Q(agente_b=agente),
-        status=TrustlineKeeper.StatusTrustline.ATIVA
-    ).select_related('agente_a', 'agente_b')
-    
-    # Para cada trustline, buscar clientes do parceiro respeitando a direcionalidade
-    for trustline in trustlines_ativas:
-        parceiro = None
-        pode_ver_clientes_parceiro = False
-        
-        # Verificar direcionalidade (com fallback para trustlines antigas sem o campo)
-        tipo_compartilhamento = getattr(
-            trustline, 
-            'tipo_compartilhamento', 
-            TrustlineKeeper.TipoCompartilhamento.BIDIRECIONAL
+            ClienteRelacao.objects.filter(agente=agente).values_list('cliente_id', flat=True)
         )
         
-        if tipo_compartilhamento == TrustlineKeeper.TipoCompartilhamento.BIDIRECIONAL:
-            # Bidirecional: ambos compartilham
-            parceiro = trustline.agente_b if trustline.agente_a == agente else trustline.agente_a
-            pode_ver_clientes_parceiro = True
-        elif tipo_compartilhamento == TrustlineKeeper.TipoCompartilhamento.UNIDIRECIONAL_A_PARA_B:
-            # Unidirecional A → B: apenas A empresta para B
-            if trustline.agente_a == agente:
-                # Agente logado é A: não vê clientes de B (direção é A → B)
-                pode_ver_clientes_parceiro = False
-            else:
-                # Agente logado é B: vê clientes de A (A empresta para B)
-                parceiro = trustline.agente_a
-                pode_ver_clientes_parceiro = True
-        elif tipo_compartilhamento == TrustlineKeeper.TipoCompartilhamento.UNIDIRECIONAL_B_PARA_A:
-            # Unidirecional B → A: apenas B empresta para A
-            if trustline.agente_b == agente:
-                # Agente logado é B: não vê clientes de A (direção é B → A)
-                pode_ver_clientes_parceiro = False
-            else:
-                # Agente logado é A: vê clientes de B (B empresta para A)
-                parceiro = trustline.agente_b
-                pode_ver_clientes_parceiro = True
-        else:
-            # Fallback: tratar como bidirecional se o valor não for reconhecido
-            parceiro = trustline.agente_b if trustline.agente_a == agente else trustline.agente_a
-            pode_ver_clientes_parceiro = True
-        
-        # Se pode ver clientes do parceiro, buscar
-        if pode_ver_clientes_parceiro and parceiro:
-            # Via ClienteRelacao do parceiro
-            cliente_ids_via_trustline.update(
-                ClienteRelacao.objects.filter(agente=parceiro).values_list('cliente_id', flat=True)
+        # Via RelacionamentoClienteShopper (se o agente tem personal_shopper)
+        if agente.personal_shopper:
+            cliente_ids_diretos.update(
+                Cliente.objects.filter(
+                    relacionamentoclienteshopper__personal_shopper=agente.personal_shopper,
+                    relacionamentoclienteshopper__status=RelacionamentoClienteShopper.Status.SEGUINDO
+                ).values_list('id', flat=True)
             )
-            
-            # Via RelacionamentoClienteShopper do parceiro
-            if parceiro.personal_shopper:
-                cliente_ids_via_trustline.update(
-                    Cliente.objects.filter(
-                        relacionamentoclienteshopper__personal_shopper=parceiro.personal_shopper,
-                        relacionamentoclienteshopper__status=RelacionamentoClienteShopper.Status.SEGUINDO
-                    ).values_list('id', flat=True)
-                )
-    
-    # Unir todos os IDs de clientes
-    todos_cliente_ids = cliente_ids_diretos | cliente_ids_via_trustline
-    
-    # Se não houver clientes, retornar query vazia
-    if not todos_cliente_ids:
-        relacoes_finais = ClienteRelacao.objects.none()
-    else:
-        # Buscar ClienteRelacao para esses clientes
-        # Primeiro, buscar relações diretas do agente
-        relacoes_diretas_qs = ClienteRelacao.objects.filter(
-            agente=agente,
-            cliente_id__in=todos_cliente_ids
-        )
         
-        # Buscar relações dos parceiros (via trustline) para os mesmos clientes
-        # Filtrar apenas parceiros que realmente compartilham clientes (respeitando direcionalidade)
-        agentes_parceiros_compartilhando = []
-        for tl in trustlines_ativas:
-            tipo_compartilhamento = getattr(
-                tl, 
-                'tipo_compartilhamento', 
-                TrustlineKeeper.TipoCompartilhamento.BIDIRECIONAL
-            )
+        # 2. IDs de clientes via trustlines ATIVAS (emprestimo de carteira)
+        cliente_ids_via_trustline = set()
+        
+        # Buscar trustlines onde o agente é agente_a ou agente_b
+        trustlines_ativas = TrustlineKeeper.objects.filter(
+            Q(agente_a=agente) | Q(agente_b=agente),
+            status=TrustlineKeeper.StatusTrustline.ATIVA
+        ).select_related('agente_a', 'agente_b')
+        
+        # Para cada trustline, buscar clientes do parceiro respeitando a direcionalidade
+        for trustline in trustlines_ativas:
+            parceiro = None
+            pode_ver_clientes_parceiro = False
             
-            if tipo_compartilhamento == TrustlineKeeper.TipoCompartilhamento.BIDIRECIONAL:
+            # Verificar direcionalidade (com fallback para trustlines antigas sem o campo)
+            try:
+                tipo_compartilhamento = trustline.tipo_compartilhamento
+            except AttributeError:
+                # Campo não existe ainda (migration não aplicada) - tratar como bidirecional
+                tipo_compartilhamento = 'bidirecional'
+            
+            # Comparar com strings para evitar problemas se a classe não existir
+            if tipo_compartilhamento == 'bidirecional' or tipo_compartilhamento is None:
                 # Bidirecional: ambos compartilham
-                parceiro = tl.agente_b if tl.agente_a == agente else tl.agente_a
-                if parceiro not in agentes_parceiros_compartilhando:
-                    agentes_parceiros_compartilhando.append(parceiro)
-            elif tipo_compartilhamento == TrustlineKeeper.TipoCompartilhamento.UNIDIRECIONAL_A_PARA_B:
-                # Unidirecional A → B: apenas B vê clientes de A
-                if tl.agente_b == agente:
-                    # Agente logado é B: pode ver clientes de A
-                    if tl.agente_a not in agentes_parceiros_compartilhando:
-                        agentes_parceiros_compartilhando.append(tl.agente_a)
-            elif tipo_compartilhamento == TrustlineKeeper.TipoCompartilhamento.UNIDIRECIONAL_B_PARA_A:
-                # Unidirecional B → A: apenas A vê clientes de B
-                if tl.agente_a == agente:
-                    # Agente logado é A: pode ver clientes de B
-                    if tl.agente_b not in agentes_parceiros_compartilhando:
-                        agentes_parceiros_compartilhando.append(tl.agente_b)
-        
-        relacoes_parceiros_qs = ClienteRelacao.objects.filter(
-            agente__in=agentes_parceiros_compartilhando,
-            cliente_id__in=todos_cliente_ids
-        ) if agentes_parceiros_compartilhando else ClienteRelacao.objects.none()
-        
-        # Combinar: priorizar relações diretas, mas incluir relações dos parceiros
-        # Para clientes que não têm relação direta, usar a relação do parceiro
-        cliente_ids_com_relacao_direta = set(relacoes_diretas_qs.values_list('cliente_id', flat=True))
-        cliente_ids_sem_relacao_direta = todos_cliente_ids - cliente_ids_com_relacao_direta
-        
-        # Buscar relações dos parceiros apenas para clientes sem relação direta
-        relacoes_parceiros_filtradas = relacoes_parceiros_qs.filter(
-            cliente_id__in=cliente_ids_sem_relacao_direta
-        ) if cliente_ids_sem_relacao_direta else ClienteRelacao.objects.none()
-        
-        # Combinar as duas queries
-        relacoes_finais = relacoes_diretas_qs | relacoes_parceiros_filtradas
-        
-        # Se ainda houver clientes sem ClienteRelacao, criar relações virtuais
-        # (para clientes que vêm apenas de RelacionamentoClienteShopper)
-        cliente_ids_com_relacao = set(relacoes_finais.values_list('cliente_id', flat=True))
-        clientes_sem_relacao_ids = todos_cliente_ids - cliente_ids_com_relacao
-        
-        if clientes_sem_relacao_ids:
-            # Criar ClienteRelacao para esses clientes se não existirem
-            for cliente_id in clientes_sem_relacao_ids:
-                try:
-                    cliente = Cliente.objects.get(id=cliente_id)
-                    
-                    # Verificar se já existe ClienteRelacao
-                    if not ClienteRelacao.objects.filter(agente=agente, cliente=cliente).exists():
-                        # Criar ClienteRelacao com valores padrão
-                        ClienteRelacao.objects.get_or_create(
-                            agente=agente,
-                            cliente=cliente,
-                            defaults={
-                                'forca_relacao': 50.0,
-                                'status': ClienteRelacao.StatusRelacao.ATIVA,
-                            }
-                        )
-                except Cliente.DoesNotExist:
-                    continue
+                parceiro = trustline.agente_b if trustline.agente_a == agente else trustline.agente_a
+                pode_ver_clientes_parceiro = True
+            elif tipo_compartilhamento == 'a_para_b':
+                # Unidirecional A → B: apenas A empresta para B
+                if trustline.agente_a == agente:
+                    # Agente logado é A: não vê clientes de B (direção é A → B)
+                    pode_ver_clientes_parceiro = False
+                else:
+                    # Agente logado é B: vê clientes de A (A empresta para B)
+                    parceiro = trustline.agente_a
+                    pode_ver_clientes_parceiro = True
+            elif tipo_compartilhamento == 'b_para_a':
+                # Unidirecional B → A: apenas B empresta para A
+                if trustline.agente_b == agente:
+                    # Agente logado é B: não vê clientes de A (direção é B → A)
+                    pode_ver_clientes_parceiro = False
+                else:
+                    # Agente logado é A: vê clientes de B (B empresta para A)
+                    parceiro = trustline.agente_b
+                    pode_ver_clientes_parceiro = True
+            else:
+                # Fallback: tratar como bidirecional se o valor não for reconhecido
+                parceiro = trustline.agente_b if trustline.agente_a == agente else trustline.agente_a
+                pode_ver_clientes_parceiro = True
             
-            # Rebuscar as relações incluindo as recém-criadas
+            # Se pode ver clientes do parceiro, buscar
+            if pode_ver_clientes_parceiro and parceiro:
+                # Via ClienteRelacao do parceiro
+                cliente_ids_via_trustline.update(
+                    ClienteRelacao.objects.filter(agente=parceiro).values_list('cliente_id', flat=True)
+                )
+                
+                # Via RelacionamentoClienteShopper do parceiro
+                if parceiro.personal_shopper:
+                    cliente_ids_via_trustline.update(
+                        Cliente.objects.filter(
+                            relacionamentoclienteshopper__personal_shopper=parceiro.personal_shopper,
+                            relacionamentoclienteshopper__status=RelacionamentoClienteShopper.Status.SEGUINDO
+                        ).values_list('id', flat=True)
+                    )
+        
+        # Unir todos os IDs de clientes
+        todos_cliente_ids = cliente_ids_diretos | cliente_ids_via_trustline
+        
+        # Se não houver clientes, retornar query vazia
+        if not todos_cliente_ids:
+            relacoes_finais = ClienteRelacao.objects.none()
+        else:
+            # Buscar ClienteRelacao para esses clientes
+            # Primeiro, buscar relações diretas do agente
             relacoes_diretas_qs = ClienteRelacao.objects.filter(
                 agente=agente,
                 cliente_id__in=todos_cliente_ids
             )
+            
+            # Buscar relações dos parceiros (via trustline) para os mesmos clientes
+            # Filtrar apenas parceiros que realmente compartilham clientes (respeitando direcionalidade)
+            agentes_parceiros_compartilhando = []
+            for tl in trustlines_ativas:
+                try:
+                    tipo_compartilhamento = tl.tipo_compartilhamento
+                except AttributeError:
+                    # Campo não existe ainda - tratar como bidirecional
+                    tipo_compartilhamento = 'bidirecional'
+                
+                # Comparar com strings
+                if tipo_compartilhamento == 'bidirecional' or tipo_compartilhamento is None:
+                    # Bidirecional: ambos compartilham
+                    parceiro = tl.agente_b if tl.agente_a == agente else tl.agente_a
+                    if parceiro not in agentes_parceiros_compartilhando:
+                        agentes_parceiros_compartilhando.append(parceiro)
+                elif tipo_compartilhamento == 'a_para_b':
+                    # Unidirecional A → B: apenas B vê clientes de A
+                    if tl.agente_b == agente:
+                        # Agente logado é B: pode ver clientes de A
+                        if tl.agente_a not in agentes_parceiros_compartilhando:
+                            agentes_parceiros_compartilhando.append(tl.agente_a)
+                elif tipo_compartilhamento == 'b_para_a':
+                    # Unidirecional B → A: apenas A vê clientes de B
+                    if tl.agente_a == agente:
+                        # Agente logado é A: pode ver clientes de B
+                        if tl.agente_b not in agentes_parceiros_compartilhando:
+                            agentes_parceiros_compartilhando.append(tl.agente_b)
+            
+            relacoes_parceiros_qs = ClienteRelacao.objects.filter(
+                agente__in=agentes_parceiros_compartilhando,
+                cliente_id__in=todos_cliente_ids
+            ) if agentes_parceiros_compartilhando else ClienteRelacao.objects.none()
+            
+            # Combinar: priorizar relações diretas, mas incluir relações dos parceiros
+            # Para clientes que não têm relação direta, usar a relação do parceiro
+            cliente_ids_com_relacao_direta = set(relacoes_diretas_qs.values_list('cliente_id', flat=True))
+            cliente_ids_sem_relacao_direta = todos_cliente_ids - cliente_ids_com_relacao_direta
+            
+            # Buscar relações dos parceiros apenas para clientes sem relação direta
             relacoes_parceiros_filtradas = relacoes_parceiros_qs.filter(
-                cliente_id__in=(todos_cliente_ids - set(relacoes_diretas_qs.values_list('cliente_id', flat=True)))
-            ) if relacoes_parceiros_qs.exists() else ClienteRelacao.objects.none()
+                cliente_id__in=cliente_ids_sem_relacao_direta
+            ) if cliente_ids_sem_relacao_direta else ClienteRelacao.objects.none()
+            
+            # Combinar as duas queries
             relacoes_finais = relacoes_diretas_qs | relacoes_parceiros_filtradas
+            
+            # Se ainda houver clientes sem ClienteRelacao, criar relações virtuais
+            # (para clientes que vêm apenas de RelacionamentoClienteShopper)
+            cliente_ids_com_relacao = set(relacoes_finais.values_list('cliente_id', flat=True))
+            clientes_sem_relacao_ids = todos_cliente_ids - cliente_ids_com_relacao
+            
+            if clientes_sem_relacao_ids:
+                # Criar ClienteRelacao para esses clientes se não existirem
+                for cliente_id in clientes_sem_relacao_ids:
+                    try:
+                        cliente = Cliente.objects.get(id=cliente_id)
+                        
+                        # Verificar se já existe ClienteRelacao
+                        if not ClienteRelacao.objects.filter(agente=agente, cliente=cliente).exists():
+                            # Criar ClienteRelacao com valores padrão
+                            ClienteRelacao.objects.get_or_create(
+                                agente=agente,
+                                cliente=cliente,
+                                defaults={
+                                    'forca_relacao': 50.0,
+                                    'status': ClienteRelacao.StatusRelacao.ATIVA,
+                                }
+                            )
+                    except Cliente.DoesNotExist:
+                        continue
+                
+                # Rebuscar as relações incluindo as recém-criadas
+                relacoes_diretas_qs = ClienteRelacao.objects.filter(
+                    agente=agente,
+                    cliente_id__in=todos_cliente_ids
+                )
+                cliente_ids_sem_relacao_direta_apos_criacao = todos_cliente_ids - set(relacoes_diretas_qs.values_list('cliente_id', flat=True))
+                if agentes_parceiros_compartilhando and cliente_ids_sem_relacao_direta_apos_criacao:
+                    relacoes_parceiros_filtradas = ClienteRelacao.objects.filter(
+                        agente__in=agentes_parceiros_compartilhando,
+                        cliente_id__in=cliente_ids_sem_relacao_direta_apos_criacao
+                    )
+                else:
+                    relacoes_parceiros_filtradas = ClienteRelacao.objects.none()
+                relacoes_finais = relacoes_diretas_qs | relacoes_parceiros_filtradas
+        
+        # Aplicar filtros de busca
+        if search:
+            relacoes_finais = relacoes_finais.filter(
+                Q(cliente__user__first_name__icontains=search) |
+                Q(cliente__user__last_name__icontains=search) |
+                Q(cliente__user__username__icontains=search)
+            )
+        
+        if status_filter:
+            relacoes_finais = relacoes_finais.filter(status=status_filter)
+        
+        # Ordenação
+        relacoes_finais = relacoes_finais.order_by('-forca_relacao', '-ultimo_pedido')
+        
+        # Paginação
+        paginator = Paginator(relacoes_finais, 20)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
     
-    # Aplicar filtros de busca
-    if search:
-        relacoes_finais = relacoes_finais.filter(
-            Q(cliente__user__first_name__icontains=search) |
-            Q(cliente__user__last_name__icontains=search) |
-            Q(cliente__user__username__icontains=search)
-        )
+        context = {
+            'agente': agente,
+            'page_obj': page_obj,
+            'search': search,
+            'status_filter': status_filter,
+            'status_choices': ClienteRelacao.StatusRelacao.choices,
+        }
+        
+        return render(request, 'app_marketplace/kmn_clientes.html', context)
     
-    if status_filter:
-        relacoes_finais = relacoes_finais.filter(status=status_filter)
-    
-    # Ordenação
-    relacoes_finais = relacoes_finais.order_by('-forca_relacao', '-ultimo_pedido')
-    
-    # Paginação
-    paginator = Paginator(relacoes_finais, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    context = {
-        'agente': agente,
-        'page_obj': page_obj,
-        'search': search,
-        'status_filter': status_filter,
-        'status_choices': ClienteRelacao.StatusRelacao.choices,
-    }
-    
-    return render(request, 'app_marketplace/kmn_clientes.html', context)
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        messages.error(request, f"Erro ao carregar clientes KMN: {str(e)}")
+        # Log do erro completo para debug
+        print(f"ERRO em kmn_clientes: {error_trace}")
+        
+        # Retornar página vazia em caso de erro
+        context = {
+            'agente': agente,
+            'page_obj': None,
+            'search': search,
+            'status_filter': status_filter,
+            'status_choices': ClienteRelacao.StatusRelacao.choices,
+        }
+        return render(request, 'app_marketplace/kmn_clientes.html', context)
 
 
 @login_required
