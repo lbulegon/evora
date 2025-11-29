@@ -256,11 +256,12 @@ def kmn_trustlines(request):
             if agente_b.id == agente.id:
                 messages.error(request, "Você não pode criar uma trustline consigo mesmo.")
             else:
-                # Verificar se já existe trustline entre os dois agentes
+                # Verificar se já existe trustline ATIVA/PENDENTE/SUSPENSA entre os dois agentes
+                # Trustlines já encerradas (status = CANCELADA) não bloqueiam nova criação
                 trustline_existente = TrustlineKeeper.objects.filter(
                     (Q(agente_a=agente) & Q(agente_b=agente_b)) |
                     (Q(agente_a=agente_b) & Q(agente_b=agente))
-                ).first()
+                ).exclude(status=TrustlineKeeper.StatusTrustline.CANCELADA).first()
                 
                 if trustline_existente:
                     messages.warning(

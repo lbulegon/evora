@@ -1537,7 +1537,7 @@ class TrustlineKeeper(models.Model):
         ATIVA = 'ativa', 'Ativa'
         PENDENTE = 'pendente', 'Pendente'
         SUSPENSA = 'suspensa', 'Suspensa'
-        CANCELADA = 'cancelada', 'Cancelada'
+        CANCELADA = 'cancelada', 'Encerrada'
     
     status = models.CharField(max_length=20, choices=StatusTrustline.choices, default=StatusTrustline.PENDENTE)
     
