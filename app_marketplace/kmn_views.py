@@ -50,7 +50,7 @@ def kmn_dashboard(request):
         'total_trustlines': TrustlineKeeper.objects.filter(
             Q(agente_a=agente) | Q(agente_b=agente),
             status='ativa'
-        ).count(),
+        ).defer('tipo_compartilhamento').count(),
     }
     
     # Scores do agente
@@ -72,7 +72,7 @@ def kmn_dashboard(request):
     trustlines_ativas = TrustlineKeeper.objects.filter(
         Q(agente_a=agente) | Q(agente_b=agente),
         status='ativa'
-    ).order_by('-aceito_em')[:5]
+    ).defer('tipo_compartilhamento').order_by('-aceito_em')[:5]
     
     # Produtos mais ofertados
     produtos_populares = Produto.objects.filter(
@@ -157,20 +157,14 @@ def kmn_clientes(request):
             campo_existe = False
         
         # Buscar trustlines onde o agente é agente_a ou agente_b
+        # Usar defer() para evitar erro se o campo tipo_compartilhamento não existir
         trustlines_ativas = TrustlineKeeper.objects.filter(
             Q(agente_a=agente) | Q(agente_b=agente),
             status=TrustlineKeeper.StatusTrustline.ATIVA
-        )
+        ).defer('tipo_compartilhamento')
         
-        # Se o campo não existe no banco, usar only() para não tentar buscá-lo
-        if not campo_existe:
-            # Especificar apenas campos que existem no banco
-            trustlines_ativas = trustlines_ativas.only(
-                'id', 'agente_a', 'agente_b', 'nivel_confianca_a_para_b', 
-                'nivel_confianca_b_para_a', 'perc_shopper', 'perc_keeper', 
-                'status', 'permite_indicacao', 'perc_indicacao', 
-                'criado_em', 'aceito_em', 'atualizado_em'
-            )
+        # Se o campo não existe no banco, já está usando defer()
+        # Se existir, ainda assim usar defer() para evitar problemas
         
         trustlines_ativas = trustlines_ativas.select_related('agente_a', 'agente_b')
         
@@ -502,7 +496,7 @@ def kmn_trustlines(request):
                 trustline_existente = TrustlineKeeper.objects.filter(
                     (Q(agente_a=agente) & Q(agente_b=agente_b)) |
                     (Q(agente_a=agente_b) & Q(agente_b=agente))
-                ).first()
+                ).defer('tipo_compartilhamento').first()
 
                 # Se houver trustline ativa / pendente / suspensa, não deixar duplicar
                 if trustline_existente and trustline_existente.status in [
@@ -559,7 +553,7 @@ def kmn_trustlines(request):
     try:
         trustlines = TrustlineKeeper.objects.filter(
             Q(agente_a=agente) | Q(agente_b=agente)
-        ).select_related('agente_a__user', 'agente_b__user').order_by('-aceito_em', '-criado_em')
+        ).defer('tipo_compartilhamento').select_related('agente_a__user', 'agente_b__user').order_by('-aceito_em', '-criado_em')
         
         # Agentes disponíveis para criar trustlines
         # IMPORTANTE: Um agente pode ter múltiplas trustlines com diferentes agentes

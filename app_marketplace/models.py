@@ -1201,6 +1201,80 @@ class WhatsappParticipant(models.Model):
         return f"{self.name or self.phone} em {self.group.name}"
 
 
+class ParticipantPermissionRequest(models.Model):
+    """
+    Solicitação de permissão para adicionar cliente de outro shopper ao grupo.
+    Quando um shopper quer adicionar um cliente que pertence à carteira de outro shopper,
+    uma solicitação é criada e o dono da carteira pode aprovar ou rejeitar.
+    """
+    class Status(models.TextChoices):
+        PENDENTE = 'pendente', 'Pendente'
+        APROVADO = 'aprovado', 'Aprovado'
+        REJEITADO = 'rejeitado', 'Rejeitado'
+        EXPIRADO = 'expirado', 'Expirado'
+    
+    # Grupo e cliente
+    group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='permission_requests')
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='permission_requests')
+    
+    # Quem está solicitando (shopper que quer adicionar)
+    requested_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='permissions_requested')
+    
+    # Dono da carteira do cliente (quem precisa aprovar)
+    carteira_owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='permissions_received')
+    
+    # Status
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
+    
+    # Mensagem opcional da solicitação
+    message = models.TextField(blank=True, help_text="Mensagem opcional explicando a solicitação")
+    
+    # Resposta do dono da carteira
+    response_message = models.TextField(blank=True, help_text="Resposta do dono da carteira")
+    
+    # Timestamps
+    requested_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True, help_text="Data de expiração da solicitação")
+    
+    class Meta:
+        verbose_name = 'Solicitação de Permissão de Participante'
+        verbose_name_plural = 'Solicitações de Permissão de Participantes'
+        unique_together = ['group', 'cliente']
+        ordering = ['-requested_at']
+        indexes = [
+            models.Index(fields=['carteira_owner', 'status']),
+            models.Index(fields=['requested_by', 'status']),
+        ]
+    
+    def __str__(self):
+        return f"Solicitação {self.get_status_display()} - {self.cliente} em {self.group.name}"
+    
+    @property
+    def is_expired(self):
+        """Verifica se a solicitação expirou"""
+        if self.expires_at:
+            from django.utils import timezone
+            return timezone.now() > self.expires_at
+        return False
+    
+    def approve(self, response_message=''):
+        """Aprova a solicitação"""
+        from django.utils import timezone
+        self.status = self.Status.APROVADO
+        self.response_message = response_message
+        self.responded_at = timezone.now()
+        self.save()
+    
+    def reject(self, response_message=''):
+        """Rejeita a solicitação"""
+        from django.utils import timezone
+        self.status = self.Status.REJEITADO
+        self.response_message = response_message
+        self.responded_at = timezone.now()
+        self.save()
+
+
 class WhatsappMessage(models.Model):
     """Mensagem do WhatsApp"""
     MESSAGE_TYPES = [
@@ -1269,6 +1343,47 @@ class WhatsappProduct(models.Model):
     
     def __str__(self):
         return f"{self.name} - {self.group.name}"
+
+
+class PostScreenshot(models.Model):
+    """
+    Captura de screenshot de um post do WhatsApp.
+    MVP: Sistema de captura de imagens dos posts.
+    """
+    post = models.ForeignKey(WhatsappProduct, on_delete=models.CASCADE, related_name='screenshots')
+    group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='post_screenshots')
+    
+    # Imagem capturada
+    screenshot_file = models.ImageField(
+        upload_to='screenshots/posts/%Y/%m/%d/',
+        help_text="Screenshot do post"
+    )
+    
+    # Metadados
+    captured_at = models.DateTimeField(auto_now_add=True)
+    captured_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='captured_screenshots',
+        help_text="Usuário que capturou a imagem"
+    )
+    
+    # Informações da captura
+    width = models.PositiveIntegerField(null=True, blank=True, help_text="Largura da imagem em pixels")
+    height = models.PositiveIntegerField(null=True, blank=True, help_text="Altura da imagem em pixels")
+    file_size = models.PositiveIntegerField(null=True, blank=True, help_text="Tamanho do arquivo em bytes")
+    
+    # Notas opcionais
+    notes = models.TextField(blank=True, help_text="Notas sobre a captura")
+    
+    class Meta:
+        verbose_name = 'Screenshot de Post'
+        verbose_name_plural = 'Screenshots de Posts'
+        ordering = ['-captured_at']
+    
+    def __str__(self):
+        return f"Screenshot de {self.post.name} - {self.captured_at.strftime('%d/%m/%Y %H:%M')}"
 
 
 class WhatsappOrder(models.Model):

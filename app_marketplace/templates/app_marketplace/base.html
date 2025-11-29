@@ -25,8 +25,18 @@
                 
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav me-auto">
-                        <!-- Menu para Personal Shoppers -->
-                        {% if user.is_shopper %}
+                        {% if user.is_superuser %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'admin_dashboard' %}">
+                                    <i class="fas fa-tachometer-alt"></i> Dashboard Admin
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/admin/" target="_blank">
+                                    <i class="fas fa-cog"></i> Admin Django
+                                </a>
+                            </li>
+                        {% elif user.is_shopper %}
                             <li class="nav-item">
                                 <a class="nav-link {% if request.resolver_match.url_name == 'shopper_dashboard' %}active{% endif %}" href="{% url 'shopper_dashboard' %}">
                                     <i class="fas fa-tachometer-alt"></i> Dashboard
@@ -86,8 +96,23 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link {% if 'whatsapp_groups' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'whatsapp_groups_list' %}">
+                                <a class="nav-link {% if 'shopper_groups' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'shopper_groups' %}">
                                     <i class="fab fa-whatsapp"></i> Grupos WhatsApp
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'shopper_products' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'shopper_products' %}">
+                                    <i class="fas fa-box"></i> Produtos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'shopper_orders' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'shopper_orders' %}">
+                                    <i class="fas fa-shopping-cart"></i> Pedidos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'shopper_analytics' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'shopper_analytics' %}">
+                                    <i class="fas fa-chart-line"></i> Analytics
                                 </a>
                             </li>
                             
@@ -115,8 +140,56 @@
                                     </a></li>
                                 </ul>
                             </li>
-                            
-                        <!-- Menu para Clientes e outros usuários -->
+                        {% elif user.is_address_keeper %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'whatsapp_dashboard' %}">
+                                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle {% if 'kmn_' in request.resolver_match.url_name %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-network-wired"></i> KMN
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item {% if request.resolver_match.url_name == 'kmn_dashboard' %}active{% endif %}" href="{% url 'kmn_dashboard' %}">
+                                        <i class="fas fa-tachometer-alt"></i> Dashboard KMN
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item {% if request.resolver_match.url_name == 'kmn_ofertas' %}active{% endif %}" href="{% url 'kmn_ofertas' %}">
+                                        <i class="fas fa-tags"></i> Minhas Ofertas
+                                    </a></li>
+                                    <li><a class="dropdown-item {% if request.resolver_match.url_name == 'kmn_estoque' %}active{% endif %}" href="{% url 'kmn_estoque' %}">
+                                        <i class="fas fa-boxes"></i> Estoque
+                                    </a></li>
+                                    <li><a class="dropdown-item {% if request.resolver_match.url_name == 'kmn_clientes' %}active{% endif %}" href="{% url 'kmn_clientes' %}">
+                                        <i class="fas fa-users"></i> Clientes
+                                    </a></li>
+                                    <li><a class="dropdown-item {% if request.resolver_match.url_name == 'kmn_trustlines' %}active{% endif %}" href="{% url 'kmn_trustlines' %}">
+                                        <i class="fas fa-handshake"></i> Trustlines
+                                    </a></li>
+                                </ul>
+                            </li>
+                        {% elif user.is_cliente %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'client_dashboard' %}">
+                                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'client_products' %}active{% endif %}" href="{% url 'client_products' %}">
+                                    <i class="fas fa-shopping-bag"></i> Produtos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'client_orders' %}active{% endif %}" href="{% url 'client_orders' %}">
+                                    <i class="fas fa-shopping-cart"></i> Meus Pedidos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'client_packages' %}">
+                                    <i class="fas fa-box"></i> Meus Pacotes
+                                </a>
+                            </li>
                         {% else %}
                             <li class="nav-item">
                                 <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">
@@ -153,29 +226,6 @@
                             </li>
                             {% endif %}
                         {% endif %}
-                        
-                        <!-- Menu comum para todos os usuários autenticados (exceto clientes simples) -->
-                        {% if user.is_authenticated and not user.is_cliente %}
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fas fa-cog"></i> Mais
-                                </a>
-                                <ul class="dropdown-menu">
-                                    {% if user.is_staff %}
-                                    <li><a class="dropdown-item" href="{% url 'admin:index' %}" target="_blank">
-                                        <i class="fas fa-cog"></i> Admin Django
-                                    </a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    {% endif %}
-                                    <li><a class="dropdown-item" href="{% url 'clientes' %}">
-                                        <i class="fas fa-users"></i> Clientes
-                                    </a></li>
-                                    <li><a class="dropdown-item" href="{% url 'pedidos' %}">
-                                        <i class="fas fa-shopping-bag"></i> Todos os Pedidos
-                                    </a></li>
-                                </ul>
-                            </li>
-                        {% endif %}
                     </ul>
                     
                     <!-- Área do usuário -->
@@ -185,7 +235,9 @@
                                 <a class="nav-link dropdown-toggle text-white" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="fas fa-user-circle"></i>
                                     <span class="ms-1">{{ user.get_full_name|default:user.username }}</span>
-                                    {% if user.is_shopper %}
+                                    {% if user.is_superuser %}
+                                        <span class="badge bg-danger ms-2">Admin</span>
+                                    {% elif user.is_shopper %}
                                         <span class="badge bg-success ms-2">Shopper</span>
                                     {% elif user.is_address_keeper %}
                                         <span class="badge bg-info ms-2">Address Keeper</span>

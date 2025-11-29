@@ -18,7 +18,10 @@ from decimal import Decimal
 from .models import (
     PersonalShopper, WhatsappGroup, WhatsappParticipant, 
     WhatsappMessage, WhatsappProduct, WhatsappOrder,
-    Cliente, Produto, Categoria
+    Cliente, Produto, Categoria, Agente, ClienteRelacao,
+    RelacionamentoClienteShopper, TrustlineKeeper,
+    ParticipantPermissionRequest, CarteiraCliente,
+    PostScreenshot
 )
 from .whatsapp_views import send_message, send_reaction
 
@@ -247,31 +250,304 @@ def update_group(request, group_id):
 
 
 @login_required
-@require_http_methods(["POST"])
-def add_participant(request, group_id):
-    """Adicionar participante ao grupo"""
-    if not request.user.is_shopper:
+def get_available_clients(request, group_id):
+    """Buscar clientes disponíveis para adicionar ao grupo"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
-        group = get_object_or_404(WhatsappGroup, id=group_id, shopper=request.user.personalshopper)
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        
+        # Buscar agente do shopper
+        agente = None
+        if request.user.is_shopper and hasattr(request.user, 'agente'):
+            agente = request.user.agente
+        elif request.user.is_shopper and hasattr(request.user, 'personalshopper'):
+            # Criar agente se não existir
+            try:
+                agente = Agente.objects.get(user=request.user)
+            except Agente.DoesNotExist:
+                agente = None
+        
+        clientes_proprios = []
+        clientes_trustline = []
+        
+        if agente:
+            # 1. Clientes próprios do agente
+            # Via ClienteRelacao
+            relacoes_proprias = ClienteRelacao.objects.filter(
+                agente=agente,
+                status='ativa'
+            ).select_related('cliente', 'cliente__user')
+            
+            for relacao in relacoes_proprias:
+                cliente = relacao.cliente
+                telefone = cliente.telefone or (cliente.user.username if cliente.user else '')
+                if telefone:
+                    clientes_proprios.append({
+                        'id': cliente.id,
+                        'name': cliente.user.get_full_name() or cliente.user.username,
+                        'phone': telefone,
+                        'owner': 'proprio',
+                        'owner_name': request.user.get_full_name() or request.user.username
+                    })
+            
+            # Via RelacionamentoClienteShopper (compatibilidade)
+            if agente.personal_shopper:
+                relacionamentos = RelacionamentoClienteShopper.objects.filter(
+                    personal_shopper=agente.personal_shopper,
+                    status='seguindo'
+                ).select_related('cliente', 'cliente__user')
+                
+                for rel in relacionamentos:
+                    cliente = rel.cliente
+                    telefone = cliente.telefone or (cliente.user.username if cliente.user else '')
+                    if telefone and not any(c['id'] == cliente.id for c in clientes_proprios):
+                        clientes_proprios.append({
+                            'id': cliente.id,
+                            'name': cliente.user.get_full_name() or cliente.user.username,
+                            'phone': telefone,
+                            'owner': 'proprio',
+                            'owner_name': request.user.get_full_name() or request.user.username
+                        })
+            
+            # 2. Clientes via trustlines
+            trustlines_ativas = TrustlineKeeper.objects.filter(
+                Q(agente_a=agente) | Q(agente_b=agente),
+                status=TrustlineKeeper.StatusTrustline.ATIVA
+            ).defer('tipo_compartilhamento').select_related('agente_a__user', 'agente_b__user')
+            
+            for trustline in trustlines_ativas:
+                parceiro = trustline.agente_b if trustline.agente_a == agente else trustline.agente_a
+                
+                # Buscar clientes do parceiro
+                relacoes_parceiro = ClienteRelacao.objects.filter(
+                    agente=parceiro,
+                    status='ativa'
+                ).select_related('cliente', 'cliente__user')
+                
+                for relacao in relacoes_parceiro:
+                    cliente = relacao.cliente
+                    telefone = cliente.telefone or (cliente.user.username if cliente.user else '')
+                    if telefone:
+                        # Verificar se já existe permissão
+                        permission = ParticipantPermissionRequest.objects.filter(
+                            group=group,
+                            cliente=cliente,
+                            status__in=['pendente', 'aprovado']
+                        ).first()
+                        
+                        has_permission = False
+                        permission_pending = False
+                        permission_id = None
+                        
+                        if permission:
+                            has_permission = permission.status == 'aprovado'
+                            permission_pending = permission.status == 'pendente'
+                            permission_id = permission.id
+                        
+                        clientes_trustline.append({
+                            'id': cliente.id,
+                            'name': cliente.user.get_full_name() or cliente.user.username,
+                            'phone': telefone,
+                            'owner': 'trustline',
+                            'owner_name': parceiro.user.get_full_name() or parceiro.user.username,
+                            'owner_id': parceiro.user.id,
+                            'trustline_id': trustline.id,
+                            'has_permission': has_permission,
+                            'permission_pending': permission_pending,
+                            'permission_id': permission_id
+                        })
+        
+        return JsonResponse({
+            'success': True,
+            'clientes_proprios': clientes_proprios,
+            'clientes_trustline': clientes_trustline
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def request_participant_permission(request, group_id):
+    """Solicitar permissão para adicionar cliente de outro shopper"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
         data = json.loads(request.body)
         
+        cliente_id = data.get('cliente_id')
+        carteira_owner_id = data.get('carteira_owner_id')
+        message = data.get('message', '')
+        
+        if not cliente_id or not carteira_owner_id:
+            return JsonResponse({'error': 'Cliente e dono da carteira são obrigatórios'}, status=400)
+        
+        cliente = get_object_or_404(Cliente, id=cliente_id)
+        carteira_owner = get_object_or_404(User, id=carteira_owner_id)
+        
+        # Verificar se já existe solicitação pendente ou aprovada
+        existing = ParticipantPermissionRequest.objects.filter(
+            group=group,
+            cliente=cliente,
+            status__in=['pendente', 'aprovado']
+        ).first()
+        
+        if existing:
+            if existing.status == 'aprovado':
+                return JsonResponse({
+                    'error': 'Permissão já foi aprovada para este cliente',
+                    'permission_id': existing.id,
+                    'already_approved': True
+                }, status=400)
+            else:
+                return JsonResponse({
+                    'error': 'Já existe uma solicitação pendente para este cliente',
+                    'permission_id': existing.id
+                }, status=400)
+        
+        # Criar solicitação
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        permission_request = ParticipantPermissionRequest.objects.create(
+            group=group,
+            cliente=cliente,
+            requested_by=request.user,
+            carteira_owner=carteira_owner,
+            message=message,
+            expires_at=timezone.now() + timedelta(days=7)  # Expira em 7 dias
+        )
+        
+        # TODO: Enviar notificação para o dono da carteira
+        
+        return JsonResponse({
+            'success': True,
+            'permission_request': {
+                'id': permission_request.id,
+                'status': permission_request.status,
+                'requested_at': permission_request.requested_at.isoformat()
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def add_participant(request, group_id):
+    """Adicionar participante ao grupo (agora com verificação de permissões)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        data = json.loads(request.body)
+        
+        cliente_id = data.get('cliente_id')
         phone = data.get('phone')
         name = data.get('name', '')
+        
+        cliente = None
+        needs_permission = False
+        carteira_owner = None
+        
+        # Se cliente_id foi fornecido, buscar o cliente
+        if cliente_id:
+            try:
+                cliente = Cliente.objects.get(id=cliente_id)
+                name = name or (cliente.user.get_full_name() or cliente.user.username)
+                phone = phone or cliente.telefone
+                
+                # Verificar se o cliente pertence à carteira de outro shopper
+                if cliente.wallet and cliente.wallet.owner != request.user:
+                    carteira_owner = cliente.wallet.owner
+                    needs_permission = True
+                else:
+                    # Verificar via ClienteRelacao
+                    relacao = ClienteRelacao.objects.filter(
+                        cliente=cliente,
+                        status='ativa'
+                    ).select_related('agente__user').first()
+                    
+                    if relacao and relacao.agente.user != request.user:
+                        carteira_owner = relacao.agente.user
+                        needs_permission = True
+            except Cliente.DoesNotExist:
+                pass
+        
+        # Se precisa de permissão e não foi fornecida, retornar erro
+        if needs_permission and carteira_owner:
+            # Verificar se já existe permissão aprovada
+            permission = ParticipantPermissionRequest.objects.filter(
+                group=group,
+                cliente=cliente,
+                carteira_owner=carteira_owner,
+                status='aprovado'
+            ).first()
+            
+            if not permission:
+                # Verificar se existe solicitação pendente
+                pending = ParticipantPermissionRequest.objects.filter(
+                    group=group,
+                    cliente=cliente,
+                    carteira_owner=carteira_owner,
+                    status='pendente'
+                ).first()
+                
+                if pending:
+                    return JsonResponse({
+                        'error': 'Aguardando aprovação do dono da carteira',
+                        'needs_permission': True,
+                        'permission_id': pending.id,
+                        'carteira_owner_name': carteira_owner.get_full_name() or carteira_owner.username
+                    }, status=403)
+                else:
+                    return JsonResponse({
+                        'error': 'É necessário solicitar permissão ao dono da carteira',
+                        'needs_permission': True,
+                        'cliente_id': cliente.id,
+                        'carteira_owner_id': carteira_owner.id,
+                        'carteira_owner_name': carteira_owner.get_full_name() or carteira_owner.username
+                    }, status=403)
         
         if not phone:
             return JsonResponse({'error': 'Telefone é obrigatório'}, status=400)
         
+        # Limpar e formatar telefone
+        phone = phone.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+        if not phone.startswith('+'):
+            if phone.startswith('55'):
+                phone = '+' + phone
+            elif phone.startswith('0'):
+                phone = '+55' + phone[1:]
+            else:
+                phone = '+55' + phone
+        
         # Verificar se já existe
         if WhatsappParticipant.objects.filter(group=group, phone=phone).exists():
-            return JsonResponse({'error': 'Participante já cadastrado'}, status=400)
+            return JsonResponse({'error': 'Participante já cadastrado neste grupo'}, status=400)
+        
+        # Se não foi fornecido cliente_id, tentar buscar pelo telefone
+        if not cliente:
+            try:
+                cliente = Cliente.objects.filter(
+                    telefone__icontains=phone.replace('+', '')
+                ).first()
+            except:
+                pass
         
         # Criar participante
         participant = WhatsappParticipant.objects.create(
             group=group,
             phone=phone,
-            name=name
+            name=name or phone,
+            cliente=cliente
         )
         
         return JsonResponse({
@@ -281,9 +557,70 @@ def add_participant(request, group_id):
                 'name': participant.name,
                 'phone': participant.phone,
                 'joined_at': participant.joined_at.isoformat(),
+                'is_cliente': participant.cliente is not None
             }
         })
         
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def respond_permission_request(request, permission_id):
+    """Aprovar ou rejeitar solicitação de permissão"""
+    try:
+        permission = get_object_or_404(ParticipantPermissionRequest, id=permission_id)
+        
+        # Verificar se o usuário é o dono da carteira
+        if permission.carteira_owner != request.user:
+            return JsonResponse({'error': 'Você não tem permissão para responder esta solicitação'}, status=403)
+        
+        data = json.loads(request.body)
+        action = data.get('action')  # 'approve' ou 'reject'
+        response_message = data.get('message', '')
+        
+        if action == 'approve':
+            permission.approve(response_message)
+            # Criar participante automaticamente após aprovação
+            try:
+                cliente = permission.cliente
+                phone = cliente.telefone or (cliente.user.username if cliente.user else '')
+                if phone:
+                    # Formatar telefone
+                    phone = phone.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+                    if not phone.startswith('+'):
+                        if phone.startswith('55'):
+                            phone = '+' + phone
+                        elif phone.startswith('0'):
+                            phone = '+55' + phone[1:]
+                        else:
+                            phone = '+55' + phone
+                    
+                    # Verificar se já existe
+                    if not WhatsappParticipant.objects.filter(group=permission.group, phone=phone).exists():
+                        WhatsappParticipant.objects.create(
+                            group=permission.group,
+                            phone=phone,
+                            name=cliente.user.get_full_name() or cliente.user.username,
+                            cliente=cliente
+                        )
+            except Exception as e:
+                pass  # Logar erro mas não falhar a aprovação
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Permissão aprovada e participante adicionado ao grupo'
+            })
+        elif action == 'reject':
+            permission.reject(response_message)
+            return JsonResponse({
+                'success': True,
+                'message': 'Permissão rejeitada'
+            })
+        else:
+            return JsonResponse({'error': 'Ação inválida'}, status=400)
+            
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -294,12 +631,12 @@ def add_participant(request, group_id):
 
 @login_required
 def products_list(request, group_id):
-    """Lista produtos de um grupo"""
-    if not request.user.is_shopper:
-        messages.error(request, "Acesso restrito a Personal Shoppers.")
+    """Lista posts/produtos de um grupo (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        messages.error(request, "Acesso restrito.")
         return redirect('home')
     
-    group = get_object_or_404(WhatsappGroup, id=group_id, shopper=request.user.personalshopper)
+    group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
     products = group.products.all().order_by('-created_at')
     
     # Filtros
@@ -345,32 +682,77 @@ def products_list(request, group_id):
 @login_required
 @require_http_methods(["POST"])
 def create_product(request, group_id):
-    """Criar produto no grupo"""
-    if not request.user.is_shopper:
+    """Criar post/produto no grupo (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
-        group = get_object_or_404(WhatsappGroup, id=group_id, shopper=request.user.personalshopper)
-        data = json.loads(request.body)
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
         
-        # Dados obrigatórios
-        name = data.get('name')
+        # Se for FormData (upload de imagem)
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            name = request.POST.get('name')
+            description = request.POST.get('description', '')
+            price = request.POST.get('price')
+            currency = request.POST.get('currency', 'USD')
+            brand = request.POST.get('brand', '')
+            category = request.POST.get('category', '')
+            is_available = request.POST.get('is_available', 'true') == 'true'
+            is_featured = request.POST.get('is_featured', 'false') == 'true'
+            
+            # Processar imagens
+            image_urls = []
+            if 'images' in request.FILES:
+                from django.core.files.storage import default_storage
+                from django.core.files.base import ContentFile
+                import os
+                from datetime import datetime
+                
+                for image_file in request.FILES.getlist('images'):
+                    # Salvar imagem
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f"posts/{group.id}/{timestamp}_{image_file.name}"
+                    path = default_storage.save(filename, ContentFile(image_file.read()))
+                    image_urls.append(default_storage.url(path))
+        else:
+            # JSON
+            data = json.loads(request.body)
+            name = data.get('name')
+            description = data.get('description', '')
+            price = data.get('price')
+            currency = data.get('currency', 'USD')
+            brand = data.get('brand', '')
+            category = data.get('category', '')
+            image_urls = data.get('image_urls', [])
+            is_available = data.get('is_available', True)
+            is_featured = data.get('is_featured', False)
+        
         if not name:
-            return JsonResponse({'error': 'Nome do produto é obrigatório'}, status=400)
+            return JsonResponse({'error': 'Nome do post é obrigatório'}, status=400)
         
-        # Criar produto
+        # Buscar ou criar participante para o owner
+        participant, _ = WhatsappParticipant.objects.get_or_create(
+            group=group,
+            phone=request.user.username if not hasattr(request.user, 'cliente') else (request.user.cliente.telefone or request.user.username),
+            defaults={
+                'name': request.user.get_full_name() or request.user.username,
+                'is_admin': True
+            }
+        )
+        
+        # Criar produto/post
         product = WhatsappProduct.objects.create(
             group=group,
             name=name,
-            description=data.get('description', ''),
-            price=Decimal(data.get('price', 0)) if data.get('price') else None,
-            currency=data.get('currency', 'USD'),
-            brand=data.get('brand', ''),
-            category=data.get('category', ''),
-            image_urls=data.get('image_urls', []),
-            is_available=data.get('is_available', True),
-            is_featured=data.get('is_featured', False),
-            posted_by=group.participants.first()  # Usar primeiro participante como exemplo
+            description=description,
+            price=Decimal(price) if price else None,
+            currency=currency,
+            brand=brand,
+            category=category,
+            image_urls=image_urls,
+            is_available=is_available,
+            is_featured=is_featured,
+            posted_by=participant
         )
         
         return JsonResponse({
@@ -378,14 +760,227 @@ def create_product(request, group_id):
             'product': {
                 'id': product.id,
                 'name': product.name,
+                'description': product.description,
                 'price': str(product.price) if product.price else None,
                 'currency': product.currency,
                 'brand': product.brand,
                 'category': product.category,
+                'image_urls': product.image_urls,
                 'is_available': product.is_available,
+                'is_featured': product.is_featured,
                 'created_at': product.created_at.isoformat(),
             }
         })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def get_product(request, group_id, product_id):
+    """Buscar produto específico (para edição)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        
+        return JsonResponse({
+            'success': True,
+            'product': {
+                'id': product.id,
+                'name': product.name,
+                'description': product.description,
+                'price': str(product.price) if product.price else None,
+                'currency': product.currency,
+                'brand': product.brand,
+                'category': product.category,
+                'image_urls': product.image_urls,
+                'is_available': product.is_available,
+                'is_featured': product.is_featured,
+                'created_at': product.created_at.isoformat(),
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["PUT", "PATCH"])
+def update_product(request, group_id, product_id):
+    """Atualizar post/produto (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        
+        data = json.loads(request.body)
+        
+        # Atualizar campos
+        if 'name' in data:
+            product.name = data['name']
+        if 'description' in data:
+            product.description = data.get('description', '')
+        if 'price' in data:
+            product.price = Decimal(data['price']) if data['price'] else None
+        if 'currency' in data:
+            product.currency = data['currency']
+        if 'brand' in data:
+            product.brand = data.get('brand', '')
+        if 'category' in data:
+            product.category = data.get('category', '')
+        if 'image_urls' in data:
+            product.image_urls = data['image_urls']
+        if 'is_available' in data:
+            product.is_available = data['is_available']
+        if 'is_featured' in data:
+            product.is_featured = data['is_featured']
+        
+        product.save()
+        
+        return JsonResponse({
+            'success': True,
+            'product': {
+                'id': product.id,
+                'name': product.name,
+                'description': product.description,
+                'price': str(product.price) if product.price else None,
+                'currency': product.currency,
+                'image_urls': product.image_urls,
+                'is_available': product.is_available,
+                'is_featured': product.is_featured,
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["DELETE"])
+def delete_product(request, group_id, product_id):
+    """Deletar post/produto (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        
+        product.delete()
+        
+        return JsonResponse({'success': True, 'message': 'Post deletado com sucesso'})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ============================================================================
+# CAPTURA DE IMAGENS (MVP)
+# ============================================================================
+
+@login_required
+@require_http_methods(["POST"])
+def capture_post_screenshot(request, group_id, product_id):
+    """Capturar screenshot de um post (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        
+        # Se for upload de imagem
+        if 'screenshot' in request.FILES:
+            screenshot_file = request.FILES['screenshot']
+            
+            # Criar screenshot
+            screenshot = PostScreenshot.objects.create(
+                post=product,
+                group=group,
+                screenshot_file=screenshot_file,
+                captured_by=request.user,
+                notes=request.POST.get('notes', '')
+            )
+            
+            # Obter dimensões se possível
+            try:
+                from PIL import Image
+                img = Image.open(screenshot.screenshot_file)
+                screenshot.width = img.width
+                screenshot.height = img.height
+                screenshot.file_size = screenshot.screenshot_file.size
+                screenshot.save()
+            except:
+                pass
+            
+            return JsonResponse({
+                'success': True,
+                'screenshot': {
+                    'id': screenshot.id,
+                    'url': screenshot.screenshot_file.url,
+                    'captured_at': screenshot.captured_at.isoformat(),
+                    'width': screenshot.width,
+                    'height': screenshot.height,
+                }
+            })
+        else:
+            return JsonResponse({'error': 'Arquivo de screenshot é obrigatório'}, status=400)
+            
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def get_post_screenshots(request, group_id, product_id):
+    """Listar screenshots de um post (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        
+        screenshots = PostScreenshot.objects.filter(post=product).order_by('-captured_at')
+        
+        screenshots_data = [{
+            'id': s.id,
+            'url': s.screenshot_file.url,
+            'captured_at': s.captured_at.isoformat(),
+            'captured_by': s.captured_by.get_full_name() or s.captured_by.username if s.captured_by else None,
+            'width': s.width,
+            'height': s.height,
+            'file_size': s.file_size,
+            'notes': s.notes,
+        } for s in screenshots]
+        
+        return JsonResponse({
+            'success': True,
+            'screenshots': screenshots_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["DELETE"])
+def delete_screenshot(request, group_id, product_id, screenshot_id):
+    """Deletar screenshot (MVP)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
+        screenshot = get_object_or_404(PostScreenshot, id=screenshot_id, post=product)
+        
+        screenshot.delete()
+        
+        return JsonResponse({'success': True, 'message': 'Screenshot deletado com sucesso'})
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from .models import (
-    Cliente, PersonalShopper, Keeper, Pedido, Pacote,
+    Cliente, PersonalShopper, AddressKeeper, Pedido, Pacote,
     WhatsappGroup, WhatsappOrder, WhatsappProduct, WhatsappParticipant,
     PagamentoIntent, Evento, Produto, Categoria, Empresa
 )
@@ -39,13 +39,13 @@ def admin_dashboard(request):
     # ========== ESTATÍSTICAS DE USUÁRIOS ==========
     total_clientes = Cliente.objects.count()
     total_shoppers = PersonalShopper.objects.count()
-    total_keepers = Keeper.objects.count()
+    total_keepers = AddressKeeper.objects.count()
     total_usuarios = total_clientes + total_shoppers + total_keepers
     
     # Novos usuários no período
     novos_clientes = Cliente.objects.filter(criado_em__gte=start_date).count()
     novos_shoppers = PersonalShopper.objects.filter(criado_em__gte=start_date).count()
-    novos_keepers = Keeper.objects.filter(criado_em__gte=start_date).count()
+    novos_keepers = AddressKeeper.objects.filter(criado_em__gte=start_date).count()
     
     # ========== ESTATÍSTICAS DE PEDIDOS ==========
     pedidos = Pedido.objects.all()
@@ -154,7 +154,7 @@ def admin_dashboard(request):
     ).order_by('-total_receita')[:5]
     
     # Top keepers por pacotes
-    top_keepers = Keeper.objects.annotate(
+    top_keepers = AddressKeeper.objects.annotate(
         total_pacotes=Count('pacotes')
     ).order_by('-total_pacotes')[:5]
     

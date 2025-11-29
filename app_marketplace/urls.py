@@ -4,6 +4,8 @@ from . import whatsapp_views
 from . import whatsapp_dashboard_views
 from . import shopper_dashboard_views
 from . import kmn_views
+from . import admin_dashboard_views
+from . import client_dashboard_views
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -34,7 +36,16 @@ urlpatterns = [
            path('api/whatsapp/groups/create/', whatsapp_dashboard_views.create_group, name='api_create_group'),
            path('api/whatsapp/groups/<int:group_id>/update/', whatsapp_dashboard_views.update_group, name='api_update_group'),
            path('api/whatsapp/groups/<int:group_id>/participants/add/', whatsapp_dashboard_views.add_participant, name='api_add_participant'),
+           path('api/whatsapp/groups/<int:group_id>/clients/available/', whatsapp_dashboard_views.get_available_clients, name='api_get_available_clients'),
+           path('api/whatsapp/groups/<int:group_id>/permissions/request/', whatsapp_dashboard_views.request_participant_permission, name='api_request_participant_permission'),
+           path('api/whatsapp/permissions/<int:permission_id>/respond/', whatsapp_dashboard_views.respond_permission_request, name='api_respond_permission'),
            path('api/whatsapp/groups/<int:group_id>/products/create/', whatsapp_dashboard_views.create_product, name='api_create_product'),
+           path('api/whatsapp/groups/<int:group_id>/products/<int:product_id>/', whatsapp_dashboard_views.get_product, name='api_get_product'),
+           path('api/whatsapp/groups/<int:group_id>/products/<int:product_id>/update/', whatsapp_dashboard_views.update_product, name='api_update_product'),
+           path('api/whatsapp/groups/<int:group_id>/products/<int:product_id>/delete/', whatsapp_dashboard_views.delete_product, name='api_delete_product'),
+           path('api/whatsapp/groups/<int:group_id>/products/<int:product_id>/screenshots/', whatsapp_dashboard_views.get_post_screenshots, name='api_get_post_screenshots'),
+           path('api/whatsapp/groups/<int:group_id>/products/<int:product_id>/screenshots/capture/', whatsapp_dashboard_views.capture_post_screenshot, name='api_capture_screenshot'),
+           path('api/whatsapp/groups/<int:group_id>/products/<int:product_id>/screenshots/<int:screenshot_id>/delete/', whatsapp_dashboard_views.delete_screenshot, name='api_delete_screenshot'),
            path('api/whatsapp/orders/<int:order_id>/update-status/', whatsapp_dashboard_views.update_order_status, name='api_update_order_status'),
            path('api/whatsapp/groups/<int:group_id>/send-message/', whatsapp_dashboard_views.send_group_message, name='api_send_group_message'),
            
@@ -48,6 +59,18 @@ urlpatterns = [
     path('shopper/products/', shopper_dashboard_views.shopper_products, name='shopper_products'),
     path('shopper/orders/', shopper_dashboard_views.shopper_orders, name='shopper_orders'),
     path('shopper/analytics/', shopper_dashboard_views.shopper_analytics, name='shopper_analytics'),
+    
+    # Dashboard de Administração
+    path('admin/dashboard/', admin_dashboard_views.admin_dashboard, name='admin_dashboard'),
+    
+    # Dashboard do Cliente
+    path('client/dashboard/', client_dashboard_views.client_dashboard, name='client_dashboard'),
+    path('client/products/', client_dashboard_views.client_products, name='client_products'),
+    path('client/orders/', client_dashboard_views.client_orders, name='client_orders'),
+    path('api/client/orders/create/', client_dashboard_views.create_whatsapp_order, name='api_create_whatsapp_order'),
+    path('client/orders/<int:pedido_id>/', client_dashboard_views.client_order_detail, name='client_order_detail'),
+    path('client/packages/', client_dashboard_views.client_packages, name='client_packages'),
+    path('client/packages/<int:pacote_id>/', client_dashboard_views.client_package_detail, name='client_package_detail'),
     
     # Helper para Chat ID WhatsApp (comentado temporariamente)
     # path('shopper/chat-id-helper/', shopper_dashboard_views.chat_id_helper, name='chat_id_helper'),
