@@ -43,8 +43,15 @@ def client_dashboard(request):
     try:
         # ========== PEDIDOS ==========
         # Usar defer para evitar buscar campos que podem não existir no banco
-        # Campos que podem não existir: codigo, carteira_cliente, tipo_cliente, etc.
-        pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em').defer('codigo', 'carteira_cliente', 'tipo_cliente')
+        # Campos que podem não existir: codigo, carteira_cliente, tipo_cliente, cliente_nome, cliente_whatsapp, cliente_email
+        pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em').defer(
+            'codigo', 
+            'carteira_cliente', 
+            'tipo_cliente',
+            'cliente_nome',
+            'cliente_whatsapp',
+            'cliente_email'
+        )
         total_pedidos = pedidos.count()
         
         # Pedidos por status (usando status corretos do modelo)
