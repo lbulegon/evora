@@ -3,12 +3,9 @@ from . import views
 from . import whatsapp_views
 from . import whatsapp_dashboard_views
 from . import shopper_dashboard_views
-<<<<<<< Updated upstream
 from . import kmn_views
-=======
 from . import admin_dashboard_views
 from . import client_dashboard_views
->>>>>>> Stashed changes
 
 urlpatterns = [
     path('', views.index, name='index'),
