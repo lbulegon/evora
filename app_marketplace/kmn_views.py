@@ -139,11 +139,40 @@ def kmn_clientes(request):
         # 2. IDs de clientes via trustlines ATIVAS (emprestimo de carteira)
         cliente_ids_via_trustline = set()
         
+        # Verificar se o campo tipo_compartilhamento existe no banco de dados
+        # Usar uma query de teste para verificar se a coluna existe
+        campo_existe = False
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name='app_marketplace_trustlinekeeper' 
+                    AND column_name='tipo_compartilhamento'
+                """)
+                campo_existe = cursor.fetchone() is not None
+        except:
+            # Se der erro na verificação, assumir que não existe
+            campo_existe = False
+        
         # Buscar trustlines onde o agente é agente_a ou agente_b
         trustlines_ativas = TrustlineKeeper.objects.filter(
             Q(agente_a=agente) | Q(agente_b=agente),
             status=TrustlineKeeper.StatusTrustline.ATIVA
-        ).select_related('agente_a', 'agente_b')
+        )
+        
+        # Se o campo não existe no banco, usar only() para não tentar buscá-lo
+        if not campo_existe:
+            # Especificar apenas campos que existem no banco
+            trustlines_ativas = trustlines_ativas.only(
+                'id', 'agente_a', 'agente_b', 'nivel_confianca_a_para_b', 
+                'nivel_confianca_b_para_a', 'perc_shopper', 'perc_keeper', 
+                'status', 'permite_indicacao', 'perc_indicacao', 
+                'criado_em', 'aceito_em', 'atualizado_em'
+            )
+        
+        trustlines_ativas = trustlines_ativas.select_related('agente_a', 'agente_b')
         
         # Para cada trustline, buscar clientes do parceiro respeitando a direcionalidade
         for trustline in trustlines_ativas:
@@ -151,10 +180,13 @@ def kmn_clientes(request):
             pode_ver_clientes_parceiro = False
             
             # Verificar direcionalidade (com fallback para trustlines antigas sem o campo)
-            try:
-                tipo_compartilhamento = trustline.tipo_compartilhamento
-            except AttributeError:
-                # Campo não existe ainda (migration não aplicada) - tratar como bidirecional
+            if campo_existe:
+                try:
+                    tipo_compartilhamento = trustline.tipo_compartilhamento
+                except (AttributeError, KeyError):
+                    tipo_compartilhamento = 'bidirecional'
+            else:
+                # Campo não existe no modelo - tratar como bidirecional
                 tipo_compartilhamento = 'bidirecional'
             
             # Comparar com strings para evitar problemas se a classe não existir
@@ -219,10 +251,13 @@ def kmn_clientes(request):
             # Filtrar apenas parceiros que realmente compartilham clientes (respeitando direcionalidade)
             agentes_parceiros_compartilhando = []
             for tl in trustlines_ativas:
-                try:
-                    tipo_compartilhamento = tl.tipo_compartilhamento
-                except AttributeError:
-                    # Campo não existe ainda - tratar como bidirecional
+                if campo_existe:
+                    try:
+                        tipo_compartilhamento = tl.tipo_compartilhamento
+                    except (AttributeError, KeyError):
+                        tipo_compartilhamento = 'bidirecional'
+                else:
+                    # Campo não existe no modelo - tratar como bidirecional
                     tipo_compartilhamento = 'bidirecional'
                 
                 # Comparar com strings
