@@ -40,20 +40,48 @@ def client_dashboard(request):
         return redirect('home')
     
     # ========== PEDIDOS ==========
+    # Usar query raw para evitar problemas com campos que não existem no banco
+    from django.db import connection
+    
     try:
-        pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em')
+        # Verificar quais campos existem na tabela
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name='app_marketplace_pedido'
+            """)
+            columns = [row[0] for row in cursor.fetchall()]
+        
+        # Campos básicos que sempre devem existir
+        campos_base = ['id', 'cliente_id', 'status', 'valor_total', 'criado_em', 'atualizado_em']
+        campos_existentes = [campo for campo in campos_base if campo in columns]
+        
+        # Adicionar campos opcionais se existirem
+        campos_opcionais = ['metodo_pagamento', 'observacoes', 'codigo_rastreamento']
+        for campo in campos_opcionais:
+            if campo in columns:
+                campos_existentes.append(campo)
+        
+        # Usar .only() apenas com campos que existem
+        pedidos = Pedido.objects.filter(cliente=cliente).only(*campos_existentes).order_by('-criado_em')
+            
     except Exception as e:
         error_msg = str(e)
-        if 'valor_subtotal' in error_msg or 'does not exist' in error_msg.lower():
-            messages.error(
+        if 'does not exist' in error_msg.lower() or 'ProgrammingError' in str(type(e).__name__):
+            messages.warning(
                 request,
-                "Erro no banco de dados: A migration precisa ser aplicada. "
-                "Execute: python manage.py migrate"
+                "Algumas migrations podem não ter sido aplicadas. "
+                "O dashboard funcionará com funcionalidades limitadas."
             )
-            # Retorna um queryset vazio para evitar mais erros
-            pedidos = Pedido.objects.none()
+            # Tenta apenas com campos mínimos essenciais
+            try:
+                pedidos = Pedido.objects.filter(cliente=cliente).only(
+                    'id', 'cliente_id', 'status', 'valor_total', 'criado_em'
+                ).order_by('-criado_em')
+            except:
+                pedidos = Pedido.objects.none()
         else:
-            # Re-lança o erro se não for relacionado ao campo faltante
             raise
     
     total_pedidos = pedidos.count()
@@ -105,7 +133,15 @@ def client_dashboard(request):
     ).order_by('-criado_em')
     
     # ========== PEDIDOS RECENTES ==========
-    pedidos_recentes = pedidos[:5]
+    try:
+        pedidos_recentes = list(pedidos[:5])
+    except Exception as e:
+        # Se houver erro ao carregar pedidos (campos faltantes), usa lista vazia
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Erro ao carregar pedidos recentes: {str(e)}")
+        pedidos_recentes = []
+    
     whatsapp_orders_recentes = whatsapp_orders[:5]
     pacotes_recentes = pacotes[:5]
     
@@ -113,15 +149,29 @@ def client_dashboard(request):
     # Combinar pedidos e pacotes recentes para timeline
     atividades = []
     
-    for pedido in pedidos[:10]:
-        atividades.append({
-            'tipo': 'pedido',
-            'objeto': pedido,
-            'data': pedido.criado_em,
-            'titulo': f"Pedido #{pedido.id}",
-            'status': pedido.get_status_display(),
-            'valor': pedido.valor_total
-        })
+    try:
+        for pedido in pedidos[:10]:
+            try:
+                atividades.append({
+                    'tipo': 'pedido',
+                    'objeto': pedido,
+                    'data': pedido.criado_em,
+                    'titulo': f"Pedido #{pedido.id}",
+                    'status': pedido.get_status_display(),
+                    'valor': pedido.valor_total
+                })
+            except Exception as e:
+                # Se houver erro ao acessar campos específicos, ignora este pedido
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Erro ao processar pedido {pedido.id}: {str(e)}")
+                continue
+    except Exception as e:
+        # Se houver erro ao iterar, ignora timeline de pedidos
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Erro ao processar pedidos na timeline: {str(e)}")
+        pass
     
     for pacote in pacotes[:10]:
         atividades.append({
