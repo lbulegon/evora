@@ -256,20 +256,39 @@ def kmn_trustlines(request):
             if agente_b.id == agente.id:
                 messages.error(request, "Você não pode criar uma trustline consigo mesmo.")
             else:
-                # Verificar se já existe trustline ATIVA/PENDENTE/SUSPENSA entre os dois agentes
-                # Trustlines já encerradas (status = CANCELADA) não bloqueiam nova criação
+                # Buscar qualquer trustline existente entre os dois agentes (qualquer status)
                 trustline_existente = TrustlineKeeper.objects.filter(
                     (Q(agente_a=agente) & Q(agente_b=agente_b)) |
                     (Q(agente_a=agente_b) & Q(agente_b=agente))
-                ).exclude(status=TrustlineKeeper.StatusTrustline.CANCELADA).first()
-                
-                if trustline_existente:
+                ).first()
+
+                # Se houver trustline ativa / pendente / suspensa, não deixar duplicar
+                if trustline_existente and trustline_existente.status in [
+                    TrustlineKeeper.StatusTrustline.ATIVA,
+                    TrustlineKeeper.StatusTrustline.PENDENTE,
+                    TrustlineKeeper.StatusTrustline.SUSPENSA,
+                ]:
                     messages.warning(
-                        request, 
+                        request,
                         f"Já existe uma trustline com {agente_b.user.get_full_name() or agente_b.user.username}."
                     )
                 else:
-                    # Criar nova trustline pendente
+                    # Se já existe uma trustline ENCERRADA, reutilizar o registro
+                    if trustline_existente and trustline_existente.status == TrustlineKeeper.StatusTrustline.CANCELADA:
+                        trustline_existente.status = TrustlineKeeper.StatusTrustline.PENDENTE
+                        trustline_existente.nivel_confianca_a_para_b = 50.0
+                        trustline_existente.nivel_confianca_b_para_a = 50.0
+                        trustline_existente.perc_shopper = 60.0
+                        trustline_existente.perc_keeper = 40.0
+                        trustline_existente.aceito_em = None
+                        trustline_existente.save()
+                        messages.success(
+                            request,
+                            f"Trustline reaberta com sucesso! Aguardando aprovação de {agente_b.user.get_full_name() or agente_b.user.username}."
+                        )
+                        return redirect('kmn_trustlines')
+
+                    # Caso contrário, criar uma nova trustline
                     try:
                         nova_trustline = TrustlineKeeper.objects.create(
                             agente_a=agente,
@@ -281,20 +300,13 @@ def kmn_trustlines(request):
                             status=TrustlineKeeper.StatusTrustline.PENDENTE
                         )
                         messages.success(
-                            request, 
+                            request,
                             f"Trustline criada com sucesso! Aguardando aprovação de {agente_b.user.get_full_name() or agente_b.user.username}."
                         )
                         # Redirecionar para remover o parâmetro da URL
                         return redirect('kmn_trustlines')
                     except Exception as e:
-                        # Tratar erros de constraint ou validação
-                        if 'unique' in str(e).lower() or 'duplicate' in str(e).lower():
-                            messages.warning(
-                                request, 
-                                f"Já existe uma trustline com {agente_b.user.get_full_name() or agente_b.user.username}."
-                            )
-                        else:
-                            messages.error(request, f"Erro ao criar trustline: {str(e)}")
+                        messages.error(request, f"Erro ao criar trustline: {str(e)}")
         except Agente.DoesNotExist:
             messages.error(request, "Agente não encontrado ou não verificado.")
         except Exception as e:
