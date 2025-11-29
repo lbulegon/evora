@@ -7,3 +7,4 @@ python manage.py collectstatic --noinput
 
 echo "✅ Build concluído!"
 
+

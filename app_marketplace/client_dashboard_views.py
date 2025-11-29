@@ -35,7 +35,22 @@ def client_dashboard(request):
         return redirect('home')
     
     # ========== PEDIDOS ==========
-    pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em')
+    try:
+        pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em')
+    except Exception as e:
+        error_msg = str(e)
+        if 'valor_subtotal' in error_msg or 'does not exist' in error_msg.lower():
+            messages.error(
+                request,
+                "Erro no banco de dados: A migration precisa ser aplicada. "
+                "Execute: python manage.py migrate"
+            )
+            # Retorna um queryset vazio para evitar mais erros
+            pedidos = Pedido.objects.none()
+        else:
+            # Re-lança o erro se não for relacionado ao campo faltante
+            raise
+    
     total_pedidos = pedidos.count()
     
     # Pedidos por status

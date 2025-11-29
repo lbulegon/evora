@@ -261,6 +261,7 @@ class PedidoSerializer(serializers.ModelSerializer):
     """Serializer para Pedido"""
     itens = ItemPedidoSerializer(many=True, read_only=True)
     pagamento = serializers.SerializerMethodField()
+    valor_subtotal = serializers.SerializerMethodField()
     
     class Meta:
         model = Pedido
@@ -271,6 +272,25 @@ class PedidoSerializer(serializers.ModelSerializer):
             'itens', 'pagamento'
         ]
         read_only_fields = ['id', 'codigo', 'criado_em', 'atualizado_em']
+    
+    def get_valor_subtotal(self, obj):
+        """Retorna valor_subtotal se existir, senão calcula baseado nos itens"""
+        try:
+            # Tenta obter do banco se o campo existir
+            if hasattr(obj, 'valor_subtotal'):
+                try:
+                    return float(obj.valor_subtotal) if obj.valor_subtotal is not None else 0
+                except (AttributeError, KeyError):
+                    pass
+            # Fallback: calcula baseado nos itens
+            if hasattr(obj, 'itens'):
+                try:
+                    return float(sum(item.subtotal() for item in obj.itens.all())) or 0
+                except:
+                    return 0
+            return 0
+        except Exception:
+            return 0
     
     def get_pagamento(self, obj):
         """Retorna dados do pagamento se existir"""
@@ -506,6 +526,7 @@ class PedidoSerializer(serializers.ModelSerializer):
     """Serializer para Pedido"""
     itens = ItemPedidoSerializer(many=True, read_only=True)
     pagamento = serializers.SerializerMethodField()
+    valor_subtotal = serializers.SerializerMethodField()
     
     class Meta:
         model = Pedido
@@ -516,6 +537,25 @@ class PedidoSerializer(serializers.ModelSerializer):
             'itens', 'pagamento'
         ]
         read_only_fields = ['id', 'codigo', 'criado_em', 'atualizado_em']
+    
+    def get_valor_subtotal(self, obj):
+        """Retorna valor_subtotal se existir, senão calcula baseado nos itens"""
+        try:
+            # Tenta obter do banco se o campo existir
+            if hasattr(obj, 'valor_subtotal'):
+                try:
+                    return float(obj.valor_subtotal) if obj.valor_subtotal is not None else 0
+                except (AttributeError, KeyError):
+                    pass
+            # Fallback: calcula baseado nos itens
+            if hasattr(obj, 'itens'):
+                try:
+                    return float(sum(item.subtotal() for item in obj.itens.all())) or 0
+                except:
+                    return 0
+            return 0
+        except Exception:
+            return 0
     
     def get_pagamento(self, obj):
         """Retorna dados do pagamento se existir"""

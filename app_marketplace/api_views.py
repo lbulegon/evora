@@ -439,3 +439,4 @@ def resolver_operacao(request):
 
 
 
+

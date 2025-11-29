@@ -79,3 +79,4 @@ print("  1. Tabela auth_user (User do Django)")
 print("  2. Tabela app_marketplace_cliente (Cliente)")
 
 
+
