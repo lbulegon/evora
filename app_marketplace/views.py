@@ -131,17 +131,33 @@ def clientes(request):
     Lista de clientes.
     
     - Se for Shopper (request.user.is_shopper): mostra apenas clientes da(s)
-      carteira(s) do shopper (wallet.owner = request.user).
+      carteira(s) do shopper OU clientes que seguem este shopper.
     - Para outros perfis (admin, staff, etc.): mostra todos os clientes.
     """
-    # Shopper: filtrar apenas clientes da carteira do shopper
     if getattr(request.user, 'is_shopper', False):
-        clientes = (
-            Cliente.objects
-            .select_related('user', 'wallet', 'wallet__owner')
-            .filter(wallet__owner=request.user)
-            .order_by('-criado_em')
-        )
+        # Shopper logado
+        try:
+            shopper = request.user.personalshopper
+        except PersonalShopper.DoesNotExist:
+            shopper = None
+
+        # Base: nenhum cliente
+        clientes_qs = Cliente.objects.none()
+
+        if shopper:
+            # 1) Clientes que seguem este shopper (relacionamento SEGUINDO)
+            clientes_seguindo = Cliente.objects.filter(
+                relacionamentoclienteshopper__personal_shopper=shopper,
+                relacionamentoclienteshopper__status=RelacionamentoClienteShopper.Status.SEGUINDO,
+            )
+
+            # 2) (Opcional/futuro) Clientes da(s) carteiras do shopper
+            clientes_carteira = Cliente.objects.filter(wallet__owner=request.user)
+
+            # Unir conjuntos e remover duplicados
+            clientes_qs = (clientes_seguindo | clientes_carteira).select_related('user').distinct()
+
+        clientes = clientes_qs.order_by('-criado_em')
     else:
         # Admin / outros usuários: ver todos
         clientes = Cliente.objects.select_related('user').all().order_by('-criado_em')
