@@ -92,6 +92,26 @@
                                                     <i class="fas fa-info-circle"></i> 
                                                     <strong>Papéis dinâmicos:</strong> Shopper = quem tem o produto | Keeper = quem tem o cliente
                                                 </small>
+                                                <br>
+                                                <small class="text-muted mt-1 d-block">
+                                                    <i class="fas fa-exchange-alt"></i> 
+                                                    <strong>Compartilhamento:</strong> 
+                                                    {% if trustline.tipo_compartilhamento == 'bidirecional' %}
+                                                        <span class="badge bg-success">Bidirecional (ambos compartilham)</span>
+                                                    {% elif trustline.tipo_compartilhamento == 'a_para_b' %}
+                                                        {% if trustline.agente_a == agente %}
+                                                            <span class="badge bg-info">Unidirecional (você empresta para {{ trustline.agente_b.user.get_full_name|default:trustline.agente_b.user.username }})</span>
+                                                        {% else %}
+                                                            <span class="badge bg-info">Unidirecional ({{ trustline.agente_a.user.get_full_name|default:trustline.agente_a.user.username }} empresta para você)</span>
+                                                        {% endif %}
+                                                    {% elif trustline.tipo_compartilhamento == 'b_para_a' %}
+                                                        {% if trustline.agente_b == agente %}
+                                                            <span class="badge bg-info">Unidirecional (você empresta para {{ trustline.agente_a.user.get_full_name|default:trustline.agente_a.user.username }})</span>
+                                                        {% else %}
+                                                            <span class="badge bg-info">Unidirecional ({{ trustline.agente_b.user.get_full_name|default:trustline.agente_b.user.username }} empresta para você)</span>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                </small>
                                             </div>
                                         </td>
                                         <td>

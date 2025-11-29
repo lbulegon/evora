@@ -1541,6 +1541,19 @@ class TrustlineKeeper(models.Model):
     
     status = models.CharField(max_length=20, choices=StatusTrustline.choices, default=StatusTrustline.PENDENTE)
     
+    # Direcionalidade do compartilhamento de clientes
+    class TipoCompartilhamento(models.TextChoices):
+        BIDIRECIONAL = 'bidirecional', 'Bidirecional (ambos compartilham)'
+        UNIDIRECIONAL_A_PARA_B = 'a_para_b', 'Unidirecional (A → B: A empresta para B)'
+        UNIDIRECIONAL_B_PARA_A = 'b_para_a', 'Unidirecional (B → A: B empresta para A)'
+    
+    tipo_compartilhamento = models.CharField(
+        max_length=20,
+        choices=TipoCompartilhamento.choices,
+        default=TipoCompartilhamento.BIDIRECIONAL,
+        help_text="Tipo de compartilhamento de carteira de clientes"
+    )
+    
     # Regras adicionais
     permite_indicacao = models.BooleanField(default=True)
     perc_indicacao = models.DecimalField(max_digits=5, decimal_places=2, default=5.0, help_text="% para indicação")
