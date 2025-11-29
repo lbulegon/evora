@@ -36,11 +36,10 @@
                             <table class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Agente Parceiro</th>
+                                        <th>Agentes</th>
                                         <th>Status</th>
-                                        <th>Confiança Média</th>
-                                        <th>% Shopper</th>
-                                        <th>% Keeper</th>
+                                        <th>Confiança</th>
+                                        <th>Comissões</th>
                                         <th>Data</th>
                                         <th>Ações</th>
                                     </tr>
@@ -49,15 +48,51 @@
                                     {% for trustline in trustlines %}
                                     <tr>
                                         <td>
-                                            {% if trustline.agente_a == agente %}
-                                                <strong>{{ trustline.agente_b.user.get_full_name|default:trustline.agente_b.user.username }}</strong>
-                                                <br>
-                                                <small class="text-muted">{{ trustline.agente_b.nome_comercial }}</small>
-                                            {% else %}
-                                                <strong>{{ trustline.agente_a.user.get_full_name|default:trustline.agente_a.user.username }}</strong>
-                                                <br>
-                                                <small class="text-muted">{{ trustline.agente_a.nome_comercial }}</small>
-                                            {% endif %}
+                                            <div class="d-flex align-items-start">
+                                                <div class="me-3">
+                                                    <div class="text-center">
+                                                        <i class="fas fa-user-circle fa-2x text-primary"></i>
+                                                        <br>
+                                                        <small class="text-muted">Você</small>
+                                                    </div>
+                                                </div>
+                                                <div class="text-center mx-2">
+                                                    <i class="fas fa-exchange-alt text-secondary"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="text-center">
+                                                        <i class="fas fa-user-circle fa-2x text-success"></i>
+                                                        <br>
+                                                        <small class="text-muted">Parceiro</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="mt-2">
+                                                <strong>Você:</strong> {{ agente.user.get_full_name|default:agente.user.username }}
+                                                {% if agente.nome_comercial %}
+                                                    <br><small class="text-muted">{{ agente.nome_comercial }}</small>
+                                                {% endif %}
+                                            </div>
+                                            <div class="mt-1">
+                                                <strong>Parceiro:</strong> 
+                                                {% if trustline.agente_a == agente %}
+                                                    {{ trustline.agente_b.user.get_full_name|default:trustline.agente_b.user.username }}
+                                                    {% if trustline.agente_b.nome_comercial %}
+                                                        <br><small class="text-muted">{{ trustline.agente_b.nome_comercial }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    {{ trustline.agente_a.user.get_full_name|default:trustline.agente_a.user.username }}
+                                                    {% if trustline.agente_a.nome_comercial %}
+                                                        <br><small class="text-muted">{{ trustline.agente_a.nome_comercial }}</small>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </div>
+                                            <div class="mt-2 p-2 bg-light rounded">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-info-circle"></i> 
+                                                    <strong>Papéis dinâmicos:</strong> Shopper = quem tem o produto | Keeper = quem tem o cliente
+                                                </small>
+                                            </div>
                                         </td>
                                         <td>
                                             {% if trustline.status == 'ativa' %}
@@ -75,23 +110,42 @@
                                                 {{ trustline.nivel_confianca_medio|floatformat:0 }}%
                                             </span>
                                         </td>
-                                        <td>{{ trustline.perc_shopper|floatformat:1 }}%</td>
-                                        <td>{{ trustline.perc_keeper|floatformat:1 }}%</td>
+                                        <td>
+                                            <div class="mb-1">
+                                                <span class="badge bg-primary">
+                                                    <i class="fas fa-shopping-bag"></i> Shopper: {{ trustline.perc_shopper|floatformat:1 }}%
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="fas fa-warehouse"></i> Keeper: {{ trustline.perc_keeper|floatformat:1 }}%
+                                                </span>
+                                            </div>
+                                            <small class="text-muted d-block mt-1">
+                                                Quando você é Shopper: {{ trustline.perc_shopper|floatformat:1 }}%<br>
+                                                Quando você é Keeper: {{ trustline.perc_keeper|floatformat:1 }}%
+                                            </small>
+                                        </td>
                                         <td>
                                             {% if trustline.aceito_em %}
-                                                {{ trustline.aceito_em|date:"d/m/Y" }}
+                                                <small>{{ trustline.aceito_em|date:"d/m/Y" }}</small>
+                                                <br>
+                                                <small class="text-muted">Aceita em</small>
                                             {% else %}
-                                                {{ trustline.criado_em|date:"d/m/Y" }}
+                                                <small>{{ trustline.criado_em|date:"d/m/Y" }}</small>
+                                                <br>
+                                                <small class="text-muted">Criada em</small>
                                             {% endif %}
                                         </td>
                                         <td>
                                             {% if trustline.status == 'pendente' and trustline.agente_b == agente %}
-                                                <button class="btn btn-sm btn-success" onclick="aceitarTrustline({{ trustline.id }})">
+                                                <button class="btn btn-sm btn-success mb-1" onclick="aceitarTrustline({{ trustline.id }})">
                                                     <i class="fas fa-check"></i> Aceitar
                                                 </button>
+                                                <br>
                                             {% endif %}
                                             {% if trustline.status == 'ativa' or trustline.status == 'pendente' %}
-                                                <button class="btn btn-sm btn-danger ms-1" onclick="encerrarTrustline({{ trustline.id }})" title="Encerrar trustline">
+                                                <button class="btn btn-sm btn-danger" onclick="encerrarTrustline({{ trustline.id }})" title="Encerrar trustline">
                                                     <i class="fas fa-times"></i> Encerrar
                                                 </button>
                                             {% endif %}
