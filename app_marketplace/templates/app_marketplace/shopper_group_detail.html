@@ -295,14 +295,47 @@
                     <div class="activity-card mb-3">
                         <h5 class="mb-3">
                             <i class="fas fa-user-plus text-success"></i>
-                            Adicionar Novo Participante
+                            Adicionar Participante do Cadastro
                         </h5>
-                        <form id="addParticipantForm" class="row g-3">
+                        
+                        <!-- Botão para carregar clientes -->
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-primary" onclick="loadAvailableClients()">
+                                <i class="fas fa-sync-alt"></i> Carregar Clientes Disponíveis
+                            </button>
+                        </div>
+                        
+                        <!-- Lista de Clientes Próprios -->
+                        <div id="clientesPropriosSection" style="display: none;">
+                            <h6 class="text-success mb-2">
+                                <i class="fas fa-user-check"></i> Meus Clientes
+                            </h6>
+                            <div id="clientesPropriosList" class="mb-3"></div>
+                        </div>
+                        
+                        <!-- Lista de Clientes via Trustline -->
+                        <div id="clientesTrustlineSection" style="display: none;">
+                            <h6 class="text-warning mb-2">
+                                <i class="fas fa-handshake"></i> Clientes via Trustline
+                                <small class="text-muted">(Requer permissão do dono da carteira)</small>
+                            </h6>
+                            <div id="clientesTrustlineList" class="mb-3"></div>
+                        </div>
+                        
+                        <!-- Formulário manual (fallback) -->
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleManualForm()">
+                                <i class="fas fa-phone"></i> Adicionar Manualmente (Telefone)
+                            </button>
+                        </div>
+                        
+                        <form id="addParticipantForm" class="row g-3 mt-2" style="display: none;">
                             {% csrf_token %}
+                            <input type="hidden" id="participant_cliente_id">
                             <div class="col-md-5">
                                 <label for="participant_phone" class="form-label">Telefone WhatsApp</label>
                                 <input type="text" class="form-control" id="participant_phone" 
-                                       placeholder="+5511999999999" required>
+                                       placeholder="+5511999999999">
                                 <small class="form-text text-muted">Formato: +5511999999999</small>
                             </div>
                             <div class="col-md-5">
@@ -511,26 +544,99 @@
         console.log('Enviando mensagem para o grupo...');
     }
 
-    // Adicionar participante via AJAX
-    document.getElementById('addParticipantForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const phone = document.getElementById('participant_phone').value.trim();
-        const name = document.getElementById('participant_name').value.trim();
+    // Carregar clientes disponíveis
+    async function loadAvailableClients() {
         const messageDiv = document.getElementById('addParticipantMessage');
-        const form = this;
+        messageDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Carregando clientes...</div>';
         
-        if (!phone) {
-            messageDiv.innerHTML = '<div class="alert alert-danger">Telefone é obrigatório!</div>';
-            return;
+        try {
+            const response = await fetch(`{% url 'api_get_available_clients' group.id %}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                if (data.clientes_proprios && data.clientes_proprios.length > 0) {
+                    displayClientesProprios(data.clientes_proprios);
+                    document.getElementById('clientesPropriosSection').style.display = 'block';
+                }
+                
+                if (data.clientes_trustline && data.clientes_trustline.length > 0) {
+                    displayClientesTrustline(data.clientes_trustline);
+                    document.getElementById('clientesTrustlineSection').style.display = 'block';
+                }
+                
+                messageDiv.innerHTML = '';
+            } else {
+                messageDiv.innerHTML = `<div class="alert alert-danger">${data.error || 'Erro ao carregar clientes'}</div>`;
+            }
+        } catch (error) {
+            messageDiv.innerHTML = `<div class="alert alert-danger">Erro: ${error.message}</div>`;
         }
+    }
+    
+    function displayClientesProprios(clientes) {
+        const listDiv = document.getElementById('clientesPropriosList');
+        listDiv.innerHTML = '';
         
-        // Desabilitar formulário
-        form.querySelector('button[type="submit"]').disabled = true;
+        clientes.forEach(cliente => {
+            const item = document.createElement('div');
+            item.className = 'participant-item mb-2';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${cliente.name}</strong>
+                        <br>
+                        <small class="text-muted">${cliente.phone}</small>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="addClienteToGroup(${cliente.id}, '${cliente.phone}', '${cliente.name.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </div>
+            `;
+            listDiv.appendChild(item);
+        });
+    }
+    
+    function displayClientesTrustline(clientes) {
+        const listDiv = document.getElementById('clientesTrustlineList');
+        listDiv.innerHTML = '';
+        
+        clientes.forEach(cliente => {
+            const item = document.createElement('div');
+            item.className = 'participant-item mb-2 border-warning';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${cliente.name}</strong>
+                        <br>
+                        <small class="text-muted">${cliente.phone}</small>
+                        <br>
+                        <small class="text-warning">
+                            <i class="fas fa-info-circle"></i> Carteira de: ${cliente.owner_name}
+                        </small>
+                    </div>
+                    <div>
+                        ${cliente.has_permission ? 
+                            `<button class="btn btn-sm btn-success" onclick="addClienteToGroup(${cliente.id}, '${cliente.phone}', '${cliente.name.replace(/'/g, "\\'")}')">
+                                <i class="fas fa-check"></i> Adicionar
+                            </button>` :
+                            cliente.permission_pending ?
+                            `<span class="badge bg-warning">Aguardando aprovação</span>` :
+                            `<button class="btn btn-sm btn-warning" onclick="requestPermission(${cliente.id}, ${cliente.owner_id}, '${cliente.name.replace(/'/g, "\\'")}', '${cliente.owner_name.replace(/'/g, "\\'")}')">
+                                <i class="fas fa-hand-paper"></i> Solicitar Permissão
+                            </button>`
+                        }
+                    </div>
+                </div>
+            `;
+            listDiv.appendChild(item);
+        });
+    }
+    
+    async function addClienteToGroup(clienteId, phone, name) {
+        const messageDiv = document.getElementById('addParticipantMessage');
         messageDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Adicionando participante...</div>';
         
         try {
-            // Obter CSRF token
             const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
             
             const response = await fetch(`{% url 'api_add_participant' group.id %}`, {
@@ -540,6 +646,7 @@
                     'X-CSRFToken': csrftoken
                 },
                 body: JSON.stringify({
+                    cliente_id: clienteId,
                     phone: phone,
                     name: name
                 })
@@ -549,27 +656,151 @@
             
             if (response.ok && data.success) {
                 messageDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check"></i> Participante adicionado com sucesso!</div>';
-                form.reset();
-                
-                // Adicionar participante à lista
                 addParticipantToList(data.participant);
-                
-                // Atualizar contador
                 updateParticipantCount();
-                
-                // Limpar mensagem após 3 segundos
                 setTimeout(() => {
                     messageDiv.innerHTML = '';
                 }, 3000);
+            } else if (data.needs_permission) {
+                showPermissionRequestModal(data);
             } else {
-                messageDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> ${data.error || 'Erro ao adicionar participante'}</div>`;
+                messageDiv.innerHTML = `<div class="alert alert-danger">${data.error || 'Erro ao adicionar participante'}</div>`;
             }
         } catch (error) {
-            messageDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> Erro: ${error.message}</div>`;
-        } finally {
-            form.querySelector('button[type="submit"]').disabled = false;
+            messageDiv.innerHTML = `<div class="alert alert-danger">Erro: ${error.message}</div>`;
         }
-    });
+    }
+    
+    async function requestPermission(clienteId, ownerId, clienteName, ownerName) {
+        const message = prompt(`Solicitar permissão para adicionar ${clienteName}?\n\nDono da carteira: ${ownerName}\n\nMensagem (opcional):`);
+        if (message === null) return;
+        
+        const messageDiv = document.getElementById('addParticipantMessage');
+        messageDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Enviando solicitação...</div>';
+        
+        try {
+            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            const response = await fetch(`{% url 'api_request_participant_permission' group.id %}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({
+                    cliente_id: clienteId,
+                    carteira_owner_id: ownerId,
+                    message: message || ''
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                messageDiv.innerHTML = `<div class="alert alert-success">
+                    <i class="fas fa-check"></i> Solicitação enviada! O dono da carteira será notificado.
+                </div>`;
+                setTimeout(() => {
+                    loadAvailableClients();
+                }, 2000);
+            } else {
+                messageDiv.innerHTML = `<div class="alert alert-danger">${data.error || 'Erro ao enviar solicitação'}</div>`;
+            }
+        } catch (error) {
+            messageDiv.innerHTML = `<div class="alert alert-danger">Erro: ${error.message}</div>`;
+        }
+    }
+    
+    function toggleManualForm() {
+        const form = document.getElementById('addParticipantForm');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    function showPermissionRequestModal(data) {
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Solicitar Permissão</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Este cliente pertence à carteira de <strong>${data.carteira_owner_name}</strong>.</p>
+                        <p>É necessário solicitar permissão para adicioná-lo ao grupo.</p>
+                        <textarea id="permissionMessage" class="form-control" placeholder="Mensagem opcional..."></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="sendPermissionRequest(${data.cliente_id}, ${data.carteira_owner_id})">Enviar Solicitação</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+    }
+
+    // Adicionar participante via AJAX (formulário manual)
+    const addParticipantForm = document.getElementById('addParticipantForm');
+    if (addParticipantForm) {
+        addParticipantForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const phone = document.getElementById('participant_phone').value.trim();
+            const name = document.getElementById('participant_name').value.trim();
+            const clienteId = document.getElementById('participant_cliente_id').value;
+            const messageDiv = document.getElementById('addParticipantMessage');
+            const form = this;
+            
+            if (!phone && !clienteId) {
+                messageDiv.innerHTML = '<div class="alert alert-danger">Telefone ou cliente é obrigatório!</div>';
+                return;
+            }
+            
+            form.querySelector('button[type="submit"]').disabled = true;
+            messageDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Adicionando participante...</div>';
+            
+            try {
+                const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                
+                const response = await fetch(`{% url 'api_add_participant' group.id %}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify({
+                        cliente_id: clienteId || null,
+                        phone: phone,
+                        name: name
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    messageDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check"></i> Participante adicionado com sucesso!</div>';
+                    form.reset();
+                    addParticipantToList(data.participant);
+                    updateParticipantCount();
+                    setTimeout(() => {
+                        messageDiv.innerHTML = '';
+                    }, 3000);
+                } else if (data.needs_permission) {
+                    showPermissionRequestModal(data);
+                } else {
+                    messageDiv.innerHTML = `<div class="alert alert-danger">${data.error || 'Erro ao adicionar participante'}</div>`;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = `<div class="alert alert-danger">Erro: ${error.message}</div>`;
+            } finally {
+                form.querySelector('button[type="submit"]').disabled = false;
+            }
+        });
+    }
     
     function addParticipantToList(participant) {
         const participantsList = document.getElementById('participantsList');

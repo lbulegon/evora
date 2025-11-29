@@ -18,7 +18,9 @@ from decimal import Decimal
 from .models import (
     PersonalShopper, WhatsappGroup, WhatsappParticipant, 
     WhatsappMessage, WhatsappProduct, WhatsappOrder,
-    Cliente, Produto, Categoria
+    Cliente, Produto, Categoria, Agente, ClienteRelacao,
+    RelacionamentoClienteShopper, TrustlineKeeper,
+    ParticipantPermissionRequest, CarteiraCliente
 )
 from .whatsapp_views import send_message, send_reaction
 
@@ -247,19 +249,271 @@ def update_group(request, group_id):
 
 
 @login_required
-@require_http_methods(["POST"])
-def add_participant(request, group_id):
-    """Adicionar participante ao grupo"""
+def get_available_clients(request, group_id):
+    """Buscar clientes disponíveis para adicionar ao grupo"""
     if not (request.user.is_shopper or request.user.is_address_keeper):
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
-        # Verificar se o grupo pertence ao usuário (owner)
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        
+        # Buscar agente do shopper
+        agente = None
+        if request.user.is_shopper and hasattr(request.user, 'agente'):
+            agente = request.user.agente
+        elif request.user.is_shopper and hasattr(request.user, 'personalshopper'):
+            # Criar agente se não existir
+            try:
+                agente = Agente.objects.get(user=request.user)
+            except Agente.DoesNotExist:
+                agente = None
+        
+        clientes_proprios = []
+        clientes_trustline = []
+        
+        if agente:
+            # 1. Clientes próprios do agente
+            # Via ClienteRelacao
+            relacoes_proprias = ClienteRelacao.objects.filter(
+                agente=agente,
+                status='ativa'
+            ).select_related('cliente', 'cliente__user')
+            
+            for relacao in relacoes_proprias:
+                cliente = relacao.cliente
+                telefone = cliente.telefone or (cliente.user.username if cliente.user else '')
+                if telefone:
+                    clientes_proprios.append({
+                        'id': cliente.id,
+                        'name': cliente.user.get_full_name() or cliente.user.username,
+                        'phone': telefone,
+                        'owner': 'proprio',
+                        'owner_name': request.user.get_full_name() or request.user.username
+                    })
+            
+            # Via RelacionamentoClienteShopper (compatibilidade)
+            if agente.personal_shopper:
+                relacionamentos = RelacionamentoClienteShopper.objects.filter(
+                    personal_shopper=agente.personal_shopper,
+                    status='seguindo'
+                ).select_related('cliente', 'cliente__user')
+                
+                for rel in relacionamentos:
+                    cliente = rel.cliente
+                    telefone = cliente.telefone or (cliente.user.username if cliente.user else '')
+                    if telefone and not any(c['id'] == cliente.id for c in clientes_proprios):
+                        clientes_proprios.append({
+                            'id': cliente.id,
+                            'name': cliente.user.get_full_name() or cliente.user.username,
+                            'phone': telefone,
+                            'owner': 'proprio',
+                            'owner_name': request.user.get_full_name() or request.user.username
+                        })
+            
+            # 2. Clientes via trustlines
+            trustlines_ativas = TrustlineKeeper.objects.filter(
+                Q(agente_a=agente) | Q(agente_b=agente),
+                status=TrustlineKeeper.StatusTrustline.ATIVA
+            ).defer('tipo_compartilhamento').select_related('agente_a__user', 'agente_b__user')
+            
+            for trustline in trustlines_ativas:
+                parceiro = trustline.agente_b if trustline.agente_a == agente else trustline.agente_a
+                
+                # Buscar clientes do parceiro
+                relacoes_parceiro = ClienteRelacao.objects.filter(
+                    agente=parceiro,
+                    status='ativa'
+                ).select_related('cliente', 'cliente__user')
+                
+                for relacao in relacoes_parceiro:
+                    cliente = relacao.cliente
+                    telefone = cliente.telefone or (cliente.user.username if cliente.user else '')
+                    if telefone:
+                        # Verificar se já existe permissão
+                        permission = ParticipantPermissionRequest.objects.filter(
+                            group=group,
+                            cliente=cliente,
+                            status__in=['pendente', 'aprovado']
+                        ).first()
+                        
+                        has_permission = False
+                        permission_pending = False
+                        permission_id = None
+                        
+                        if permission:
+                            has_permission = permission.status == 'aprovado'
+                            permission_pending = permission.status == 'pendente'
+                            permission_id = permission.id
+                        
+                        clientes_trustline.append({
+                            'id': cliente.id,
+                            'name': cliente.user.get_full_name() or cliente.user.username,
+                            'phone': telefone,
+                            'owner': 'trustline',
+                            'owner_name': parceiro.user.get_full_name() or parceiro.user.username,
+                            'owner_id': parceiro.user.id,
+                            'trustline_id': trustline.id,
+                            'has_permission': has_permission,
+                            'permission_pending': permission_pending,
+                            'permission_id': permission_id
+                        })
+        
+        return JsonResponse({
+            'success': True,
+            'clientes_proprios': clientes_proprios,
+            'clientes_trustline': clientes_trustline
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def request_participant_permission(request, group_id):
+    """Solicitar permissão para adicionar cliente de outro shopper"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
         group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
         data = json.loads(request.body)
         
+        cliente_id = data.get('cliente_id')
+        carteira_owner_id = data.get('carteira_owner_id')
+        message = data.get('message', '')
+        
+        if not cliente_id or not carteira_owner_id:
+            return JsonResponse({'error': 'Cliente e dono da carteira são obrigatórios'}, status=400)
+        
+        cliente = get_object_or_404(Cliente, id=cliente_id)
+        carteira_owner = get_object_or_404(User, id=carteira_owner_id)
+        
+        # Verificar se já existe solicitação pendente ou aprovada
+        existing = ParticipantPermissionRequest.objects.filter(
+            group=group,
+            cliente=cliente,
+            status__in=['pendente', 'aprovado']
+        ).first()
+        
+        if existing:
+            if existing.status == 'aprovado':
+                return JsonResponse({
+                    'error': 'Permissão já foi aprovada para este cliente',
+                    'permission_id': existing.id,
+                    'already_approved': True
+                }, status=400)
+            else:
+                return JsonResponse({
+                    'error': 'Já existe uma solicitação pendente para este cliente',
+                    'permission_id': existing.id
+                }, status=400)
+        
+        # Criar solicitação
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        permission_request = ParticipantPermissionRequest.objects.create(
+            group=group,
+            cliente=cliente,
+            requested_by=request.user,
+            carteira_owner=carteira_owner,
+            message=message,
+            expires_at=timezone.now() + timedelta(days=7)  # Expira em 7 dias
+        )
+        
+        # TODO: Enviar notificação para o dono da carteira
+        
+        return JsonResponse({
+            'success': True,
+            'permission_request': {
+                'id': permission_request.id,
+                'status': permission_request.status,
+                'requested_at': permission_request.requested_at.isoformat()
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def add_participant(request, group_id):
+    """Adicionar participante ao grupo (agora com verificação de permissões)"""
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        data = json.loads(request.body)
+        
+        cliente_id = data.get('cliente_id')
         phone = data.get('phone')
         name = data.get('name', '')
+        
+        cliente = None
+        needs_permission = False
+        carteira_owner = None
+        
+        # Se cliente_id foi fornecido, buscar o cliente
+        if cliente_id:
+            try:
+                cliente = Cliente.objects.get(id=cliente_id)
+                name = name or (cliente.user.get_full_name() or cliente.user.username)
+                phone = phone or cliente.telefone
+                
+                # Verificar se o cliente pertence à carteira de outro shopper
+                if cliente.wallet and cliente.wallet.owner != request.user:
+                    carteira_owner = cliente.wallet.owner
+                    needs_permission = True
+                else:
+                    # Verificar via ClienteRelacao
+                    relacao = ClienteRelacao.objects.filter(
+                        cliente=cliente,
+                        status='ativa'
+                    ).select_related('agente__user').first()
+                    
+                    if relacao and relacao.agente.user != request.user:
+                        carteira_owner = relacao.agente.user
+                        needs_permission = True
+            except Cliente.DoesNotExist:
+                pass
+        
+        # Se precisa de permissão e não foi fornecida, retornar erro
+        if needs_permission and carteira_owner:
+            # Verificar se já existe permissão aprovada
+            permission = ParticipantPermissionRequest.objects.filter(
+                group=group,
+                cliente=cliente,
+                carteira_owner=carteira_owner,
+                status='aprovado'
+            ).first()
+            
+            if not permission:
+                # Verificar se existe solicitação pendente
+                pending = ParticipantPermissionRequest.objects.filter(
+                    group=group,
+                    cliente=cliente,
+                    carteira_owner=carteira_owner,
+                    status='pendente'
+                ).first()
+                
+                if pending:
+                    return JsonResponse({
+                        'error': 'Aguardando aprovação do dono da carteira',
+                        'needs_permission': True,
+                        'permission_id': pending.id,
+                        'carteira_owner_name': carteira_owner.get_full_name() or carteira_owner.username
+                    }, status=403)
+                else:
+                    return JsonResponse({
+                        'error': 'É necessário solicitar permissão ao dono da carteira',
+                        'needs_permission': True,
+                        'cliente_id': cliente.id,
+                        'carteira_owner_id': carteira_owner.id,
+                        'carteira_owner_name': carteira_owner.get_full_name() or carteira_owner.username
+                    }, status=403)
         
         if not phone:
             return JsonResponse({'error': 'Telefone é obrigatório'}, status=400)
@@ -267,7 +521,6 @@ def add_participant(request, group_id):
         # Limpar e formatar telefone
         phone = phone.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
         if not phone.startswith('+'):
-            # Se não começar com +, assumir que é brasileiro
             if phone.startswith('55'):
                 phone = '+' + phone
             elif phone.startswith('0'):
@@ -279,15 +532,14 @@ def add_participant(request, group_id):
         if WhatsappParticipant.objects.filter(group=group, phone=phone).exists():
             return JsonResponse({'error': 'Participante já cadastrado neste grupo'}, status=400)
         
-        # Tentar vincular com cliente existente pelo telefone
-        cliente = None
-        try:
-            # Buscar cliente pelo telefone
-            cliente = Cliente.objects.filter(
-                telefone__icontains=phone.replace('+', '')
-            ).first()
-        except:
-            pass
+        # Se não foi fornecido cliente_id, tentar buscar pelo telefone
+        if not cliente:
+            try:
+                cliente = Cliente.objects.filter(
+                    telefone__icontains=phone.replace('+', '')
+                ).first()
+            except:
+                pass
         
         # Criar participante
         participant = WhatsappParticipant.objects.create(
@@ -308,6 +560,66 @@ def add_participant(request, group_id):
             }
         })
         
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def respond_permission_request(request, permission_id):
+    """Aprovar ou rejeitar solicitação de permissão"""
+    try:
+        permission = get_object_or_404(ParticipantPermissionRequest, id=permission_id)
+        
+        # Verificar se o usuário é o dono da carteira
+        if permission.carteira_owner != request.user:
+            return JsonResponse({'error': 'Você não tem permissão para responder esta solicitação'}, status=403)
+        
+        data = json.loads(request.body)
+        action = data.get('action')  # 'approve' ou 'reject'
+        response_message = data.get('message', '')
+        
+        if action == 'approve':
+            permission.approve(response_message)
+            # Criar participante automaticamente após aprovação
+            try:
+                cliente = permission.cliente
+                phone = cliente.telefone or (cliente.user.username if cliente.user else '')
+                if phone:
+                    # Formatar telefone
+                    phone = phone.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+                    if not phone.startswith('+'):
+                        if phone.startswith('55'):
+                            phone = '+' + phone
+                        elif phone.startswith('0'):
+                            phone = '+55' + phone[1:]
+                        else:
+                            phone = '+55' + phone
+                    
+                    # Verificar se já existe
+                    if not WhatsappParticipant.objects.filter(group=permission.group, phone=phone).exists():
+                        WhatsappParticipant.objects.create(
+                            group=permission.group,
+                            phone=phone,
+                            name=cliente.user.get_full_name() or cliente.user.username,
+                            cliente=cliente
+                        )
+            except Exception as e:
+                pass  # Logar erro mas não falhar a aprovação
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Permissão aprovada e participante adicionado ao grupo'
+            })
+        elif action == 'reject':
+            permission.reject(response_message)
+            return JsonResponse({
+                'success': True,
+                'message': 'Permissão rejeitada'
+            })
+        else:
+            return JsonResponse({'error': 'Ação inválida'}, status=400)
+            
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
