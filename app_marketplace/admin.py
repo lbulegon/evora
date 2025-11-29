@@ -174,8 +174,23 @@ class PersonalShopperAdmin(admin.ModelAdmin):
 
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'slug']
+    list_display = ['nome', 'slug', 'total_produtos']
     prepopulated_fields = {'slug': ('nome',)}
+    search_fields = ['nome', 'slug']
+    list_filter = ['nome']
+    ordering = ['nome']
+    
+    def total_produtos(self, obj):
+        """Retorna o total de produtos nesta categoria"""
+        return obj.produtos.count()
+    total_produtos.short_description = 'Total de Produtos'
+    total_produtos.admin_order_field = 'produtos__count'
+    
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('nome', 'slug')
+        }),
+    )
 
 @admin.register(Produto)
 class ProdutoAdmin(admin.ModelAdmin):

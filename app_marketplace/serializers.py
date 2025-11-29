@@ -65,7 +65,7 @@ class ClienteRelacaoSerializer(serializers.ModelSerializer):
 
 class ProdutoSerializer(serializers.ModelSerializer):
     """Serializer para Produto"""
-    categoria_nome = serializers.CharField(source='categoria.nome', read_only=True)
+    categoria_nome = serializers.SerializerMethodField()
     empresa_nome = serializers.CharField(source='empresa.nome', read_only=True)
     
     class Meta:
@@ -75,6 +75,10 @@ class ProdutoSerializer(serializers.ModelSerializer):
             'empresa', 'empresa_nome', 'imagem', 'ativo', 'criado_em'
         ]
         read_only_fields = ['id', 'criado_em']
+    
+    def get_categoria_nome(self, obj):
+        """Retorna o nome da categoria se existir, senão None"""
+        return obj.categoria.nome if obj.categoria else None
 
 
 class EstoqueItemSerializer(serializers.ModelSerializer):
