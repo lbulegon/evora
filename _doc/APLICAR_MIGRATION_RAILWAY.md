@@ -43,3 +43,4 @@ ALTER COLUMN message_id DROP NOT NULL;
 
 Após aplicar a migration ou o SQL, **teste criar um produto novamente**. O erro deve desaparecer.
 
+

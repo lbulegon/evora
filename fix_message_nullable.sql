@@ -11,3 +11,4 @@ ALTER COLUMN message_id DROP NOT NULL;
 -- WHERE table_name = 'app_marketplace_whatsappproduct' 
 -- AND column_name = 'message_id';
 
+
