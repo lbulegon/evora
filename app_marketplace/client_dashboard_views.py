@@ -15,7 +15,7 @@ from .models import (
     Cliente, Pedido, Pacote, PedidoPacote, EnderecoEntrega,
     WhatsappOrder, PagamentoIntent, MovimentoPacote, FotoPacote,
     WhatsappGroup, WhatsappProduct, WhatsappParticipant,
-    RelacionamentoClienteShopper, PersonalShopper, LigacaoMesh
+    RelacionamentoClienteShopper, PersonalShopper, LigacaoMesh, TrustlineKeeper
 )
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
@@ -373,29 +373,65 @@ def client_products(request):
     relacionamentos = RelacionamentoClienteShopper.objects.filter(
         cliente=cliente,
         status=RelacionamentoClienteShopper.Status.SEGUINDO
-    ).select_related('personal_shopper', 'personal_shopper__user')
+    ).select_related('personal_shopper', 'personal_shopper__user', 'personal_shopper__agente_profile', 'personal_shopper__agente_profile__user')
     
-    # IDs dos usuários (owners) dos shoppers seguidos
+    # IDs dos usuários (owners) dos shoppers seguidos e conectados via KMN
     users_com_mesh = set()
     
-    # Adicionar os próprios shoppers seguidos
+    # Adicionar os próprios shoppers seguidos e buscar conexões KMN
     for relacao in relacionamentos:
         if relacao.personal_shopper and relacao.personal_shopper.user:
             shopper_user = relacao.personal_shopper.user
             users_com_mesh.add(shopper_user.id)
             
-            # Buscar LigacaoMesh onde este shopper está envolvido
-            mesh_ligacoes = LigacaoMesh.objects.filter(
-                (Q(agente_a=shopper_user) | Q(agente_b=shopper_user)),
-                ativo=True
-            ).select_related('agente_a', 'agente_b')
+            # Buscar LigacaoMesh onde este shopper está envolvido (se existir)
+            try:
+                mesh_ligacoes = LigacaoMesh.objects.filter(
+                    (Q(agente_a=shopper_user) | Q(agente_b=shopper_user)),
+                    ativo=True
+                ).select_related('agente_a', 'agente_b')
+                
+                # Adicionar os outros agentes das ligações Mesh
+                for mesh in mesh_ligacoes:
+                    if mesh.agente_a_id == shopper_user.id:
+                        users_com_mesh.add(mesh.agente_b_id)
+                    elif mesh.agente_b_id == shopper_user.id:
+                        users_com_mesh.add(mesh.agente_a_id)
+            except Exception:
+                # LigacaoMesh pode não estar disponível, continuar
+                pass
             
-            # Adicionar os outros agentes das ligações Mesh
-            for mesh in mesh_ligacoes:
-                if mesh.agente_a_id == shopper_user.id:
-                    users_com_mesh.add(mesh.agente_b_id)
-                elif mesh.agente_b_id == shopper_user.id:
-                    users_com_mesh.add(mesh.agente_a_id)
+            # Buscar TrustlineKeeper (KMN) via Agente
+            try:
+                # Verificar se o PersonalShopper tem um Agente vinculado
+                if hasattr(relacao.personal_shopper, 'agente_profile') and relacao.personal_shopper.agente_profile:
+                    agente_shopper = relacao.personal_shopper.agente_profile
+                    
+                    # Buscar TrustlineKeeper ativas onde este agente está envolvido
+                    trustlines = TrustlineKeeper.objects.filter(
+                        (Q(agente_a=agente_shopper) | Q(agente_b=agente_shopper)),
+                        status=TrustlineKeeper.StatusTrustline.ATIVA
+                    ).select_related('agente_a__user', 'agente_b__user', 'agente_a__personal_shopper', 'agente_b__personal_shopper')
+                    
+                    # Para cada trustline, pegar o outro agente e seu PersonalShopper (se existir)
+                    for trustline in trustlines:
+                        outro_agente = None
+                        if trustline.agente_a == agente_shopper:
+                            outro_agente = trustline.agente_b
+                        else:
+                            outro_agente = trustline.agente_a
+                        
+                        # Se o outro agente tem um PersonalShopper vinculado, adicionar o User dele
+                        if outro_agente and hasattr(outro_agente, 'personal_shopper') and outro_agente.personal_shopper:
+                            outro_shopper_user = outro_agente.personal_shopper.user
+                            if outro_shopper_user:
+                                users_com_mesh.add(outro_shopper_user.id)
+            except Exception as e:
+                # TrustlineKeeper ou Agente podem não estar disponíveis, continuar
+                import traceback
+                print(f"Erro ao buscar TrustlineKeeper: {e}")
+                traceback.print_exc()
+                pass
     
     # 2. Buscar grupos dos agentes conectados via Mesh (incluindo os seguidos diretamente)
     grupos_validos = WhatsappGroup.objects.filter(
