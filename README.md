@@ -183,3 +183,8 @@ Este projeto está sob a licença MIT.
 **ÉVORA Connect** - *Where form becomes community. Where trust becomes network.*
 
 ✨ **Minimalist, Sophisticated Style** ✨
+
+
+
+chat Id
+7b059999-6bdf-47d9-a806-ddd9a3b9be53
