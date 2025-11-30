@@ -370,49 +370,36 @@ def client_products(request):
         return redirect('home')
     
     # 1. Buscar shoppers que o cliente está seguindo
-    shoppers_seguindo = RelacionamentoClienteShopper.objects.filter(
+    relacionamentos = RelacionamentoClienteShopper.objects.filter(
         cliente=cliente,
         status=RelacionamentoClienteShopper.Status.SEGUINDO
-    ).values_list('personal_shopper_id', flat=True)
+    ).select_related('personal_shopper', 'personal_shopper__user')
     
     # IDs dos usuários (owners) dos shoppers seguidos
-    users_shoppers_seguidos = PersonalShopper.objects.filter(
-        id__in=shoppers_seguindo
-    ).values_list('user_id', flat=True)
+    users_com_mesh = set()
     
-    # 2. Buscar grupos desses shoppers seguidos
-    grupos_shoppers_seguidos = WhatsappGroup.objects.filter(
-        owner_id__in=users_shoppers_seguidos,
-        active=True
-    )
-    
-    # 3. Buscar agentes conectados via LigacaoMesh aos shoppers seguidos
-    # Para cada shopper seguido, buscar LigacaoMesh ativas
-    users_com_mesh = set(users_shoppers_seguidos)  # Incluir os próprios shoppers seguidos
-    
-    for shopper_id in shoppers_seguindo:
-        try:
-            shopper = PersonalShopper.objects.get(id=shopper_id)
-            shopper_user = shopper.user
+    # Adicionar os próprios shoppers seguidos
+    for relacao in relacionamentos:
+        if relacao.personal_shopper and relacao.personal_shopper.user:
+            shopper_user = relacao.personal_shopper.user
+            users_com_mesh.add(shopper_user.id)
             
             # Buscar LigacaoMesh onde este shopper está envolvido
             mesh_ligacoes = LigacaoMesh.objects.filter(
-                Q(agente_a=shopper_user) | Q(agente_b=shopper_user),
+                (Q(agente_a=shopper_user) | Q(agente_b=shopper_user)),
                 ativo=True
-            )
+            ).select_related('agente_a', 'agente_b')
             
-            # Adicionar os outros agentes das ligações
+            # Adicionar os outros agentes das ligações Mesh
             for mesh in mesh_ligacoes:
-                if mesh.agente_a == shopper_user:
+                if mesh.agente_a_id == shopper_user.id:
                     users_com_mesh.add(mesh.agente_b_id)
-                else:
+                elif mesh.agente_b_id == shopper_user.id:
                     users_com_mesh.add(mesh.agente_a_id)
-        except PersonalShopper.DoesNotExist:
-            continue
     
-    # 4. Buscar grupos dos agentes conectados via Mesh (incluindo os seguidos diretamente)
+    # 2. Buscar grupos dos agentes conectados via Mesh (incluindo os seguidos diretamente)
     grupos_validos = WhatsappGroup.objects.filter(
-        owner_id__in=users_com_mesh,
+        owner_id__in=list(users_com_mesh),
         active=True
     )
     
