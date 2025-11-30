@@ -87,15 +87,15 @@ def client_dashboard(request):
     
     total_pedidos = pedidos.count()
     
-    # Pedidos por status
-    pedidos_pendentes = pedidos.filter(status='pendente').count()
+    # Pedidos por status (usando status corretos do modelo)
+    pedidos_pendentes = pedidos.filter(status__in=['criado', 'aguardando_pagamento']).count()
     pedidos_pagos = pedidos.filter(status='pago').count()
-    pedidos_enviados = pedidos.filter(status='enviado').count()
-    pedidos_entregues = pedidos.filter(status='entregue').count()
+    pedidos_enviados = pedidos.filter(status='em_transporte').count()
+    pedidos_entregues = pedidos.filter(status='concluido').count()
     
-    # Total gasto
+    # Total gasto (pedidos pagos ou concluídos)
     total_gasto = pedidos.filter(
-        status__in=['pago', 'enviado', 'entregue']
+        status__in=['pago', 'em_preparacao', 'em_transporte', 'concluido']
     ).aggregate(total=Sum('valor_total'))['total'] or Decimal('0')
     
     # ========== PEDIDOS WHATSAPP ==========
@@ -120,7 +120,7 @@ def client_dashboard(request):
     total_pacotes = pacotes.count()
     
     pacotes_em_guarda = pacotes.filter(status='em_guarda').count()
-    pacotes_enviados = pacotes.filter(status='enviado').count()
+    pacotes_enviados = pacotes.filter(status='despachado').count()
     pacotes_entregues = pacotes.filter(status='entregue').count()
     
     # ========== ENDEREÇOS ==========
