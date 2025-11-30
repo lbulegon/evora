@@ -623,7 +623,22 @@ def create_product(request):
         if estabelecimento_id:
             estabelecimento = get_object_or_404(Empresa, id=estabelecimento_id)
         
-        # Criar produto
+        # Buscar ou criar participante para o owner (obrigatório)
+        # Usar telefone do usuário ou username como fallback
+        phone = request.user.username
+        if hasattr(request.user, 'cliente') and request.user.cliente.telefone:
+            phone = request.user.cliente.telefone
+        
+        participant, _ = WhatsappParticipant.objects.get_or_create(
+            group=group,
+            phone=phone,
+            defaults={
+                'name': request.user.get_full_name() or request.user.username,
+                'is_admin': True
+            }
+        )
+        
+        # Criar produto (message é opcional - None para produtos criados diretamente)
         product = WhatsappProduct.objects.create(
             name=name,
             description=data.get('description', ''),
@@ -632,6 +647,8 @@ def create_product(request):
             brand=data.get('brand', ''),
             category=data.get('category', ''),
             group=group,
+            posted_by=participant,  # OBRIGATÓRIO
+            message=None,  # Opcional - None para produtos criados diretamente
             estabelecimento=estabelecimento,
             localizacao_especifica=data.get('localizacao_especifica', ''),
             codigo_barras=data.get('codigo_barras', ''),
