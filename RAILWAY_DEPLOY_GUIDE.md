@@ -3,10 +3,8 @@
 ## 🔧 **Configuração Atualizada**
 
 ### **1. Settings.py Otimizado**
-- ✅ Detecção automática Railway vs Local
 - ✅ DEBUG=False em produção
-- ✅ Banco PostgreSQL no Railway
-- ✅ SQLite local para desenvolvimento
+- ✅ Banco PostgreSQL (sempre)
 - ✅ Arquivos estáticos configurados
 
 ### **2. Railway.toml Configurado**
@@ -99,7 +97,7 @@ CSRF_TRUSTED_ORIGINS = [
 | Configuração | Local | Railway |
 |--------------|-------|---------|
 | DEBUG | True | False |
-| Database | SQLite | PostgreSQL |
+| Database | PostgreSQL | PostgreSQL |
 | Static Files | STATICFILES_DIRS | STATIC_ROOT |
 | ALLOWED_HOSTS | localhost | * |
 | Environment | Development | Production |

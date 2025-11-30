@@ -70,7 +70,7 @@ def reverter_migracao(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('app_marketplace', '0020_rename_keeper_to_address_keeper'),
+        ('app_marketplace', '0028_make_whatsapp_product_message_optional'),
     ]
 
     operations = [

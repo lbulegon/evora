@@ -4,13 +4,9 @@
 
 ### **1. Variáveis de Ambiente**
 ```bash
-# Local
-DEBUG=True
-DATABASE_URL=sqlite:///db.sqlite3
-
-# Railway
-DEBUG=False
-DATABASE_URL=postgresql://user:pass@host:port/db
+# Local e Railway
+DEBUG=True/False  # Depende do ambiente
+DATABASE_URL=postgresql://user:pass@host:port/db  # PostgreSQL sempre
 ```
 
 ### **2. Dependências**
@@ -36,29 +32,19 @@ from decouple import config
 # Detectar se está no Railway
 IS_RAILWAY = os.getenv('RAILWAY_ENVIRONMENT') is not None
 
-# Configurações baseadas no ambiente
-if IS_RAILWAY:
-    DEBUG = False
-    ALLOWED_HOSTS = ['*']
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('PGDATABASE'),
-            'USER': os.getenv('PGUSER'),
-            'PASSWORD': os.getenv('PGPASSWORD'),
-            'HOST': os.getenv('PGHOST'),
-            'PORT': os.getenv('PGPORT'),
-        }
+# Configurações - sempre PostgreSQL
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
+ALLOWED_HOSTS = ['*'] if not DEBUG else ['localhost', '127.0.0.1']
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('PGDATABASE', 'railway'),
+        'USER': os.getenv('PGUSER', 'postgres'),
+        'PASSWORD': os.getenv('PGPASSWORD', ''),
+        'HOST': os.getenv('PGHOST', 'localhost'),
+        'PORT': os.getenv('PGPORT', '5432'),
     }
-else:
-    DEBUG = True
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
 ```
 
 ### **2. Verificar Logs do Railway**

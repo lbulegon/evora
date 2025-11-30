@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('app_marketplace', '0022_migrar_dados_estabelecimento_para_empresa'),
+        ('app_marketplace', '0020_rename_keeper_to_address_keeper'),
     ]
 
     operations = [

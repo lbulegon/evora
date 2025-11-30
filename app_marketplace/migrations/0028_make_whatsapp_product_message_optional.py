@@ -4,6 +4,22 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
+def make_message_nullable_postgresql(apps, schema_editor):
+    """Garantir que message_id aceita NULL no PostgreSQL"""
+    schema_editor.execute(
+        'ALTER TABLE app_marketplace_whatsappproduct '
+        'ALTER COLUMN message_id DROP NOT NULL;'
+    )
+
+
+def reverse_make_message_nullable(apps, schema_editor):
+    """Reverter: tornar message_id obrigatório novamente"""
+    schema_editor.execute(
+        'ALTER TABLE app_marketplace_whatsappproduct '
+        'ALTER COLUMN message_id SET NOT NULL;'
+    )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -11,6 +27,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Alterar o campo no modelo Django
         migrations.AlterField(
             model_name='whatsappproduct',
             name='message',
@@ -20,5 +37,10 @@ class Migration(migrations.Migration):
             model_name='whatsappproduct',
             name='posted_by',
             field=models.ForeignKey(help_text='Participante que criou/postou este produto', on_delete=django.db.models.deletion.CASCADE, related_name='posted_products', to='app_marketplace.whatsappparticipant'),
+        ),
+        # Operação SQL direta para PostgreSQL
+        migrations.RunPython(
+            make_message_nullable_postgresql,
+            reverse_make_message_nullable,
         ),
     ]
