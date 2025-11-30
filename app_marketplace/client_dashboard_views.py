@@ -14,7 +14,8 @@ from decimal import Decimal
 from .models import (
     Cliente, Pedido, Pacote, PedidoPacote, EnderecoEntrega,
     WhatsappOrder, PagamentoIntent, MovimentoPacote, FotoPacote,
-    WhatsappGroup, WhatsappProduct, WhatsappParticipant
+    WhatsappGroup, WhatsappProduct, WhatsappParticipant,
+    RelacionamentoClienteShopper, PersonalShopper, LigacaoMesh
 )
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
@@ -350,7 +351,14 @@ def client_orders(request):
 
 @login_required
 def client_products(request):
-    """Lista de produtos disponíveis para o cliente (MVP)"""
+    """
+    Lista de produtos disponíveis para o cliente.
+    
+    REGRA DE NEGÓCIO:
+    1. Produtos aparecem se o cliente segue o shopper que criou o produto
+    2. OU se o shopper seguido tem KMN/TrustLine com outro shopper/keeper,
+       os produtos desse outro também aparecem (mas cliente só precisa seguir o shopper de origem)
+    """
     if not request.user.is_cliente:
         messages.error(request, "Acesso restrito a clientes.")
         return redirect('home')
@@ -361,14 +369,58 @@ def client_products(request):
         messages.error(request, "Perfil de cliente não encontrado.")
         return redirect('home')
     
-    # Buscar grupos onde o cliente é participante
-    participant_groups = WhatsappParticipant.objects.filter(
-        cliente=cliente
-    ).values_list('group_id', flat=True)
+    # 1. Buscar shoppers que o cliente está seguindo
+    shoppers_seguindo = RelacionamentoClienteShopper.objects.filter(
+        cliente=cliente,
+        status=RelacionamentoClienteShopper.Status.SEGUINDO
+    ).values_list('personal_shopper_id', flat=True)
     
-    # Buscar produtos dos grupos
+    # IDs dos usuários (owners) dos shoppers seguidos
+    users_shoppers_seguidos = PersonalShopper.objects.filter(
+        id__in=shoppers_seguindo
+    ).values_list('user_id', flat=True)
+    
+    # 2. Buscar grupos desses shoppers seguidos
+    grupos_shoppers_seguidos = WhatsappGroup.objects.filter(
+        owner_id__in=users_shoppers_seguidos,
+        active=True
+    )
+    
+    # 3. Buscar agentes conectados via LigacaoMesh aos shoppers seguidos
+    # Para cada shopper seguido, buscar LigacaoMesh ativas
+    users_com_mesh = set(users_shoppers_seguidos)  # Incluir os próprios shoppers seguidos
+    
+    for shopper_id in shoppers_seguindo:
+        try:
+            shopper = PersonalShopper.objects.get(id=shopper_id)
+            shopper_user = shopper.user
+            
+            # Buscar LigacaoMesh onde este shopper está envolvido
+            mesh_ligacoes = LigacaoMesh.objects.filter(
+                Q(agente_a=shopper_user) | Q(agente_b=shopper_user),
+                ativo=True
+            )
+            
+            # Adicionar os outros agentes das ligações
+            for mesh in mesh_ligacoes:
+                if mesh.agente_a == shopper_user:
+                    users_com_mesh.add(mesh.agente_b_id)
+                else:
+                    users_com_mesh.add(mesh.agente_a_id)
+        except PersonalShopper.DoesNotExist:
+            continue
+    
+    # 4. Buscar grupos dos agentes conectados via Mesh (incluindo os seguidos diretamente)
+    grupos_validos = WhatsappGroup.objects.filter(
+        owner_id__in=users_com_mesh,
+        active=True
+    )
+    
+    group_ids_validos = grupos_validos.values_list('id', flat=True)
+    
+    # 5. Buscar produtos dos grupos válidos
     products = WhatsappProduct.objects.filter(
-        group_id__in=participant_groups,
+        group_id__in=group_ids_validos,
         is_available=True
     ).order_by('-is_featured', '-created_at')
     
@@ -390,8 +442,8 @@ def client_products(request):
     if group_id:
         products = products.filter(group_id=group_id)
     
-    # Grupos disponíveis
-    groups = WhatsappGroup.objects.filter(id__in=participant_groups).order_by('name')
+    # Grupos disponíveis (apenas os válidos pela regra de negócio)
+    groups = grupos_validos.order_by('name')
     
     # Paginação
     paginator = Paginator(products, 12)
