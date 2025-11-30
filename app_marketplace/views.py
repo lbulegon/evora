@@ -222,7 +222,7 @@ def escolher_shoppers(request):
     # Obter shoppers que o cliente já segue
     shoppers_seguindo = RelacionamentoClienteShopper.objects.filter(
         cliente=cliente,
-        status='seguindo'
+        status=RelacionamentoClienteShopper.Status.SEGUINDO
     ).values_list('personal_shopper_id', flat=True)
     
     # Processar ação (seguir/deixar de seguir)
@@ -238,10 +238,10 @@ def escolher_shoppers(request):
                 relacao, created = RelacionamentoClienteShopper.objects.get_or_create(
                     cliente=cliente,
                     personal_shopper=shopper,
-                    defaults={'status': 'seguindo'}
+                    defaults={'status': RelacionamentoClienteShopper.Status.SEGUINDO}
                 )
                 if not created:
-                    relacao.status = 'seguindo'
+                    relacao.status = RelacionamentoClienteShopper.Status.SEGUINDO
                     relacao.save()
                 messages.success(request, f'Você agora está seguindo {shopper.user.get_full_name() or shopper.user.username}!')
             

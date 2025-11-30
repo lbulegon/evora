@@ -176,6 +176,11 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'escolher_shoppers' %}active{% endif %}" href="{% url 'escolher_shoppers' %}">
+                                    <i class="fas fa-user-plus"></i> Seguir Shoppers
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link {% if request.resolver_match.url_name == 'client_products' %}active{% endif %}" href="{% url 'client_products' %}">
                                     <i class="fas fa-shopping-bag"></i> Produtos
                                 </a>
