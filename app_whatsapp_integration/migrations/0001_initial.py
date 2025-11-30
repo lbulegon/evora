@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
                 ('message_timestamp', models.DateTimeField(db_index=True, default=django.utils.timezone.now, help_text='Quando a mensagem foi enviada/recebida', verbose_name='Timestamp da Mensagem')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Criado em')),
                 ('metadata', models.JSONField(blank=True, default=dict, help_text='Informações adicionais sobre a mensagem', verbose_name='Metadados')),
-                ('contact', models.ForeignKey(help_text='Contato associado à mensagem', on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='whatsapp_integration.whatsappcontact', verbose_name='Contato')),
+                ('contact', models.ForeignKey(help_text='Contato associado à mensagem', on_delete=django.db.models.deletion.CASCADE, related_name='messages', to='app_whatsapp_integration.whatsappcontact', verbose_name='Contato')),
             ],
             options={
                 'verbose_name': 'Log de Mensagem WhatsApp',

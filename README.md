@@ -39,6 +39,9 @@ python manage.py createsuperuser
 # Rode o servidor
 python manage.py runserver
 ```
+git status
+git fetch origin
+git reset --hard origin/main
 
 ## 📁 Documentação
 

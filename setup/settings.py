@@ -151,7 +151,7 @@ INSTALLED_APPS = [
     
     # Local apps
     'app_marketplace',
-    'whatsapp_integration',  # Integração WhatsApp via gateway
+    'app_whatsapp_integration',  # Integração WhatsApp via gateway
 ]
 
 MIDDLEWARE = [
