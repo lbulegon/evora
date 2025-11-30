@@ -1309,10 +1309,16 @@ class WhatsappMessage(models.Model):
 
 
 class WhatsappProduct(models.Model):
-    """Produto postado em grupo WhatsApp"""
+    """Produto postado em grupo WhatsApp
+    
+    MVP: Shopper cria produtos diretamente no grupo.
+    - group: obrigatório (produto pertence a um grupo)
+    - message: opcional (pode ser criado direto pelo shopper ou vinculado a uma mensagem)
+    - posted_by: obrigatório (quem postou/criou o produto)
+    """
     group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='products')
-    message = models.ForeignKey(WhatsappMessage, on_delete=models.CASCADE, related_name='products')
-    posted_by = models.ForeignKey(WhatsappParticipant, on_delete=models.CASCADE, related_name='posted_products')
+    message = models.ForeignKey(WhatsappMessage, on_delete=models.CASCADE, related_name='products', null=True, blank=True, help_text="Mensagem do WhatsApp que originou este produto (opcional)")
+    posted_by = models.ForeignKey(WhatsappParticipant, on_delete=models.CASCADE, related_name='posted_products', help_text="Participante que criou/postou este produto")
     
     # Dados do produto
     name = models.CharField(max_length=200)

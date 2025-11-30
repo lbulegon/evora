@@ -391,15 +391,17 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="productCategory" class="form-label">Categoria</label>
-                                <input type="text" class="form-control" id="productCategory">
+                                <input type="text" class="form-control" id="productCategory" placeholder="Ex: Eletrônicos, Roupas, Acessórios">
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="productGroup" class="form-label">Grupo</label>
+                                <label for="productGroup" class="form-label">Grupo <span class="text-danger">*</span></label>
                                 <select class="form-select" id="productGroup" required>
                                     <option value="">Selecione um grupo</option>
-                                    <!-- Será preenchido via JavaScript -->
+                                    {% for group in groups %}
+                                    <option value="{{ group.id }}" {% if group_id == group.id|stringformat:"s" %}selected{% endif %}>{{ group.name }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>

@@ -311,12 +311,25 @@ def shopper_products(request):
         messages.error(request, "Acesso restrito a Personal Shoppers.")
         return redirect('home')
     
-    products = WhatsappProduct.objects.filter(group__owner=request.user).order_by('-created_at')
+    # Base: todos os produtos do shopper
+    base_products = WhatsappProduct.objects.filter(group__owner=request.user).order_by('-created_at')
     
-    # Estabelecimentos disponíveis (base geral)
-    estabelecimentos = Empresa.objects.filter(ativo=True).order_by('nome')
+    # Categorias e marcas disponíveis - BUSCAR ANTES DOS FILTROS para mostrar todas
+    categories = base_products.values_list('category', flat=True).distinct().exclude(category='').exclude(category__isnull=True)
+    brands = base_products.values_list('brand', flat=True).distinct().exclude(brand='').exclude(brand__isnull=True)
     
-    # Filtros
+    # Aplicar filtros
+    products = base_products
+    
+    # Filtro de grupo (se vier na URL)
+    group_id = request.GET.get('group', '')
+    if group_id:
+        try:
+            products = products.filter(group_id=group_id)
+        except ValueError:
+            pass  # Se não for um ID válido, ignora
+    
+    # Outros filtros
     search = request.GET.get('search', '')
     category = request.GET.get('category', '')
     brand = request.GET.get('brand', '')
@@ -346,14 +359,13 @@ def shopper_products(request):
     elif featured == 'no':
         products = products.filter(is_featured=False)
     
-    # Estatísticas
-    total_products = products.count()
-    available_products = products.filter(is_available=True).count()
-    featured_products = products.filter(is_featured=True).count()
+    # Estatísticas (base total do shopper)
+    total_products = base_products.count()
+    available_products = base_products.filter(is_available=True).count()
+    featured_products = base_products.filter(is_featured=True).count()
     
-    # Categorias e marcas disponíveis
-    categories = products.values_list('category', flat=True).distinct().exclude(category='')
-    brands = products.values_list('brand', flat=True).distinct().exclude(brand='')
+    # Estabelecimentos disponíveis (base geral)
+    estabelecimentos = Empresa.objects.filter(ativo=True).order_by('nome')
     
     # Paginação
     paginator = Paginator(products, 20)
@@ -367,6 +379,7 @@ def shopper_products(request):
         'brand': brand,
         'availability': availability,
         'featured': featured,
+        'group_id': group_id,
         'categories': categories,
         'brands': brands,
         'total_products': total_products,
@@ -594,11 +607,11 @@ def create_product(request):
         if not name:
             return JsonResponse({'error': 'Nome do produto é obrigatório'}, status=400)
         
-        # Buscar grupo (opcional)
+        # Buscar grupo (obrigatório)
         group_id = data.get('group_id')
-        group = None
-        if group_id:
-            group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+        if not group_id:
+            return JsonResponse({'error': 'Grupo é obrigatório para criar produto'}, status=400)
+        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
         
         # Buscar estabelecimento
         estabelecimento_id = data.get('estabelecimento_id')

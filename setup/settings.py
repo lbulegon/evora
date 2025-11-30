@@ -40,11 +40,30 @@ IS_RAILWAY = (
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = not IS_RAILWAY  # False no Railway, True local
 
+# Obter domínio do Railway se disponível
+RAILWAY_PUBLIC_DOMAIN = os.getenv('RAILWAY_PUBLIC_DOMAIN', 'evora-product.up.railway.app')
+RAILWAY_URL = f"https://{RAILWAY_PUBLIC_DOMAIN}"
+
+# Lista completa de origens confiáveis para CSRF
 CSRF_TRUSTED_ORIGINS = [
     'https://evora-product.up.railway.app',
+    RAILWAY_URL,
+    f'https://{RAILWAY_PUBLIC_DOMAIN}',
     'http://127.0.0.1:8000',
-    'http://localhost:8000'
+    'http://localhost:8000',
+    'http://localhost',
+    'http://127.0.0.1',
 ]
+
+# Se houver variável de ambiente com domínio adicional (do Railway)
+if os.getenv('RAILWAY_PUBLIC_DOMAIN'):
+    domain = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+    CSRF_TRUSTED_ORIGINS.append(f'https://{domain}')
+    
+# Se houver variável customizada CSRF_TRUSTED_ORIGINS
+if os.getenv('CSRF_TRUSTED_ORIGINS'):
+    additional_origins = [origin.strip() for origin in os.getenv('CSRF_TRUSTED_ORIGINS').split(',')]
+    CSRF_TRUSTED_ORIGINS.extend(additional_origins)
 
 ALLOWED_HOSTS = ['*']  # Permitir todos os hosts
 
@@ -54,8 +73,27 @@ if IS_RAILWAY:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    # Cookies - configurações otimizadas para Railway
+    # Usar Lax ao invés de None para melhor compatibilidade
     SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_HTTPONLY = True
     CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = 'Lax'  # Lax funciona melhor com HTTPS no Railway
+    CSRF_COOKIE_HTTPONLY = False  # Permitir acesso via JavaScript
+    CSRF_USE_SESSIONS = False  # Usar cookie ao invés de sessão para CSRF
+    CSRF_COOKIE_NAME = 'csrftoken'
+    CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
+    # Não restringir domínio - Railway gerencia isso
+    CSRF_COOKIE_DOMAIN = None
+    # Desabilitar verificação estrita de Referer se necessário
+    CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
+else:
+    # Desenvolvimento local - configurações mais permissivas
+    SESSION_COOKIE_SECURE = False
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SECURE = False
+    CSRF_COOKIE_SAMESITE = 'Lax'
 
 # Configurações de logging para Railway
 LOGGING = {

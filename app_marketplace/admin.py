@@ -176,7 +176,7 @@ class PersonalShopperAdmin(admin.ModelAdmin):
 class CategoriaAdmin(admin.ModelAdmin):
     list_display = ['nome', 'slug', 'total_produtos']
     prepopulated_fields = {'slug': ('nome',)}
-    search_fields = ['nome', 'slug']
+    search_fields = ['nome', 'slug']  # Necessário para autocomplete_fields funcionar
     list_filter = ['nome']
     ordering = ['nome']
     
@@ -192,11 +192,59 @@ class CategoriaAdmin(admin.ModelAdmin):
         }),
     )
 
+class ProdutoEventoInlineProduto(admin.TabularInline):
+    """Inline para mostrar eventos/campanhas onde o produto está vinculado (no admin de Produto)"""
+    model = ProdutoEvento
+    extra = 0
+    autocomplete_fields = ['evento']
+    fields = ['evento', 'importado_de']
+    readonly_fields = ['importado_de']
+    verbose_name = 'Evento/Campanha'
+    verbose_name_plural = 'Eventos/Campanhas'
+    fk_name = 'produto'  # Especificar o ForeignKey usado
+
+
 @admin.register(Produto)
 class ProdutoAdmin(admin.ModelAdmin):
-    list_display  = ['nome', 'empresa', 'preco', 'categoria', 'ativo', 'criado_em']
-    list_filter   = ['empresa', 'categoria', 'ativo']
-    search_fields = ['nome', 'descricao']
+    list_display  = ['nome', 'empresa', 'preco', 'categoria', 'criado_por', 'total_eventos', 'ativo', 'criado_em']
+    list_filter   = ['empresa', 'categoria', 'ativo', 'criado_por', 'criado_em']
+    search_fields = ['nome', 'descricao', 'empresa__nome', 'categoria__nome', 'criado_por__username']
+    autocomplete_fields = ['categoria', 'empresa', 'criado_por']
+    readonly_fields = ['criado_em', 'total_eventos']
+    inlines = [ProdutoEventoInlineProduto]
+    
+    def total_eventos(self, obj):
+        """Total de eventos/campanhas onde o produto está vinculado"""
+        return obj.produto_eventos.count()
+    total_eventos.short_description = 'Eventos/Campanhas'
+    total_eventos.admin_order_field = 'produto_eventos__count'
+    
+    fieldsets = (
+        ('Informações Básicas', {
+            'fields': ('nome', 'descricao', 'preco', 'categoria', 'empresa'),
+            'description': 'Dados gerais do produto (cadastro geral)'
+        }),
+        ('Shopper', {
+            'fields': ('criado_por',),
+            'description': 'Shopper que criou este produto (opcional - para cadastros gerais, deixe em branco)'
+        }),
+        ('Imagem', {
+            'fields': ('imagem',)
+        }),
+        ('Status', {
+            'fields': ('ativo',)
+        }),
+        ('Informações', {
+            'fields': ('criado_em', 'total_eventos'),
+            'description': 'Total de eventos/campanhas onde este produto está vinculado',
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_queryset(self, request):
+        """Otimizar queryset com contagem de eventos"""
+        qs = super().get_queryset(request)
+        return qs.prefetch_related('produto_eventos')
 
 @admin.register(EnderecoEntrega)
 class EnderecoAdmin(admin.ModelAdmin):
@@ -653,9 +701,9 @@ class WhatsappMessageAdmin(admin.ModelAdmin):
 
 @admin.register(WhatsappProduct)
 class WhatsappProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'brand', 'price', 'currency', 'estabelecimento', 'group', 'is_available', 'created_at']
-    list_filter = ['is_available', 'is_featured', 'currency', 'created_at', 'group__owner', 'estabelecimento']
-    search_fields = ['name', 'brand', 'description', 'group__name', 'estabelecimento__nome']
+    list_display = ['name', 'brand', 'price', 'currency', 'group', 'posted_by', 'estabelecimento', 'is_available', 'created_at']
+    list_filter = ['is_available', 'is_featured', 'currency', 'created_at', 'group__owner', 'estabelecimento', 'category']
+    search_fields = ['name', 'brand', 'description', 'group__name', 'estabelecimento__nome', 'posted_by__name']
     autocomplete_fields = ['group', 'message', 'posted_by', 'estabelecimento']
     
     # ISOLAMENTO - Apenas produtos dos grupos do usuário
@@ -667,13 +715,16 @@ class WhatsappProductAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Produto', {
-            'fields': ('name', 'description', 'brand', 'category', 'price', 'currency')
+            'fields': ('name', 'description', 'brand', 'category', 'price', 'currency'),
+            'description': 'Dados do produto postado no grupo'
+        }),
+        ('Grupo e Postagem', {
+            'fields': ('group', 'posted_by', 'message'),
+            'description': 'Grupo onde o produto está disponível. Message é opcional (preenchido apenas se o produto foi extraído de uma mensagem do WhatsApp)'
         }),
         ('Localização', {
-            'fields': ('estabelecimento', 'localizacao_especifica', 'codigo_barras', 'sku_loja')
-        }),
-        ('Grupo', {
-            'fields': ('group', 'message', 'posted_by')
+            'fields': ('estabelecimento', 'localizacao_especifica', 'codigo_barras', 'sku_loja'),
+            'description': 'Onde encontrar o produto (loja/estabelecimento)'
         }),
         ('Mídia', {
             'fields': ('image_urls',)
