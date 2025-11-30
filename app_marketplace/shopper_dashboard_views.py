@@ -367,6 +367,9 @@ def shopper_products(request):
     # Estabelecimentos disponíveis (base geral)
     estabelecimentos = Empresa.objects.filter(ativo=True).order_by('nome')
     
+    # Grupos do shopper para o modal de criação (OBRIGATÓRIO para o dropdown)
+    groups = WhatsappGroup.objects.filter(owner=request.user).order_by('name')
+    
     # Paginação
     paginator = Paginator(products, 20)
     page_number = request.GET.get('page')
@@ -382,6 +385,7 @@ def shopper_products(request):
         'group_id': group_id,
         'categories': categories,
         'brands': brands,
+        'groups': groups,  # GRUPOS PARA O DROPDOWN - ESSENCIAL!
         'total_products': total_products,
         'available_products': available_products,
         'featured_products': featured_products,
