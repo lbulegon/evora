@@ -80,6 +80,11 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link {% if 'product_photo_create' == request.resolver_match.url_name %}active{% endif %}" href="{% url 'product_photo_create' %}">
+                                    <i class="fas fa-camera"></i> Cadastrar por Foto
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link {% if 'shopper_orders' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'shopper_orders' %}">
                                     <i class="fas fa-shopping-cart"></i> Pedidos
                                 </a>
@@ -143,6 +148,11 @@
                             <li class="nav-item">
                                 <a class="nav-link {% if 'shopper_products' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'shopper_products' %}">
                                     <i class="fas fa-box"></i> Produtos
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'product_photo_create' == request.resolver_match.url_name %}active{% endif %}" href="{% url 'product_photo_create' %}">
+                                    <i class="fas fa-camera"></i> Cadastrar por Foto
                                 </a>
                             </li>
                             <li class="nav-item">

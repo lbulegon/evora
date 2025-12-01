@@ -596,8 +596,22 @@ async function analyzePhoto(blob) {
     showLoading('Analisando imagem com IA...');
     hideError();
     
+    // Verificar se o blob é válido
+    if (!blob || blob.size === 0) {
+        showError('Erro: Imagem capturada está vazia. Tente novamente.');
+        return;
+    }
+    
     const formData = new FormData();
-    formData.append('image', blob);
+    // Criar um File a partir do Blob para garantir nome e tipo
+    const imageFile = new File([blob], 'captured_image.jpg', { type: 'image/jpeg' });
+    formData.append('image', imageFile);
+    
+    console.log('Enviando imagem:', {
+        size: imageFile.size,
+        type: imageFile.type,
+        name: imageFile.name
+    });
     
     try {
         const response = await fetch('{% url "api_detect_product_by_photo" %}', {
@@ -605,10 +619,12 @@ async function analyzePhoto(blob) {
             body: formData,
             headers: {
                 'X-CSRFToken': csrfToken
+                // NÃO definir Content-Type manualmente - deixar o browser definir com boundary
             }
         });
         
         const data = await response.json();
+        console.log('Resposta da API:', data);
         hideLoading();
         
         if (data.success) {
@@ -639,11 +655,15 @@ async function analyzePhoto(blob) {
             goToStep(2);
             
         } else {
-            showError(data.error || 'Erro ao analisar imagem');
+            // Mostrar erro mais detalhado
+            const errorMsg = data.error || 'Erro ao analisar imagem';
+            const debugInfo = data.debug ? ` (Debug: ${JSON.stringify(data.debug)})` : '';
+            showError(errorMsg + debugInfo);
         }
         
     } catch (error) {
         hideLoading();
+        console.error('Erro ao analisar imagem:', error);
         showError('Erro ao analisar imagem: ' + error.message);
     }
 }

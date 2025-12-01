@@ -67,18 +67,40 @@ def detect_product_by_photo(request):
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
+        # Verificar se há arquivo na requisição
         if 'image' not in request.FILES:
-            return JsonResponse({'error': 'Imagem é obrigatória'}, status=400)
+            # Log detalhado para debug
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Erro: 'image' não encontrado em request.FILES. Chaves disponíveis: {list(request.FILES.keys())}")
+            logger.error(f"Content-Type: {request.content_type}")
+            logger.error(f"Request method: {request.method}")
+            return JsonResponse({
+                'error': 'Imagem é obrigatória',
+                'debug': {
+                    'files_keys': list(request.FILES.keys()),
+                    'content_type': request.content_type,
+                }
+            }, status=400)
         
         image_file = request.FILES['image']
         
-        # Validar tipo
-        if not image_file.content_type.startswith('image/'):
-            return JsonResponse({'error': 'Arquivo deve ser uma imagem'}, status=400)
+        # Validar se o arquivo tem conteúdo
+        if not image_file:
+            return JsonResponse({'error': 'Arquivo de imagem vazio'}, status=400)
+        
+        # Validar tipo (pode ser None se o browser não enviar content_type)
+        if hasattr(image_file, 'content_type') and image_file.content_type:
+            if not image_file.content_type.startswith('image/'):
+                return JsonResponse({'error': f'Arquivo deve ser uma imagem. Tipo recebido: {image_file.content_type}'}, status=400)
         
         # Validar tamanho (max 10MB)
         if image_file.size > 10 * 1024 * 1024:
             return JsonResponse({'error': 'Imagem muito grande. Máximo 10MB'}, status=400)
+        
+        # Validar tamanho mínimo
+        if image_file.size == 0:
+            return JsonResponse({'error': 'Arquivo de imagem está vazio'}, status=400)
         
         # Salvar imagem temporariamente para análise e depois recuperar
         timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
