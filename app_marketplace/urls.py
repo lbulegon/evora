@@ -8,6 +8,7 @@ from . import shopper_dashboard_views
 from . import kmn_views
 from . import admin_dashboard_views
 from . import client_dashboard_views
+from . import user_settings_views
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -110,6 +111,11 @@ urlpatterns = [
     path('kmn/estoque/', kmn_views.kmn_estoque, name='kmn_estoque'),
     path('kmn/trustlines/', kmn_views.kmn_trustlines, name='kmn_trustlines'),
     path('kmn/catalogo/<int:cliente_id>/', kmn_views.kmn_catalogo_cliente, name='kmn_catalogo_cliente'),
+    
+    # Configurações do Usuário
+    path('settings/', user_settings_views.user_settings, name='user_settings'),
+    path('settings/profile/update/', user_settings_views.update_profile, name='update_profile'),
+    path('settings/password/change/', user_settings_views.change_password, name='change_password'),
     
     # AJAX KMN
     path('ajax/kmn/criar-oferta/', kmn_views.ajax_criar_oferta, name='ajax_criar_oferta'),

@@ -1,0 +1,542 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Configurações - ÉVORA Connect{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-container {
+        max-width: 900px;
+        margin: 2rem auto;
+    }
+    
+    .settings-section {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .settings-section h5 {
+        border-bottom: 2px solid #f0f0f0;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .settings-section h5 i {
+        color: #0d6efd;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .status-connected {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-disconnected {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .qrcode-container {
+        text-align: center;
+        padding: 1.5rem;
+        background: #f8f9fa;
+        border-radius: 10px;
+        margin-top: 1rem;
+    }
+    
+    .qrcode-image {
+        max-width: 250px;
+        margin: 1rem auto;
+        display: block;
+        border: 3px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 1rem;
+        background: white;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #0d6efd;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .instructions {
+        background: #fff3cd;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-top: 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .instructions ol {
+        margin: 0.5rem 0 0 0;
+        padding-left: 1.5rem;
+    }
+    
+    .instructions li {
+        margin: 0.25rem 0;
+    }
+    
+    .phone-info {
+        background: #e7f3ff;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-top: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    
+    .phone-info i {
+        font-size: 1.5rem;
+        color: #28a745;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="settings-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-cog"></i> Configurações
+            </h1>
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+        
+        <!-- Perfil do Usuário -->
+        <div class="settings-section">
+            <h5><i class="fas fa-user"></i> Informações Pessoais</h5>
+            
+            <form id="profileForm" onsubmit="updateProfile(event)">
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Nome</label>
+                            <input type="text" name="first_name" class="form-control" 
+                                   value="{{ user.first_name }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Sobrenome</label>
+                            <input type="text" name="last_name" class="form-control" 
+                                   value="{{ user.last_name }}" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>E-mail</label>
+                    <input type="email" name="email" class="form-control" 
+                           value="{{ user.email }}" required>
+                </div>
+                
+                {% if user_profile %}
+                <div class="form-group">
+                    <label>Telefone</label>
+                    <input type="text" name="phone" class="form-control" 
+                           value="{% if user_profile.telefone %}{{ user_profile.telefone }}{% endif %}" 
+                           placeholder="(00) 00000-0000">
+                </div>
+                {% endif %}
+                
+                {% if user.is_shopper and user_profile %}
+                <div class="form-group">
+                    <label>Bio</label>
+                    <textarea name="bio" class="form-control" rows="3" 
+                              placeholder="Sua biografia...">{% if user_profile.bio %}{{ user_profile.bio }}{% endif %}</textarea>
+                </div>
+                {% endif %}
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Salvar Alterações
+                </button>
+            </form>
+        </div>
+        
+        <!-- Alterar Senha -->
+        <div class="settings-section">
+            <h5><i class="fas fa-lock"></i> Segurança</h5>
+            
+            <form id="passwordForm" onsubmit="changePassword(event)">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label>Senha Atual</label>
+                    <input type="password" name="old_password" class="form-control" required>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Nova Senha</label>
+                            <input type="password" name="new_password1" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Confirmar Nova Senha</label>
+                            <input type="password" name="new_password2" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-key"></i> Alterar Senha
+                </button>
+            </form>
+        </div>
+        
+        <!-- Conexão WhatsApp (apenas para Shoppers e Keepers) -->
+        {% if user.is_shopper or user.is_address_keeper %}
+        <div class="settings-section">
+            <h5><i class="fab fa-whatsapp"></i> Conexão WhatsApp</h5>
+            
+            <!-- Status da Conexão -->
+            <div class="mb-3">
+                <label>Status:</label>
+                <div>
+                    {% if whatsapp_connected %}
+                    <span class="status-badge status-connected">
+                        <i class="fas fa-check-circle"></i> Conectado
+                        {% if whatsapp_status.phone %}
+                        - {{ whatsapp_status.phone }}
+                        {% endif %}
+                    </span>
+                    {% else %}
+                    <span class="status-badge status-disconnected">
+                        <i class="fas fa-times-circle"></i> Desconectado
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- QR Code Container -->
+            <div id="whatsappConnectionArea">
+                {% if not whatsapp_connected %}
+                <div class="qrcode-container" id="qrcodeContainer" style="display: none;">
+                    <h6>📱 Escaneie o QR Code</h6>
+                    
+                    <div id="qrcodeLoading" style="display: none;">
+                        <div class="loading-spinner"></div>
+                        <p class="mt-3">Gerando QR Code...</p>
+                    </div>
+                    
+                    <div id="qrcodeDisplay" style="display: none;">
+                        <img id="qrcodeImage" src="" alt="QR Code WhatsApp" class="qrcode-image">
+                        <p class="text-muted mt-3 small">
+                            <i class="fas fa-info-circle"></i> 
+                            O QR Code expira em 30 segundos. Se expirar, clique em "Atualizar QR Code"
+                        </p>
+                    </div>
+                    
+                    <div id="qrcodeError" style="display: none;">
+                        <i class="fas fa-exclamation-triangle text-warning" style="font-size: 2rem;"></i>
+                        <p class="text-danger mt-3" id="qrcodeErrorMessage"></p>
+                    </div>
+                    
+                    <div class="instructions">
+                        <strong>📋 Como conectar:</strong>
+                        <ol>
+                            <li>Abra o WhatsApp no seu celular</li>
+                            <li>Toque em <strong>Menu</strong> ou <strong>Configurações</strong></li>
+                            <li>Toque em <strong>Aparelhos conectados</strong></li>
+                            <li>Toque em <strong>Conectar um aparelho</strong></li>
+                            <li>Aponte seu celular para esta tela para capturar o QR Code</li>
+                        </ol>
+                    </div>
+                </div>
+                
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-success" id="btnConnectWhatsApp" onclick="connectWhatsApp()">
+                        <i class="fab fa-whatsapp"></i> Conectar WhatsApp
+                    </button>
+                    <button class="btn btn-outline-primary" id="btnRefreshQR" onclick="refreshQRCode()" style="display: none;">
+                        <i class="fas fa-sync-alt"></i> Atualizar QR Code
+                    </button>
+                </div>
+                {% else %}
+                <div class="phone-info">
+                    <i class="fas fa-check-circle"></i>
+                    <div>
+                        <strong>WhatsApp Conectado!</strong>
+                        {% if whatsapp_status.phone %}
+                        <div class="small text-muted">
+                            <i class="fas fa-phone"></i> {{ whatsapp_status.phone }}
+                            {% if whatsapp_status.name %}
+                            - {{ whatsapp_status.name }}
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button class="btn btn-danger" onclick="logoutWhatsApp()">
+                        <i class="fas fa-sign-out-alt"></i> Desconectar
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="deleteWhatsAppSession()">
+                        <i class="fas fa-trash"></i> Deletar Sessão
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="checkWhatsAppStatus()">
+                        <i class="fas fa-sync-alt"></i> Atualizar Status
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    let statusCheckInterval = null;
+    
+    // Atualizar perfil
+    async function updateProfile(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        
+        try {
+            const response = await fetch('{% url "update_profile" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                alert('Perfil atualizado com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro ao atualizar perfil: ' + (data.error || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            alert('Erro ao atualizar perfil: ' + error.message);
+        }
+    }
+    
+    // Alterar senha
+    async function changePassword(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        
+        try {
+            const response = await fetch('{% url "change_password" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                alert('Senha alterada com sucesso!');
+                form.reset();
+            } else {
+                const errors = data.errors ? JSON.parse(data.errors) : {};
+                const errorMsg = Object.values(errors).flat().join(', ');
+                alert('Erro ao alterar senha: ' + errorMsg);
+            }
+        } catch (error) {
+            alert('Erro ao alterar senha: ' + error.message);
+        }
+    }
+    
+    // Conectar WhatsApp
+    async function connectWhatsApp() {
+        const btnConnect = document.getElementById('btnConnectWhatsApp');
+        const qrcodeContainer = document.getElementById('qrcodeContainer');
+        const qrcodeLoading = document.getElementById('qrcodeLoading');
+        const qrcodeDisplay = document.getElementById('qrcodeDisplay');
+        const qrcodeError = document.getElementById('qrcodeError');
+        
+        btnConnect.disabled = true;
+        btnConnect.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
+        qrcodeContainer.style.display = 'block';
+        qrcodeLoading.style.display = 'block';
+        qrcodeDisplay.style.display = 'none';
+        qrcodeError.style.display = 'none';
+        
+        try {
+            const response = await fetch('/whatsapp/connection/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.qrCode) {
+                document.getElementById('qrcodeImage').src = `data:image/png;base64,${data.qrCode}`;
+                qrcodeLoading.style.display = 'none';
+                qrcodeDisplay.style.display = 'block';
+                document.getElementById('btnRefreshQR').style.display = 'inline-block';
+                startStatusCheck();
+            } else {
+                throw new Error(data.error || 'Erro ao criar sessão');
+            }
+        } catch (error) {
+            qrcodeLoading.style.display = 'none';
+            qrcodeError.style.display = 'block';
+            document.getElementById('qrcodeErrorMessage').textContent = error.message;
+        } finally {
+            btnConnect.disabled = false;
+            btnConnect.innerHTML = '<i class="fab fa-whatsapp"></i> Conectar WhatsApp';
+        }
+    }
+    
+    // Atualizar QR Code
+    async function refreshQRCode() {
+        const qrcodeLoading = document.getElementById('qrcodeLoading');
+        const qrcodeDisplay = document.getElementById('qrcodeDisplay');
+        const qrcodeError = document.getElementById('qrcodeError');
+        
+        qrcodeLoading.style.display = 'block';
+        qrcodeDisplay.style.display = 'none';
+        qrcodeError.style.display = 'none';
+        
+        try {
+            const response = await fetch('/whatsapp/connection/qrcode/');
+            const data = await response.json();
+            
+            if (data.success && data.qrCode) {
+                document.getElementById('qrcodeImage').src = `data:image/png;base64,${data.qrCode}`;
+                qrcodeLoading.style.display = 'none';
+                qrcodeDisplay.style.display = 'block';
+            } else {
+                throw new Error(data.error || 'QR Code não disponível');
+            }
+        } catch (error) {
+            qrcodeLoading.style.display = 'none';
+            qrcodeError.style.display = 'block';
+            document.getElementById('qrcodeErrorMessage').textContent = error.message;
+        }
+    }
+    
+    // Verificar status
+    async function checkWhatsAppStatus() {
+        try {
+            const response = await fetch('/whatsapp/connection/status/');
+            const data = await response.json();
+            
+            if (data.connected) {
+                stopStatusCheck();
+                location.reload();
+            }
+        } catch (error) {
+            console.error('Erro ao verificar status:', error);
+        }
+    }
+    
+    // Desconectar
+    async function logoutWhatsApp() {
+        if (!confirm('Tem certeza que deseja desconectar o WhatsApp?')) return;
+        
+        try {
+            const response = await fetch('/whatsapp/connection/logout/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro: ' + (data.error || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            alert('Erro: ' + error.message);
+        }
+    }
+    
+    // Deletar sessão
+    async function deleteWhatsAppSession() {
+        if (!confirm('ATENÇÃO: Isso irá deletar completamente a sessão. Tem certeza?')) return;
+        
+        try {
+            const response = await fetch('/whatsapp/connection/delete/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro: ' + (data.error || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            alert('Erro: ' + error.message);
+        }
+    }
+    
+    // Auto-check status
+    function startStatusCheck() {
+        if (statusCheckInterval) clearInterval(statusCheckInterval);
+        statusCheckInterval = setInterval(checkWhatsAppStatus, 5000);
+    }
+    
+    function stopStatusCheck() {
+        if (statusCheckInterval) {
+            clearInterval(statusCheckInterval);
+            statusCheckInterval = null;
+        }
+    }
+    
+    // Iniciar verificação se necessário
+    {% if not whatsapp_connected %}
+    // Tentar obter QR Code existente ao carregar
+    window.addEventListener('load', () => {
+        refreshQRCode();
+    });
+    {% endif %}
+</script>
+{% endblock %}
+
