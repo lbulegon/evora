@@ -2,6 +2,7 @@ from django.urls import path, include
 from . import views
 from . import whatsapp_views
 from . import whatsapp_dashboard_views
+from . import whatsapp_connection_views
 from . import conversations_views
 from . import shopper_dashboard_views
 from . import kmn_views
@@ -24,6 +25,14 @@ urlpatterns = [
     # WhatsApp Integration
     path('webhooks/whatsapp/', whatsapp_views.whatsapp_webhook, name='whatsapp_webhook'),
     path('api/whatsapp/reply/', whatsapp_views.reply_to_group, name='whatsapp_reply'),
+    
+    # WhatsApp Connection (QR Code)
+    path('whatsapp/connection/', whatsapp_connection_views.whatsapp_connect, name='whatsapp_connect'),
+    path('whatsapp/connection/create/', whatsapp_connection_views.create_session, name='whatsapp_create_session'),
+    path('whatsapp/connection/qrcode/', whatsapp_connection_views.get_qr_code, name='whatsapp_get_qrcode'),
+    path('whatsapp/connection/status/', whatsapp_connection_views.get_session_status, name='whatsapp_session_status'),
+    path('whatsapp/connection/logout/', whatsapp_connection_views.logout_session, name='whatsapp_logout_session'),
+    path('whatsapp/connection/delete/', whatsapp_connection_views.delete_session, name='whatsapp_delete_session'),
     
     # WhatsApp Dashboard
     path('whatsapp/dashboard/', whatsapp_dashboard_views.whatsapp_dashboard, name='whatsapp_dashboard'),

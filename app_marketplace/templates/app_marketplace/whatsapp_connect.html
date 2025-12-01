@@ -1,0 +1,415 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Conectar WhatsApp - ÉVORA Connect{% endblock %}
+
+{% block extra_css %}
+<style>
+    .connection-container {
+        max-width: 600px;
+        margin: 2rem auto;
+    }
+    
+    .status-card {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    
+    .status-connected {
+        border-left: 5px solid #28a745;
+    }
+    
+    .status-disconnected {
+        border-left: 5px solid #dc3545;
+    }
+    
+    .status-pairing {
+        border-left: 5px solid #ffc107;
+    }
+    
+    .qrcode-container {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    
+    .qrcode-image {
+        max-width: 300px;
+        margin: 1rem auto;
+        display: block;
+        border: 3px solid #f0f0f0;
+        border-radius: 10px;
+        padding: 1rem;
+        background: white;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #0d6efd;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .instructions {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-top: 1.5rem;
+    }
+    
+    .instructions ol {
+        text-align: left;
+        margin: 0;
+        padding-left: 1.5rem;
+    }
+    
+    .instructions li {
+        margin: 0.5rem 0;
+    }
+    
+    .phone-info {
+        background: #e7f3ff;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-top: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    
+    .phone-info i {
+        font-size: 1.5rem;
+        color: #28a745;
+    }
+    
+    .btn-group-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="connection-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0">
+                <i class="fab fa-whatsapp text-success"></i> Conectar WhatsApp
+            </h1>
+            <a href="{% url 'whatsapp_dashboard' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+        
+        <!-- Status da Conexão -->
+        <div class="status-card {% if is_connected %}status-connected{% elif is_paired %}status-pairing{% else %}status-disconnected{% endif %}" id="statusCard">
+            {% if is_connected %}
+            <div class="phone-info">
+                <i class="fas fa-check-circle"></i>
+                <div>
+                    <strong>WhatsApp Conectado!</strong>
+                    {% if session_status.phone %}
+                    <div class="small text-muted">
+                        <i class="fas fa-phone"></i> {{ session_status.phone }}
+                        {% if session_status.name %}
+                        - {{ session_status.name }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% elif is_paired %}
+            <div>
+                <div class="loading-spinner mb-3"></div>
+                <h5>Aguardando conexão...</h5>
+                <p class="text-muted">QR Code escaneado! Aguardando confirmação...</p>
+            </div>
+            {% else %}
+            <div>
+                <i class="fas fa-times-circle text-danger" style="font-size: 3rem;"></i>
+                <h5>WhatsApp Desconectado</h5>
+                <p class="text-muted">Conecte seu WhatsApp escaneando o QR Code</p>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- QR Code Container -->
+        <div class="qrcode-container" id="qrcodeContainer" style="display: {% if is_connected %}none{% else %}block{% endif %};">
+            <h5 class="mb-3">📱 Escaneie o QR Code</h5>
+            
+            <div id="qrcodeLoading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p class="mt-3">Gerando QR Code...</p>
+            </div>
+            
+            <div id="qrcodeDisplay" style="display: none;">
+                <img id="qrcodeImage" src="" alt="QR Code WhatsApp" class="qrcode-image">
+                <p class="text-muted mt-3">
+                    <i class="fas fa-info-circle"></i> 
+                    O QR Code expira em 30 segundos. Se expirar, clique em "Atualizar QR Code"
+                </p>
+            </div>
+            
+            <div id="qrcodeError" style="display: none;">
+                <i class="fas fa-exclamation-triangle text-warning" style="font-size: 3rem;"></i>
+                <p class="text-danger mt-3" id="qrcodeErrorMessage"></p>
+            </div>
+            
+            <div class="instructions">
+                <h6>📋 Como conectar:</h6>
+                <ol>
+                    <li>Abra o WhatsApp no seu celular</li>
+                    <li>Toque em <strong>Menu</strong> ou <strong>Configurações</strong></li>
+                    <li>Toque em <strong>Aparelhos conectados</strong></li>
+                    <li>Toque em <strong>Conectar um aparelho</strong></li>
+                    <li>Aponte seu celular para esta tela para capturar o QR Code</li>
+                </ol>
+            </div>
+        </div>
+        
+        <!-- Ações -->
+        <div class="status-card">
+            <div class="btn-group-actions">
+                {% if not is_connected %}
+                <button class="btn btn-primary btn-lg" id="btnCreateSession" onclick="createSession()">
+                    <i class="fab fa-whatsapp"></i> Conectar WhatsApp
+                </button>
+                <button class="btn btn-outline-primary" id="btnRefreshQR" onclick="refreshQRCode()" style="display: none;">
+                    <i class="fas fa-sync-alt"></i> Atualizar QR Code
+                </button>
+                {% else %}
+                <button class="btn btn-danger" onclick="logoutSession()">
+                    <i class="fas fa-sign-out-alt"></i> Desconectar
+                </button>
+                <button class="btn btn-outline-danger" onclick="deleteSession()">
+                    <i class="fas fa-trash"></i> Deletar Sessão
+                </button>
+                {% endif %}
+                <button class="btn btn-outline-secondary" onclick="checkStatus()">
+                    <i class="fas fa-sync-alt"></i> Atualizar Status
+                </button>
+            </div>
+        </div>
+        
+        <!-- Informações de Configuração -->
+        <div class="status-card">
+            <h6 class="mb-3">⚙️ Configuração</h6>
+            <div class="small text-muted">
+                <p><strong>WPPConnect URL:</strong> <code>{{ wpp_base }}</code></p>
+                <p><strong>Sessão:</strong> <code>{{ wpp_session }}</code></p>
+                <p class="mb-0">
+                    <i class="fas fa-info-circle"></i> 
+                    Certifique-se de que o serviço WPPConnect está rodando.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let statusCheckInterval = null;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    
+    // Verificar status automaticamente a cada 5 segundos
+    function startStatusCheck() {
+        if (statusCheckInterval) {
+            clearInterval(statusCheckInterval);
+        }
+        
+        statusCheckInterval = setInterval(() => {
+            checkStatus();
+        }, 5000);
+    }
+    
+    function stopStatusCheck() {
+        if (statusCheckInterval) {
+            clearInterval(statusCheckInterval);
+            statusCheckInterval = null;
+        }
+    }
+    
+    // Criar sessão e obter QR Code
+    async function createSession() {
+        const btnCreate = document.getElementById('btnCreateSession');
+        const qrcodeLoading = document.getElementById('qrcodeLoading');
+        const qrcodeDisplay = document.getElementById('qrcodeDisplay');
+        const qrcodeError = document.getElementById('qrcodeError');
+        const qrcodeContainer = document.getElementById('qrcodeContainer');
+        
+        // Mostrar loading
+        btnCreate.disabled = true;
+        btnCreate.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
+        qrcodeContainer.style.display = 'block';
+        qrcodeLoading.style.display = 'block';
+        qrcodeDisplay.style.display = 'none';
+        qrcodeError.style.display = 'none';
+        
+        try {
+            const response = await fetch('/whatsapp/connection/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.qrCode) {
+                // Mostrar QR Code
+                document.getElementById('qrcodeImage').src = `data:image/png;base64,${data.qrCode}`;
+                qrcodeLoading.style.display = 'none';
+                qrcodeDisplay.style.display = 'block';
+                document.getElementById('btnRefreshQR').style.display = 'inline-block';
+                
+                // Iniciar verificação de status
+                startStatusCheck();
+            } else {
+                throw new Error(data.error || 'Erro ao criar sessão');
+            }
+        } catch (error) {
+            qrcodeLoading.style.display = 'none';
+            qrcodeError.style.display = 'block';
+            document.getElementById('qrcodeErrorMessage').textContent = error.message;
+        } finally {
+            btnCreate.disabled = false;
+            btnCreate.innerHTML = '<i class="fab fa-whatsapp"></i> Conectar WhatsApp';
+        }
+    }
+    
+    // Atualizar QR Code
+    async function refreshQRCode() {
+        const qrcodeLoading = document.getElementById('qrcodeLoading');
+        const qrcodeDisplay = document.getElementById('qrcodeDisplay');
+        const qrcodeError = document.getElementById('qrcodeError');
+        
+        qrcodeLoading.style.display = 'block';
+        qrcodeDisplay.style.display = 'none';
+        qrcodeError.style.display = 'none';
+        
+        try {
+            const response = await fetch('/whatsapp/connection/qrcode/');
+            const data = await response.json();
+            
+            if (data.success && data.qrCode) {
+                document.getElementById('qrcodeImage').src = `data:image/png;base64,${data.qrCode}`;
+                qrcodeLoading.style.display = 'none';
+                qrcodeDisplay.style.display = 'block';
+            } else {
+                throw new Error(data.error || 'QR Code não disponível');
+            }
+        } catch (error) {
+            qrcodeLoading.style.display = 'none';
+            qrcodeError.style.display = 'block';
+            document.getElementById('qrcodeErrorMessage').textContent = error.message;
+        }
+    }
+    
+    // Verificar status
+    async function checkStatus() {
+        try {
+            const response = await fetch('/whatsapp/connection/status/');
+            const data = await response.json();
+            
+            if (data.connected) {
+                // Conectado - recarregar página
+                stopStatusCheck();
+                location.reload();
+            } else if (data.status === 'PAIRING') {
+                // Aguardando confirmação - continuar verificando
+                updateStatusCard(data);
+            } else {
+                // Desconectado
+                updateStatusCard(data);
+            }
+        } catch (error) {
+            console.error('Erro ao verificar status:', error);
+        }
+    }
+    
+    function updateStatusCard(status) {
+        const statusCard = document.getElementById('statusCard');
+        // Atualizar visual do card conforme status
+        // Implementar se necessário
+    }
+    
+    // Desconectar
+    async function logoutSession() {
+        if (!confirm('Tem certeza que deseja desconectar o WhatsApp?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch('/whatsapp/connection/logout/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao desconectar: ' + (data.error || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            alert('Erro ao desconectar: ' + error.message);
+        }
+    }
+    
+    // Deletar sessão
+    async function deleteSession() {
+        if (!confirm('ATENÇÃO: Isso irá deletar completamente a sessão. Tem certeza?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch('/whatsapp/connection/delete/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Erro ao deletar sessão: ' + (data.error || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            alert('Erro ao deletar sessão: ' + error.message);
+        }
+    }
+    
+    // Iniciar verificação de status se estiver aguardando conexão
+    {% if is_paired %}
+    startStatusCheck();
+    {% elif not is_connected %}
+    // Tentar obter QR Code existente
+    refreshQRCode();
+    {% endif %}
+</script>
+{% endblock %}
+
