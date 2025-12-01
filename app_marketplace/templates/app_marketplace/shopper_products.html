@@ -122,9 +122,14 @@
                     </h1>
                     <p class="text-muted mb-0">Gerencie seu catálogo de produtos</p>
                 </div>
-                <button class="btn create-product-btn" data-bs-toggle="modal" data-bs-target="#createProductModal">
-                    <i class="fas fa-plus"></i> Novo Produto
-                </button>
+                <div class="btn-group">
+                    <button class="btn create-product-btn" data-bs-toggle="modal" data-bs-target="#createProductModal">
+                        <i class="fas fa-plus"></i> Novo Produto
+                    </button>
+                    <a href="{% url 'product_photo_create' %}" class="btn btn-success">
+                        <i class="fas fa-camera"></i> Cadastrar por Foto
+                    </a>
+                </div>
             </div>
         </div>
     </div>

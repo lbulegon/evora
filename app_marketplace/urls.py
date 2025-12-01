@@ -9,6 +9,7 @@ from . import kmn_views
 from . import admin_dashboard_views
 from . import client_dashboard_views
 from . import user_settings_views
+from . import product_photo_views
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -69,8 +70,13 @@ urlpatterns = [
            path('api/whatsapp/orders/<int:order_id>/update-status/', whatsapp_dashboard_views.update_order_status, name='api_update_order_status'),
            path('api/whatsapp/groups/<int:group_id>/send-message/', whatsapp_dashboard_views.send_group_message, name='api_send_group_message'),
            
-           # API para criação de produtos (sem grupo específico)
-           path('api/products/create/', shopper_dashboard_views.create_product, name='api_create_product_general'),
+      # API para criação de produtos (sem grupo específico)
+      path('api/products/create/', shopper_dashboard_views.create_product, name='api_create_product_general'),
+      
+      # Cadastrar produto por foto (inspirado no app de nutrição)
+      path('products/cadastrar-por-foto/', product_photo_views.product_photo_create, name='product_photo_create'),
+      path('api/produtos/detectar_por_foto/', product_photo_views.detect_product_by_photo, name='api_detect_product_by_photo'),
+      path('api/produtos/salvar_por_foto/', product_photo_views.save_product_from_photo, name='api_save_product_from_photo'),
     
     # Dashboard Específico do Shopper
     path('shopper/dashboard/', shopper_dashboard_views.shopper_dashboard, name='shopper_dashboard'),
