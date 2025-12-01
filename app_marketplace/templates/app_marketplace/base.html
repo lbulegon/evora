@@ -80,11 +80,6 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link {% if 'product_camera' == request.resolver_match.url_name %}active{% endif %}" href="{% url 'product_camera' %}">
-                                    <i class="fas fa-camera"></i> Fotografar Produto
-                                </a>
-                            </li>
-                            <li class="nav-item">
                                 <a class="nav-link {% if 'shopper_orders' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'shopper_orders' %}">
                                     <i class="fas fa-shopping-cart"></i> Pedidos
                                 </a>

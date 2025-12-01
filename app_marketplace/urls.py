@@ -9,7 +9,6 @@ from . import kmn_views
 from . import admin_dashboard_views
 from . import client_dashboard_views
 from . import user_settings_views
-from . import product_camera_views
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -80,10 +79,6 @@ urlpatterns = [
     path('shopper/products/', shopper_dashboard_views.shopper_products, name='shopper_products'),
     path('shopper/orders/', shopper_dashboard_views.shopper_orders, name='shopper_orders'),
     path('shopper/analytics/', shopper_dashboard_views.shopper_analytics, name='shopper_analytics'),
-    
-    # Captura de Foto de Produtos (PWA)
-    path('products/camera/', product_camera_views.product_camera, name='product_camera'),
-    path('api/products/upload-photo/', product_camera_views.upload_product_photo, name='api_upload_product_photo'),
     
     # Dashboard de Administração
     path('admin/dashboard/', admin_dashboard_views.admin_dashboard, name='admin_dashboard'),
