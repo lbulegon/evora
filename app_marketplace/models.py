@@ -1275,6 +1275,289 @@ class ParticipantPermissionRequest(models.Model):
         self.save()
 
 
+# ============================================================================
+# SISTEMA DE CONVERSAS INDIVIDUAIS WHATSAPP - INSPIRADO NO UMBLER TALK
+# Paradigma: Grupo para vendas/anúncios → Atendimento individual após compra
+# ============================================================================
+
+class WhatsappConversation(models.Model):
+    """
+    Conversa individual/ticket com cliente via WhatsApp
+    Inspirado no Umbler Talk (https://www.umbler.com/br) e TalkRobo
+    
+    Paradigma:
+    - GRUPO: Usado para vendas/anúncios de produtos (modo geral)
+    - INDIVIDUAL: Após compra, atendimento é individualizado
+    """
+    STATUS_CHOICES = [
+        ('new', 'Nova'),
+        ('open', 'Aberta'),
+        ('waiting', 'Aguardando Cliente'),
+        ('pending', 'Pendente'),
+        ('resolved', 'Resolvida'),
+        ('closed', 'Fechada'),
+    ]
+    
+    PRIORITY_CHOICES = [
+        (1, 'Baixa'),
+        (3, 'Normal'),
+        (5, 'Média'),
+        (7, 'Alta'),
+        (9, 'Urgente'),
+    ]
+    
+    # Identificação única
+    conversation_id = models.CharField(max_length=50, unique=True, help_text="ID único da conversa")
+    
+    # Contexto da conversa
+    group = models.ForeignKey(
+        WhatsappGroup, 
+        on_delete=models.CASCADE, 
+        related_name='conversations',
+        null=True,
+        blank=True,
+        help_text="Grupo onde iniciou (se veio de grupo)"
+    )
+    participant = models.ForeignKey(
+        WhatsappParticipant, 
+        on_delete=models.CASCADE, 
+        related_name='conversations',
+        help_text="Participante/cliente da conversa"
+    )
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='whatsapp_conversations',
+        help_text="Cliente cadastrado (se vinculado)"
+    )
+    
+    # Status e atribuição (estilo Umbler/TalkRobo)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
+    assigned_to = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_conversations',
+        help_text="Agente/shopper responsável pelo atendimento"
+    )
+    
+    # Organização (estilo Umbler Talk)
+    tags = models.JSONField(
+        default=list,
+        help_text="Tags para categorizar: vendas, suporte, pedido, urgente, etc."
+    )
+    priority = models.IntegerField(
+        choices=PRIORITY_CHOICES,
+        default=3,
+        help_text="Prioridade 1-9 (auto-calculada ou manual)"
+    )
+    
+    # Metadados temporais
+    first_message_at = models.DateTimeField(auto_now_add=True, help_text="Primeira mensagem")
+    last_message_at = models.DateTimeField(auto_now=True, help_text="Última mensagem")
+    first_response_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Quando foi respondida pela primeira vez"
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True, help_text="Quando foi resolvida")
+    closed_at = models.DateTimeField(null=True, blank=True, help_text="Quando foi fechada")
+    
+    # Estatísticas
+    message_count = models.IntegerField(default=0, help_text="Total de mensagens")
+    unread_count = models.IntegerField(default=0, help_text="Mensagens não lidas")
+    response_time_avg = models.DurationField(
+        null=True,
+        blank=True,
+        help_text="Tempo médio de resposta"
+    )
+    
+    # Vinculação com pedidos (após compra)
+    related_orders = models.ManyToManyField(
+        'WhatsappOrder',
+        blank=True,
+        related_name='conversations',
+        help_text="Pedidos relacionados a esta conversa"
+    )
+    
+    # Contexto adicional
+    source = models.CharField(
+        max_length=50,
+        default='group',
+        choices=[
+            ('group', 'Grupo'),
+            ('direct', 'Direto'),
+            ('after_purchase', 'Pós-Compra'),
+            ('support', 'Suporte'),
+        ],
+        help_text="Origem da conversa"
+    )
+    notes = models.TextField(blank=True, help_text="Anotações internas do atendente")
+    
+    class Meta:
+        verbose_name = 'Conversa WhatsApp'
+        verbose_name_plural = 'Conversas WhatsApp'
+        ordering = ['-last_message_at', '-priority']
+        indexes = [
+            models.Index(fields=['status', 'assigned_to']),
+            models.Index(fields=['group', 'participant']),
+            models.Index(fields=['cliente', 'status']),
+            models.Index(fields=['last_message_at', 'status']),
+        ]
+    
+    def __str__(self):
+        return f"Conversa #{self.conversation_id} - {self.participant.name or self.participant.phone}"
+    
+    def save(self, *args, **kwargs):
+        import secrets
+        import string
+        
+        if not self.conversation_id:
+            timestamp = timezone.now().strftime("%y%m%d")
+            random = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+            self.conversation_id = f"CONV-{timestamp}-{random}"
+        
+        # Se mudou para resolvida, registrar data
+        if self.status == 'resolved' and not self.resolved_at:
+            self.resolved_at = timezone.now()
+        
+        # Se mudou para fechada, registrar data
+        if self.status == 'closed' and not self.closed_at:
+            self.closed_at = timezone.now()
+        
+        super().save(*args, **kwargs)
+    
+    @property
+    def is_unread(self):
+        """Verifica se há mensagens não lidas"""
+        return self.unread_count > 0
+    
+    @property
+    def waiting_time(self):
+        """Tempo desde a última mensagem do cliente"""
+        if self.last_message_at:
+            return timezone.now() - self.last_message_at
+        return None
+    
+    @property
+    def first_response_time(self):
+        """Tempo até primeira resposta"""
+        if self.first_response_at and self.first_message_at:
+            return self.first_response_at - self.first_message_at
+        return None
+    
+    def calculate_priority(self):
+        """Calcula prioridade automaticamente baseada em fatores"""
+        priority = 3  # Normal
+        
+        # Tags
+        if self.tags:
+            tag_lower = [t.lower() for t in self.tags]
+            if 'urgente' in tag_lower:
+                priority = 9
+            elif 'reclamação' in tag_lower:
+                priority = 8
+            elif 'vendas' in tag_lower:
+                priority = 5
+        
+        # Tempo sem resposta
+        if self.last_message_at:
+            hours_since = (timezone.now() - self.last_message_at).total_seconds() / 3600
+            if hours_since > 24:
+                priority += 2
+            elif hours_since > 12:
+                priority += 1
+        
+        # Cliente VIP (muitos pedidos)
+        if self.cliente:
+            total_pedidos = self.cliente.whatsapp_orders.count()
+            if total_pedidos > 10:
+                priority += 1
+        
+        # Pedido relacionado aumenta prioridade
+        if hasattr(self, 'related_orders') and self.related_orders.exists():
+            priority += 1
+        
+        # Status
+        if self.status == 'new':
+            priority += 1
+        
+        return min(priority, 9)
+    
+    def auto_calculate_priority(self):
+        """Atualiza prioridade automaticamente"""
+        self.priority = self.calculate_priority()
+        self.save(update_fields=['priority'])
+    
+    def mark_as_read(self, user=None):
+        """Marca todas as mensagens como lidas"""
+        from app_marketplace.models import WhatsappMessage
+        unread_messages = WhatsappMessage.objects.filter(
+            conversation=self,
+            read=False
+        )
+        unread_messages.update(
+            read=True,
+            read_at=timezone.now()
+        )
+        self.unread_count = 0
+        self.save(update_fields=['unread_count'])
+    
+    def add_tag(self, tag):
+        """Adiciona uma tag"""
+        if tag not in self.tags:
+            self.tags.append(tag)
+            self.save(update_fields=['tags'])
+    
+    def remove_tag(self, tag):
+        """Remove uma tag"""
+        if tag in self.tags:
+            self.tags.remove(tag)
+            self.save(update_fields=['tags'])
+    
+    def assign(self, agent):
+        """Atribui conversa para um agente"""
+        self.assigned_to = agent
+        self.status = 'open'
+        self.save(update_fields=['assigned_to', 'status'])
+    
+    def close(self):
+        """Fecha a conversa"""
+        self.status = 'closed'
+        self.closed_at = timezone.now()
+        self.save(update_fields=['status', 'closed_at'])
+
+
+class ConversationNote(models.Model):
+    """
+    Notas internas sobre uma conversa (não visíveis ao cliente)
+    Estilo Umbler/TalkRobo
+    """
+    conversation = models.ForeignKey(
+        WhatsappConversation,
+        on_delete=models.CASCADE,
+        related_name='internal_notes'
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='conversation_notes'
+    )
+    content = models.TextField(help_text="Conteúdo da nota")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Nota de Conversa'
+        verbose_name_plural = 'Notas de Conversas'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Nota de {self.author.username} em {self.conversation.conversation_id}"
+
+
 class WhatsappMessage(models.Model):
     """Mensagem do WhatsApp"""
     MESSAGE_TYPES = [
@@ -1288,7 +1571,7 @@ class WhatsappMessage(models.Model):
     ]
     
     message_id = models.CharField(max_length=100, unique=True, help_text="ID da mensagem no WhatsApp")
-    group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='messages')
+    group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='messages', null=True, blank=True)
     sender = models.ForeignKey(WhatsappParticipant, on_delete=models.CASCADE, related_name='sent_messages')
     message_type = models.CharField(max_length=20, choices=MESSAGE_TYPES, default='text')
     content = models.TextField(help_text="Conteúdo da mensagem")
@@ -1297,10 +1580,27 @@ class WhatsappMessage(models.Model):
     processed = models.BooleanField(default=False, help_text="Se foi processada pelo sistema")
     created_at = models.DateTimeField(auto_now_add=True)
     
+    # Sistema de conversas individuais (inspirado no Umbler Talk)
+    conversation = models.ForeignKey(
+        'WhatsappConversation',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='messages',
+        help_text="Conversa/ticket individual (após compra)"
+    )
+    read = models.BooleanField(default=False, help_text="Mensagem foi lida")
+    read_at = models.DateTimeField(null=True, blank=True, help_text="Quando foi lida")
+    is_from_customer = models.BooleanField(default=True, help_text="Mensagem veio do cliente")
+    
     class Meta:
         verbose_name = 'Mensagem WhatsApp'
         verbose_name_plural = 'Mensagens WhatsApp'
         ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['conversation', 'read']),
+            models.Index(fields=['sender', 'timestamp']),
+        ]
     
     def __str__(self):
         return f"{self.sender.name}: {self.content[:50]}..."

@@ -537,6 +537,10 @@ def create_whatsapp_order(request):
             payment_status='pending'
         )
         
+        # Criar conversa individual automaticamente após pedido (Umbler Talk Style)
+        from .conversations_views import create_conversation_after_order
+        conversation = create_conversation_after_order(order)
+        
         return JsonResponse({
             'success': True,
             'order': {

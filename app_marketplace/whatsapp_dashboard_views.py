@@ -21,7 +21,7 @@ from .models import (
     Cliente, Produto, Categoria, Agente, ClienteRelacao,
     RelacionamentoClienteShopper, TrustlineKeeper,
     ParticipantPermissionRequest, CarteiraCliente,
-    PostScreenshot
+    PostScreenshot, WhatsappConversation, ConversationNote
 )
 from .whatsapp_views import send_message, send_reaction
 

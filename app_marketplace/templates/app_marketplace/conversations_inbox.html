@@ -1,0 +1,419 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Caixa de Entrada WhatsApp - ÉVORA Connect{% endblock %}
+
+{% block extra_css %}
+<style>
+    .conversations-container {
+        height: calc(100vh - 200px);
+        display: flex;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+        background: white;
+    }
+    
+    .conversations-sidebar {
+        width: 300px;
+        border-right: 1px solid #dee2e6;
+        background: #f8f9fa;
+        overflow-y: auto;
+        padding: 1rem;
+    }
+    
+    .conversations-list {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    
+    .conversations-header {
+        padding: 1rem;
+        border-bottom: 1px solid #dee2e6;
+        background: white;
+    }
+    
+    .conversation-item {
+        padding: 1rem;
+        border-bottom: 1px solid #e9ecef;
+        cursor: pointer;
+        transition: background 0.2s;
+        position: relative;
+    }
+    
+    .conversation-item:hover {
+        background: #f8f9fa;
+    }
+    
+    .conversation-item.active {
+        background: #e7f3ff;
+        border-left: 4px solid #0d6efd;
+    }
+    
+    .conversation-item.unread {
+        background: #fff3cd;
+        font-weight: 500;
+    }
+    
+    .conversation-item.unread.active {
+        background: #e7f3ff;
+    }
+    
+    .unread-badge {
+        background: #dc3545;
+        color: white;
+        border-radius: 12px;
+        padding: 2px 8px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin-left: auto;
+    }
+    
+    .priority-badge {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .priority-urgent { background: #dc3545; }
+    .priority-high { background: #fd7e14; }
+    .priority-medium { background: #ffc107; }
+    .priority-normal { background: #28a745; }
+    .priority-low { background: #6c757d; }
+    
+    .stats-item {
+        padding: 0.5rem 1rem;
+        margin-bottom: 0.5rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .stats-item:hover {
+        background: #e9ecef;
+    }
+    
+    .stats-item.active {
+        background: #0d6efd;
+        color: white;
+    }
+    
+    .filter-section {
+        margin-top: 1.5rem;
+    }
+    
+    .filter-section h6 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #6c757d;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+    }
+    
+    .tag-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        margin: 0.25rem;
+        background: #e9ecef;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .tag-badge:hover {
+        background: #dee2e6;
+    }
+    
+    .tag-badge.active {
+        background: #0d6efd;
+        color: white;
+    }
+    
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #6c757d;
+        text-align: center;
+        padding: 2rem;
+    }
+    
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+    
+    .time-ago {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+    
+    .conversation-preview {
+        font-size: 0.875rem;
+        color: #6c757d;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fab fa-whatsapp text-success"></i> Caixa de Entrada WhatsApp
+        </h1>
+        <div>
+            <a href="{% url 'whatsapp_dashboard' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="conversations-container">
+        <!-- Sidebar com Filtros e Estatísticas -->
+        <div class="conversations-sidebar">
+            <!-- Estatísticas -->
+            <div class="mb-4">
+                <h5 class="mb-3">📊 Estatísticas</h5>
+                
+                <div class="stats-item {% if not filters.status or filters.status == 'new' or filters.status == 'open' or filters.status == 'waiting' %}active{% endif %}" 
+                     onclick="window.location='{% url 'conversations_inbox' %}'">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Total</span>
+                        <strong>{{ stats.total }}</strong>
+                    </div>
+                </div>
+                
+                <div class="stats-item {% if filters.status == 'new' %}active{% endif %}" 
+                     onclick="window.location='{% url 'conversations_inbox' %}?status=new'">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-circle text-danger"></i> Novas</span>
+                        <strong>{{ stats.new }}</strong>
+                    </div>
+                </div>
+                
+                <div class="stats-item {% if filters.status == 'open' %}active{% endif %}" 
+                     onclick="window.location='{% url 'conversations_inbox' %}?status=open'">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-folder-open text-primary"></i> Abertas</span>
+                        <strong>{{ stats.open }}</strong>
+                    </div>
+                </div>
+                
+                <div class="stats-item {% if filters.status == 'waiting' %}active{% endif %}" 
+                     onclick="window.location='{% url 'conversations_inbox' %}?status=waiting'">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-clock text-warning"></i> Aguardando</span>
+                        <strong>{{ stats.waiting }}</strong>
+                    </div>
+                </div>
+                
+                <div class="stats-item {% if filters.status == 'resolved' %}active{% endif %}" 
+                     onclick="window.location='{% url 'conversations_inbox' %}?status=resolved'">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-check-circle text-success"></i> Resolvidas</span>
+                        <strong>{{ stats.resolved }}</strong>
+                    </div>
+                </div>
+                
+                {% if stats.unread > 0 %}
+                <div class="stats-item mt-3" 
+                     onclick="window.location='{% url 'conversations_inbox' %}'">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-envelope"></i> Não Lidas</span>
+                        <span class="unread-badge">{{ stats.unread }}</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Filtros -->
+            <div class="filter-section">
+                <h6>Filtros</h6>
+                
+                <div class="mb-3">
+                    <label class="form-label small">Atribuídas:</label>
+                    <div class="d-flex flex-column gap-1">
+                        <button class="btn btn-sm btn-outline-primary {% if filters.assigned == 'me' %}active{% endif %}" 
+                                onclick="window.location='{% url 'conversations_inbox' %}?assigned=me'">
+                            Minhas
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary {% if filters.assigned == 'unassigned' %}active{% endif %}" 
+                                onclick="window.location='{% url 'conversations_inbox' %}?assigned=unassigned'">
+                            Sem atribuição
+                        </button>
+                    </div>
+                </div>
+                
+                {% if all_tags %}
+                <div class="mb-3">
+                    <label class="form-label small">Tags:</label>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for tag in all_tags %}
+                        <span class="tag-badge {% if filters.tag == tag %}active{% endif %}" 
+                              onclick="window.location='{% url 'conversations_inbox' %}?tag={{ tag }}'">
+                            #{{ tag }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Lista de Conversas -->
+        <div class="conversations-list">
+            <!-- Header com Busca -->
+            <div class="conversations-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📧 Conversas</h5>
+                    <form method="get" class="d-flex gap-2" style="width: 400px;">
+                        <input type="text" name="search" class="form-control form-control-sm" 
+                               placeholder="Buscar conversas..." 
+                               value="{{ filters.search }}">
+                        {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
+                        {% if filters.assigned %}<input type="hidden" name="assigned" value="{{ filters.assigned }}">{% endif %}
+                        {% if filters.tag %}<input type="hidden" name="tag" value="{{ filters.tag }}">{% endif %}
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            <i class="fas fa-search"></i>
+                        </button>
+                        {% if filters.search %}
+                        <a href="{% url 'conversations_inbox' %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-times"></i>
+                        </a>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Lista -->
+            <div style="flex: 1; overflow-y: auto;">
+                {% if page_obj %}
+                    {% for conversation in page_obj %}
+                    <div class="conversation-item {% if conversation.is_unread %}unread{% endif %}" 
+                         onclick="window.location='{% url 'conversation_detail' conversation.conversation_id %}'">
+                        <div class="d-flex align-items-start gap-2">
+                            <!-- Indicador de Prioridade -->
+                            <span class="priority-badge 
+                                {% if conversation.priority >= 9 %}priority-urgent
+                                {% elif conversation.priority >= 7 %}priority-high
+                                {% elif conversation.priority >= 5 %}priority-medium
+                                {% elif conversation.priority >= 3 %}priority-normal
+                                {% else %}priority-low{% endif %}"></span>
+                            
+                            <div class="flex-grow-1" style="min-width: 0;">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <div>
+                                        <strong>{{ conversation.participant.name|default:conversation.participant.phone }}</strong>
+                                        {% if conversation.cliente %}
+                                        <span class="badge bg-info ms-2">Cliente</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        {% if conversation.is_unread %}
+                                        <span class="unread-badge">{{ conversation.unread_count }}</span>
+                                        {% endif %}
+                                        <span class="time-ago">
+                                            {% if conversation.last_message_at %}
+                                                {{ conversation.last_message_at|timesince }} atrás
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div class="conversation-preview mb-1">
+                                    {% if conversation.messages.first %}
+                                        {{ conversation.messages.first.content|truncatewords:15 }}
+                                    {% else %}
+                                        Nova conversa
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="badge bg-{% if conversation.status == 'new' %}danger{% elif conversation.status == 'open' %}primary{% elif conversation.status == 'waiting' %}warning{% elif conversation.status == 'resolved' %}success{% else %}secondary{% endif %}">
+                                        {{ conversation.get_status_display }}
+                                    </span>
+                                    
+                                    {% if conversation.assigned_to %}
+                                    <small class="text-muted">
+                                        <i class="fas fa-user"></i> {{ conversation.assigned_to.get_full_name|default:conversation.assigned_to.username }}
+                                    </small>
+                                    {% else %}
+                                    <small class="text-muted">
+                                        <i class="fas fa-user-slash"></i> Sem atribuição
+                                    </small>
+                                    {% endif %}
+                                    
+                                    {% if conversation.tags %}
+                                    <div>
+                                        {% for tag in conversation.tags|slice:":3" %}
+                                        <span class="badge bg-secondary">#{{ tag }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fab fa-whatsapp"></i>
+                        <h5>Nenhuma conversa encontrada</h5>
+                        <p class="text-muted">Não há conversas que correspondam aos filtros selecionados.</p>
+                        <a href="{% url 'conversations_inbox' %}" class="btn btn-primary">
+                            Ver todas as conversas
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Paginação -->
+            {% if page_obj.has_other_pages %}
+            <div class="conversations-header border-top">
+                <nav aria-label="Paginação">
+                    <ul class="pagination pagination-sm mb-0 justify-content-center">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.assigned %}&assigned={{ filters.assigned }}{% endif %}{% if filters.tag %}&tag={{ filters.tag }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}">Anterior</a>
+                        </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.assigned %}&assigned={{ filters.assigned }}{% endif %}{% if filters.tag %}&tag={{ filters.tag }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}">Próxima</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-refresh a cada 30 segundos
+    setTimeout(function() {
+        location.reload();
+    }, 30000);
+</script>
+{% endblock %}
+

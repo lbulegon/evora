@@ -2,6 +2,7 @@ from django.urls import path, include
 from . import views
 from . import whatsapp_views
 from . import whatsapp_dashboard_views
+from . import conversations_views
 from . import shopper_dashboard_views
 from . import kmn_views
 from . import admin_dashboard_views
@@ -31,6 +32,15 @@ urlpatterns = [
     path('whatsapp/groups/<int:group_id>/products/', whatsapp_dashboard_views.products_list, name='whatsapp_products_list'),
     path('whatsapp/groups/<int:group_id>/orders/', whatsapp_dashboard_views.orders_list, name='whatsapp_orders_list'),
     path('whatsapp/analytics/', whatsapp_dashboard_views.whatsapp_analytics, name='whatsapp_analytics'),
+    
+    # Sistema de Conversas Individuais (Umbler Talk Style)
+    path('whatsapp/conversations/', conversations_views.conversations_inbox, name='conversations_inbox'),
+    path('whatsapp/conversations/<str:conversation_id>/', conversations_views.conversation_detail, name='conversation_detail'),
+    path('api/conversations/<str:conversation_id>/send-message/', conversations_views.send_conversation_message, name='api_send_conversation_message'),
+    path('api/conversations/<str:conversation_id>/assign/', conversations_views.assign_conversation, name='api_assign_conversation'),
+    path('api/conversations/<str:conversation_id>/status/', conversations_views.update_conversation_status, name='api_update_conversation_status'),
+    path('api/conversations/<str:conversation_id>/tags/', conversations_views.add_conversation_tag, name='api_add_conversation_tag'),
+    path('api/conversations/<str:conversation_id>/notes/', conversations_views.create_conversation_note, name='api_create_conversation_note'),
     
            # API Endpoints
            path('api/whatsapp/groups/create/', whatsapp_dashboard_views.create_group, name='api_create_group'),

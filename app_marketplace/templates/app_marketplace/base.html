@@ -62,6 +62,11 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link {% if 'conversations_inbox' == request.resolver_match.url_name or 'conversation_detail' == request.resolver_match.url_name %}active{% endif %}" href="{% url 'conversations_inbox' %}">
+                                    <i class="fas fa-comments"></i> Conversas
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link {% if 'shopper_products' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'shopper_products' %}">
                                     <i class="fas fa-box"></i> Produtos
                                 </a>
