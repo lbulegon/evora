@@ -1,5 +1,7 @@
 """
-Extração de dados de produtos usando IA (OpenAI Vision API)
+Extração de dados de produtos usando IA
+Foco: OpenMind AI (servidor próprio no SinapUm)
+Fallback: OpenAI (opcional)
 Formata JSON no padrão ÉVORA conforme especificação
 """
 import os
@@ -9,7 +11,12 @@ import re
 from io import BytesIO
 from django.conf import settings
 from PIL import Image
+import requests
+import logging
 
+logger = logging.getLogger(__name__)
+
+# Verificar disponibilidade da OpenAI (opcional, para fallback)
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
@@ -120,14 +127,135 @@ def format_evora_json(extracted_data, image_url=None):
 
 def extract_product_data_from_image(image_file):
     """
-    Extrai dados de produto de uma imagem usando OpenAI Vision API
-    Retorna JSON formatado no padrão ÉVORA
+    Extrai dados de produto de uma imagem usando IA
+    Prioriza OpenMind AI, com fallback para OpenAI se configurado
     
     Args:
         image_file: Arquivo de imagem (BytesIO, File, ou caminho)
     
     Returns:
         dict: Dados extraídos no formato ÉVORA ou erro
+    """
+    # Verificar qual serviço usar (prioridade: OpenMind AI)
+    ai_service = os.getenv('AI_SERVICE', 'openmind').lower()
+    
+    if ai_service == 'openmind':
+        return _extract_with_openmind_ai(image_file)
+    elif ai_service == 'openai' and OPENAI_AVAILABLE:
+        return _extract_with_openai(image_file)
+    else:
+        return {
+            'error': f'Serviço de IA não configurado. AI_SERVICE={ai_service}. Configure OPENMIND_AI_URL ou OPENAI_API_KEY.'
+        }
+
+
+def _extract_with_openmind_ai(image_file):
+    """
+    Extrai dados usando OpenMind AI (servidor SinapUm)
+    """
+    openmind_url = os.getenv('OPENMIND_AI_URL') or getattr(settings, 'OPENMIND_AI_URL', None)
+    openmind_key = os.getenv('OPENMIND_AI_KEY') or getattr(settings, 'OPENMIND_AI_KEY', None)
+    timeout = int(os.getenv('OPENMIND_AI_TIMEOUT', '30'))
+    
+    if not openmind_url:
+        return {
+            'error': 'OPENMIND_AI_URL não configurada. Configure no arquivo .env'
+        }
+    
+    if not openmind_key:
+        return {
+            'error': 'OPENMIND_AI_KEY não configurada. Configure no arquivo .env'
+        }
+    
+    try:
+        # Preparar imagem
+        if isinstance(image_file, str):
+            with open(image_file, 'rb') as f:
+                image_data = f.read()
+                image_filename = os.path.basename(image_file)
+        elif hasattr(image_file, 'read'):
+            image_file.seek(0)
+            image_data = image_file.read()
+            image_filename = getattr(image_file, 'name', 'image.jpg')
+        else:
+            return {'error': 'Formato de imagem inválido'}
+        
+        # Construir URL completa do endpoint
+        endpoint_url = f"{openmind_url.rstrip('/')}/analyze-product-image"
+        
+        # Preparar requisição
+        files = {
+            'image': (image_filename, image_data, 'image/jpeg')
+        }
+        headers = {
+            'Authorization': f'Bearer {openmind_key}'
+        }
+        
+        logger.info(f"Enviando imagem para OpenMind AI: {endpoint_url}")
+        
+        # Fazer requisição HTTP
+        response = requests.post(
+            endpoint_url,
+            files=files,
+            headers=headers,
+            timeout=timeout
+        )
+        
+        # Verificar resposta
+        if response.status_code == 200:
+            result = response.json()
+            
+            if result.get('success'):
+                # OpenMind AI já retorna no formato ÉVORA
+                return {
+                    'success': True,
+                    'data': result.get('data', {})
+                }
+            else:
+                return {
+                    'error': result.get('error', 'Erro desconhecido do OpenMind AI'),
+                    'error_code': result.get('error_code', 'UNKNOWN')
+                }
+        elif response.status_code == 401:
+            return {
+                'error': 'Autenticação falhou. Verifique OPENMIND_AI_KEY',
+                'error_code': 'UNAUTHORIZED'
+            }
+        elif response.status_code == 400:
+            error_data = response.json() if response.content else {}
+            return {
+                'error': error_data.get('error', 'Erro na requisição ao OpenMind AI'),
+                'error_code': error_data.get('error_code', 'BAD_REQUEST')
+            }
+        else:
+            return {
+                'error': f'Erro ao conectar com OpenMind AI: Status {response.status_code}',
+                'error_code': 'HTTP_ERROR',
+                'status_code': response.status_code
+            }
+    
+    except requests.exceptions.Timeout:
+        return {
+            'error': f'Timeout ao conectar com OpenMind AI (timeout: {timeout}s)',
+            'error_code': 'TIMEOUT'
+        }
+    except requests.exceptions.ConnectionError as e:
+        return {
+            'error': f'Não foi possível conectar com OpenMind AI em {openmind_url}. Verifique se o servidor está rodando.',
+            'error_code': 'CONNECTION_ERROR'
+        }
+    except Exception as e:
+        import traceback
+        logger.error(f"Erro ao processar imagem com OpenMind AI: {str(e)}")
+        logger.error(traceback.format_exc())
+        return {
+            'error': f'Erro ao processar imagem com OpenMind AI: {str(e)}'
+        }
+
+
+def _extract_with_openai(image_file):
+    """
+    Extrai dados usando OpenAI Vision API (fallback)
     """
     if not OPENAI_AVAILABLE:
         return {

@@ -188,3 +188,7 @@ Este projeto está sob a licença MIT.
 
 chat Id
 7b059999-6bdf-47d9-a806-ddd9a3b9be53
+
+
+
+OPENMIND_AI_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1

@@ -1,0 +1,135 @@
+# =============================================================================
+# COMANDOS PARA DEPLOY - OpenMind AI Server no SinapUm
+# =============================================================================
+# Copie e cole cada seção no terminal conforme indicado
+
+# =============================================================================
+# PARTE 1: NO SEU COMPUTADOR (Windows PowerShell)
+# =============================================================================
+
+# Navegar para o diretório do projeto
+cd C:\Users\lbule\OneDrive\Documentos\Source\evora
+
+# Transferir todos os arquivos para o servidor SinapUm
+scp -r openmind-ai-server/* root@69.169.102.84:/opt/openmind-ai/
+
+
+# =============================================================================
+# PARTE 2: NO SERVIDOR SINAPUM (via SSH)
+# =============================================================================
+
+# Conectar ao servidor
+ssh root@69.169.102.84
+
+# Criar diretório (se não existir)
+mkdir -p /opt/openmind-ai
+cd /opt/openmind-ai
+
+# Instalar dependências do sistema
+apt update && apt upgrade -y
+apt install -y python3 python3-pip python3-venv git curl wget
+
+# Criar ambiente virtual
+python3 -m venv venv
+source venv/bin/activate
+
+# Instalar dependências Python
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Criar arquivo .env
+cat > .env << 'EOF'
+OPENMIND_AI_API_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+OPENMIND_AI_HOST=0.0.0.0
+OPENMIND_AI_PORT=8000
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o
+RATE_LIMIT_PER_MINUTE=100
+MAX_IMAGE_SIZE_MB=10
+ALLOWED_IMAGE_FORMATS=jpeg,jpg,png,webp
+IMAGE_MAX_DIMENSION=2048
+LOG_LEVEL=INFO
+CORS_ORIGINS=*
+EOF
+
+# Testar servidor (modo desenvolvimento)
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# (Em outro terminal, testar:)
+# curl http://localhost:8000/health
+# (Se funcionar, pressione Ctrl+C para parar)
+
+# Criar diretório de logs
+mkdir -p /var/log/openmind-ai
+chmod 755 /var/log/openmind-ai
+
+# Criar serviço systemd
+cat > /etc/systemd/system/openmind-ai.service << 'EOF'
+[Unit]
+Description=OpenMind AI Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/openmind-ai
+Environment="PATH=/opt/openmind-ai/venv/bin"
+ExecStart=/opt/openmind-ai/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Ativar e iniciar serviço
+systemctl daemon-reload
+systemctl enable openmind-ai
+systemctl start openmind-ai
+
+# Verificar status
+systemctl status openmind-ai
+
+# Configurar firewall
+ufw allow 8000/tcp
+ufw reload
+
+# Testar health check
+curl http://localhost:8000/health
+
+# Testar de fora (do seu computador)
+# curl http://69.169.102.84:8000/health
+
+
+# =============================================================================
+# PARTE 3: CONFIGURAR NO ÉVORA (no seu computador)
+# =============================================================================
+
+# O arquivo .env do ÉVORA já deve ter:
+# AI_SERVICE=openmind
+# OPENMIND_AI_URL=http://69.169.102.84:8000/api/v1
+# OPENMIND_AI_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+
+# Se não tiver, adicione essas linhas ao .env do ÉVORA
+
+
+# =============================================================================
+# COMANDOS ÚTEIS PARA DEPOIS
+# =============================================================================
+
+# Ver logs do serviço
+journalctl -u openmind-ai -f
+
+# Reiniciar serviço
+systemctl restart openmind-ai
+
+# Parar serviço
+systemctl stop openmind-ai
+
+# Ver status
+systemctl status openmind-ai
+
+# Ver documentação da API
+# Acesse: http://69.169.102.84:8000/docs

@@ -141,3 +141,4 @@ Erros CSRF são intermitentes - a maioria dos logins funciona. Pode ser relacion
 - [Django Storages Documentation](https://django-storages.readthedocs.io/)
 - [Railway Ephemeral Filesystem](https://docs.railway.app/guides/railway-volumes)
 - [Django Static Files](https://docs.djangoproject.com/en/5.2/howto/static-files/)
+

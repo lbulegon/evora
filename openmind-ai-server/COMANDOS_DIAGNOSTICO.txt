@@ -1,0 +1,45 @@
+# =============================================================================
+# COMANDOS DE DIAGNÓSTICO E CORREÇÃO
+# Execute estes comandos no servidor SinapUm (SSH)
+# =============================================================================
+
+# 1. Ir para o diretório do projeto
+cd /opt/openmind-ai
+source venv/bin/activate
+
+# 2. Verificar se os arquivos foram transferidos
+ls -la
+ls -la app/
+ls -la app/main.py
+
+# 3. Ver logs do serviço (ver o erro)
+journalctl -u openmind-ai -n 100 --no-pager
+
+# 4. Ver status do serviço
+systemctl status openmind-ai
+
+# 5. Corrigir requirements.txt (remover python-cors)
+sed -i '/python-cors/d' requirements.txt
+
+# 6. Reinstalar dependências
+pip install -r requirements.txt
+
+# 7. Testar se consegue importar
+python3 -c "from app.main import app; print('OK')"
+
+# 8. Se der erro, ver qual erro:
+python3 -c "from app.main import app" 2>&1
+
+# 9. Se os arquivos não existirem, você precisa transferir:
+# (No seu computador)
+# scp -r openmind-ai-server/* root@69.169.102.84:/opt/openmind-ai/
+
+# 10. Depois de corrigir, reiniciar serviço
+systemctl restart openmind-ai
+
+# 11. Verificar se está funcionando
+systemctl status openmind-ai
+curl http://localhost:8000/health
+
+# 12. Ver logs em tempo real
+journalctl -u openmind-ai -f

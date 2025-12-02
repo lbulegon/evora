@@ -14,7 +14,14 @@ from pathlib import Path
 from decouple import config
 
 
+# Configurações de IA
 OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
+
+# OpenMind AI - Servidor próprio (SinapUm)
+AI_SERVICE = config("AI_SERVICE", default="openmind")  # "openmind" ou "openai"
+OPENMIND_AI_URL = config("OPENMIND_AI_URL", default="")
+OPENMIND_AI_KEY = config("OPENMIND_AI_KEY", default="")
+OPENMIND_AI_TIMEOUT = config("OPENMIND_AI_TIMEOUT", default=30, cast=int)
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.

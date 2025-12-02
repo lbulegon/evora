@@ -48,6 +48,22 @@ WEBHOOK_URL=http://localhost:8000/webhooks/whatsapp/
 OPENAI_API_KEY=sk-sua-chave-aqui
 
 # =============================================================================
+# OPENMIND AI - Servidor SinapUm (Opcional - para substituir OpenAI)
+# =============================================================================
+AI_SERVICE=openmind  # ou "openai" para usar OpenAI | "openmind" para usar servidor próprio
+OPENMIND_AI_URL=http://69.169.102.84:8000/api/v1  # URL do servidor SinapUm
+OPENMIND_AI_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+OPENMIND_AI_TIMEOUT=30
+
+# =============================================================================
+# SERVIDOR SINAPUM - SSH (Para deploy/manutenção)
+# =============================================================================
+SINAPUM_SSH_HOST=69.169.102.84
+SINAPUM_SSH_USER=root
+SINAPUM_SSH_PASSWORD=sua-senha-aqui
+SINAPUM_SSH_PORT=22
+
+# =============================================================================
 # CÂMBIO (Opcional - para conversão USD → BRL)
 # =============================================================================
 USD_BRL=5.0
