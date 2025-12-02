@@ -23,6 +23,9 @@ from .models import (
     Categoria, Empresa
 )
 from .ai_product_extractor import extract_product_data_from_image, format_evora_json, generate_sku_interno
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -69,12 +72,6 @@ def detect_product_by_photo(request):
     try:
         # Verificar se há arquivo na requisição
         if 'image' not in request.FILES:
-            # Log detalhado para debug
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Erro: 'image' não encontrado em request.FILES. Chaves disponíveis: {list(request.FILES.keys())}")
-            logger.error(f"Content-Type: {request.content_type}")
-            logger.error(f"Request method: {request.method}")
             return JsonResponse({
                 'error': 'Imagem é obrigatória',
                 'debug': {
@@ -129,10 +126,7 @@ def detect_product_by_photo(request):
         image_file.seek(0)  # Resetar para ler novamente
         result = extract_product_data_from_image(image_file)
         
-        logger.info(f"Resultado da análise: success={result.get('success')}, has_error={bool(result.get('error'))}, has_data={bool(result.get('data'))}")
-        
         if result.get('error'):
-            logger.error(f"Erro na análise: {result['error']}")
             return JsonResponse({
                 'error': result['error'],
                 'image_url': image_url  # Retornar URL mesmo se IA falhar
@@ -140,7 +134,6 @@ def detect_product_by_photo(request):
         
         # Verificar se tem dados
         if not result.get('success') or not result.get('data'):
-            logger.error(f"Análise não retornou dados: {result}")
             return JsonResponse({
                 'error': 'Análise não retornou dados válidos. Verifique se o servidor OpenMind AI está funcionando.',
                 'debug': result
@@ -148,7 +141,6 @@ def detect_product_by_photo(request):
         
         # Formatar dados no padrão ÉVORA
         ai_data = result['data']
-        logger.info(f"Dados extraídos: nome={ai_data.get('nome_produto', 'N/A')}, categoria={ai_data.get('categoria', 'N/A')}")
         evora_json = format_evora_json(ai_data, image_url)
         
         # Retornar JSON ÉVORA completo + dados simplificados para formulário
