@@ -635,45 +635,25 @@ async function analyzePhoto(blob) {
             console.log('Dados extraídos:', extractedData);
             console.log('Product data:', data.product_data);
             
-            // Preencher formulário com dados simplificados (sempre, mesmo se alguns campos estiverem vazios)
-            if (data.product_data) {
+            // Preencher formulário com dados simplificados
+            if (data.product_data && Object.keys(data.product_data).length > 0) {
                 fillForm(data.product_data);
-                console.log('Formulário preenchido com:', data.product_data);
             } else {
-                console.warn('Product data não disponível');
-                showError('Dados extraídos não disponíveis. A IA pode não ter conseguido analisar a imagem completamente.');
+                console.warn('Product data vazio ou não disponível');
+                showError('Dados extraídos estão vazios. A IA não conseguiu analisar a imagem.');
+                return;
             }
             
             // Preencher campos adicionais do JSON ÉVORA
             if (extractedData) {
-                const subcatInput = document.getElementById('inputSubcategoria');
-                if (subcatInput && extractedData.subcategoria) {
-                    subcatInput.value = extractedData.subcategoria;
-                }
-                const skuInput = document.getElementById('inputSkuInterno');
-                if (skuInput && extractedData.sku_interno && !skuInput.value) {
-                    skuInput.value = extractedData.sku_interno;
-                }
+                document.getElementById('inputSubcategoria').value = extractedData.subcategoria || '';
+                document.getElementById('inputSkuInterno').value = extractedData.sku_interno || '';
             }
             
-            // Mostrar preview da imagem (usar blob se URL não funcionar)
+            // Mostrar preview da imagem
             const imgPreview = document.getElementById('step2ImagePreview');
-            if (imgPreview) {
-                if (currentImageUrl) {
-                    imgPreview.src = currentImageUrl;
-                    imgPreview.style.display = 'block';
-                    // Se falhar carregar, usar o blob
-                    imgPreview.onerror = function() {
-                        console.warn('Erro ao carregar imagem da URL, usando blob');
-                        if (capturedBlob) {
-                            imgPreview.src = URL.createObjectURL(capturedBlob);
-                        }
-                    };
-                } else if (capturedBlob) {
-                    imgPreview.src = URL.createObjectURL(capturedBlob);
-                    imgPreview.style.display = 'block';
-                }
-            }
+            imgPreview.src = currentImageUrl;
+            imgPreview.style.display = 'block';
             
             // Atualizar JSON editor com JSON ÉVORA completo
             document.getElementById('jsonEditor').value = JSON.stringify(extractedData, null, 2);
@@ -699,75 +679,24 @@ async function analyzePhoto(blob) {
 
 // Preencher formulário com dados extraídos
 function fillForm(data) {
-    console.log('fillForm chamado com dados:', data);
+    document.getElementById('inputName').value = data.nome_sugerido || '';
+    document.getElementById('inputBrand').value = data.marca_sugerida || '';
+    document.getElementById('inputPrice').value = data.preco_visivel || '';
+    document.getElementById('inputDescription').value = data.descricao_observacoes || '';
+    document.getElementById('inputPesoVolume').value = data.peso_volume || '';
+    document.getElementById('inputCodigoBarras').value = data.codigo_barras || '';
+    document.getElementById('inputSkuInterno').value = data.sku_interno || '';
     
-    try {
-        // Nome do produto
-        const nameInput = document.getElementById('inputName');
-        if (nameInput && data.nome_sugerido) {
-            nameInput.value = data.nome_sugerido;
-            console.log('Nome preenchido:', data.nome_sugerido);
-        }
-        
-        // Marca
-        const brandInput = document.getElementById('inputBrand');
-        if (brandInput && data.marca_sugerida) {
-            brandInput.value = data.marca_sugerida;
-            console.log('Marca preenchida:', data.marca_sugerida);
-        }
-        
-        // Preço
-        const priceInput = document.getElementById('inputPrice');
-        if (priceInput && data.preco_visivel) {
-            priceInput.value = data.preco_visivel;
-            console.log('Preço preenchido:', data.preco_visivel);
-        }
-        
-        // Descrição
-        const descInput = document.getElementById('inputDescription');
-        if (descInput && data.descricao_observacoes) {
-            descInput.value = data.descricao_observacoes;
-            console.log('Descrição preenchida');
-        }
-        
-        // Peso/Volume
-        const pesoInput = document.getElementById('inputPesoVolume');
-        if (pesoInput && data.peso_volume) {
-            pesoInput.value = data.peso_volume;
-        }
-        
-        // Código de barras
-        const barcodeInput = document.getElementById('inputCodigoBarras');
-        if (barcodeInput && data.codigo_barras) {
-            barcodeInput.value = data.codigo_barras;
-            console.log('Código de barras preenchido:', data.codigo_barras);
-        }
-        
-        // SKU Interno
-        const skuInput = document.getElementById('inputSkuInterno');
-        if (skuInput && data.sku_interno) {
-            skuInput.value = data.sku_interno;
-        }
-        
-        // Selecionar categoria se encontrada
-        if (data.categoria_sugerida) {
-            const categorySelect = document.getElementById('inputCategory');
-            if (categorySelect) {
-                for (let option of categorySelect.options) {
-                    if (option.text.toLowerCase().includes(data.categoria_sugerida.toLowerCase()) || 
-                        data.categoria_sugerida.toLowerCase().includes(option.text.toLowerCase())) {
-                        option.selected = true;
-                        console.log('Categoria selecionada:', option.text);
-                        break;
-                    }
-                }
+    // Selecionar categoria se encontrada
+    if (data.categoria_sugerida) {
+        const categorySelect = document.getElementById('inputCategory');
+        for (let option of categorySelect.options) {
+            if (option.text.toLowerCase().includes(data.categoria_sugerida.toLowerCase()) || 
+                data.categoria_sugerida.toLowerCase().includes(option.text.toLowerCase())) {
+                option.selected = true;
+                break;
             }
         }
-        
-        console.log('Formulário preenchido com sucesso!');
-    } catch (error) {
-        console.error('Erro ao preencher formulário:', error);
-        showError('Erro ao preencher formulário: ' + error.message);
     }
 }
 
