@@ -143,21 +143,49 @@ def detect_product_by_photo(request):
         ai_data = result['data']
         evora_json = format_evora_json(ai_data, image_url)
         
+        # Extrair marca corretamente (pode estar em caracteristicas ou direto)
+        caracteristicas_evora = evora_json.get('caracteristicas', {})
+        caracteristicas_ai = ai_data.get('caracteristicas', {}) if isinstance(ai_data.get('caracteristicas'), dict) else {}
+        
+        marca_sugerida = ''
+        if isinstance(caracteristicas_evora, dict) and caracteristicas_evora.get('marca'):
+            marca_sugerida = caracteristicas_evora.get('marca', '')
+        elif isinstance(caracteristicas_ai, dict) and caracteristicas_ai.get('marca'):
+            marca_sugerida = caracteristicas_ai.get('marca', '')
+        elif ai_data.get('marca'):
+            marca_sugerida = ai_data.get('marca', '')
+        
+        # Extrair código de barras
+        codigo_barras = evora_json.get('codigo_barras') or ai_data.get('codigo_barras')
+        if codigo_barras:
+            codigo_barras = str(codigo_barras)
+        else:
+            codigo_barras = ''
+        
+        # Extrair preço visível
+        preco_visivel = ai_data.get('preco_visivel') or evora_json.get('preco_visivel')
+        if preco_visivel:
+            preco_visivel = str(preco_visivel)
+        else:
+            preco_visivel = ''
+        
+        # Preparar product_data
+        product_data = {
+            'nome_sugerido': evora_json.get('nome_produto', '') or ai_data.get('nome_produto', ''),
+            'marca_sugerida': marca_sugerida,
+            'categoria_sugerida': evora_json.get('categoria', '') or ai_data.get('categoria', ''),
+            'subcategoria_sugerida': evora_json.get('subcategoria', '') or ai_data.get('subcategoria', ''),
+            'descricao_observacoes': evora_json.get('descricao', '') or ai_data.get('descricao', ''),
+            'codigo_barras': codigo_barras,
+            'sku_interno': evora_json.get('sku_interno', '') or ai_data.get('sku_interno', ''),
+            'preco_visivel': preco_visivel,
+        }
+        
         # Retornar JSON ÉVORA completo + dados simplificados para formulário
         return JsonResponse({
             'success': True,
             'evora_json': evora_json,  # JSON completo no padrão ÉVORA
-            'product_data': {
-                # Dados simplificados para preencher formulário
-                'nome_sugerido': evora_json.get('nome_produto', ''),
-                'marca_sugerida': evora_json.get('caracteristicas', {}).get('marca', ''),
-                'categoria_sugerida': evora_json.get('categoria', ''),
-                'subcategoria_sugerida': evora_json.get('subcategoria', ''),
-                'descricao_observacoes': evora_json.get('descricao', ''),
-                'codigo_barras': evora_json.get('codigo_barras', ''),
-                'sku_interno': evora_json.get('sku_interno', ''),
-                'preco_visivel': ai_data.get('preco_visivel', ''),  # Se houver na embalagem
-            },
+            'product_data': product_data,
             'image_url': image_url,  # URL da imagem salva para uso posterior
             'temp_path': saved_path  # Para referência
         })
