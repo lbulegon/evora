@@ -1,0 +1,30 @@
+# =============================================================================
+# VARIÁVEIS DE AMBIENTE PARA CONFIGURAR NO RAILWAY
+# Copie e cole estas variáveis no painel do Railway
+# =============================================================================
+
+# Escolher serviço de IA
+AI_SERVICE=openmind
+
+# Configuração do OpenMind AI (servidor SinapUm)
+OPENMIND_AI_URL=http://69.169.102.84:8000/api/v1
+OPENMIND_AI_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+OPENMIND_AI_TIMEOUT=30
+
+# =============================================================================
+# COMO ADICIONAR NO RAILWAY:
+# =============================================================================
+# 1. Acesse: https://railway.app
+# 2. Selecione seu projeto ÉVORA
+# 3. Vá em "Variables" ou "Settings" → "Variables"
+# 4. Clique em "New Variable"
+# 5. Adicione cada uma das variáveis acima (Nome e Valor)
+# 6. Clique em "Add"
+# 7. O Railway vai fazer redeploy automaticamente
+# =============================================================================
+
+# OU via CLI:
+# railway variables set AI_SERVICE=openmind
+# railway variables set OPENMIND_AI_URL=http://69.169.102.84:8000/api/v1
+# railway variables set OPENMIND_AI_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+# railway variables set OPENMIND_AI_TIMEOUT=30

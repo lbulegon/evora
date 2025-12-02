@@ -1,0 +1,46 @@
+# =============================================================================
+# COMANDOS PARA CONFIGURAR OPENAI API KEY NO SERVIDOR SINAPUM
+# =============================================================================
+
+# 1. Conectar ao servidor SinapUm
+ssh root@69.169.102.84
+
+# 2. Ir para o diretório do OpenMind AI
+cd /opt/openmind-ai
+
+# 3. Verificar se já existe alguma configuração
+cat .env | grep OPENAI_API_KEY
+
+# 4. Editar arquivo .env
+nano .env
+
+# 5. Adicionar ou editar a linha:
+# OPENAI_API_KEY=sk-sua-chave-openai-aqui
+# 
+# Use a mesma chave que está no Railway ou crie uma nova
+# Para obter chave: https://platform.openai.com/api-keys
+
+# 6. Salvar arquivo (Ctrl+O, Enter, Ctrl+X)
+
+# 7. Verificar se foi salvo corretamente
+cat .env | grep OPENAI_API_KEY
+
+# 8. Reiniciar serviço
+systemctl restart openmind-ai
+
+# 9. Verificar status
+systemctl status openmind-ai
+
+# 10. Ver logs (deve mostrar processamento quando analisar imagem)
+journalctl -u openmind-ai -f
+
+# =============================================================================
+# TESTAR APÓS CONFIGURAR
+# =============================================================================
+
+# Teste manual (com uma imagem):
+curl -X POST http://localhost:8000/api/v1/analyze-product-image \
+  -H "Authorization: Bearer om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1" \
+  -F "image=@/caminho/para/imagem.jpg"
+
+# Deve retornar dados reais do produto, não dados genéricos!

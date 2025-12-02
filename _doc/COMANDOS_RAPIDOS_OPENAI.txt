@@ -1,0 +1,37 @@
+# =============================================================================
+# COMANDOS RÁPIDOS - Configurar OpenAI no SinapUm
+# Copie e cole no terminal SSH
+# =============================================================================
+
+# 1. Conectar
+ssh root@69.169.102.84
+
+# 2. Ir para o diretório
+cd /opt/openmind-ai
+
+# 3. Ver configuração atual
+cat .env | grep OPENAI_API_KEY
+
+# 4. Editar (substitua "sk-sua-chave-aqui" pela chave real)
+nano .env
+
+# No editor nano:
+# - Procure por OPENAI_API_KEY
+# - Substitua ou adicione: OPENAI_API_KEY=sk-sua-chave-aqui
+# - Salve: Ctrl+O, Enter, Ctrl+X
+
+# 5. Verificar se salvou
+cat .env | grep OPENAI_API_KEY
+
+# 6. Reiniciar serviço
+systemctl restart openmind-ai
+
+# 7. Ver status
+systemctl status openmind-ai
+
+# 8. Ver logs (opcional - para monitorar)
+journalctl -u openmind-ai -f
+
+# =============================================================================
+# PRONTO! Agora teste no ÉVORA! 🚀
+# =============================================================================
