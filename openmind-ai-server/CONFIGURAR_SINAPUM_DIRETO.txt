@@ -1,0 +1,29 @@
+# Comandos para executar diretamente no servidor SinapUm
+# Você já está conectado, então execute estes comandos:
+
+cd /opt/openmind-ai
+
+# Backup
+cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+
+# Adicionar variáveis
+cat >> .env << 'EOF'
+
+# Autenticação do próprio servidor
+OPENMIND_AI_API_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+
+# OpenMind.org - LLM principal (você já pagou!)
+OPENMIND_ORG_API_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+OPENMIND_ORG_BASE_URL=https://api.openmind.org/api/core/openai
+OPENMIND_ORG_MODEL=qwen2.5-vl-72b-instruct
+EOF
+
+# Verificar
+cat .env | grep OPENMIND
+
+# Reiniciar
+systemctl restart openmind-ai
+
+# Status
+systemctl status openmind-ai
+
