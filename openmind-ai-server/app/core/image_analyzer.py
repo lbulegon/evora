@@ -5,10 +5,13 @@ Integra com modelos de IA (OpenAI, Ollama, ou modelo customizado)
 import os
 import json
 import base64
+import logging
 from io import BytesIO
 from PIL import Image
 from typing import Dict, Any
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 # Tentar importar OpenAI (para usar com OpenMind.org que é compatível)
 try:
@@ -46,11 +49,16 @@ def analyze_product_image(image_data: bytes, image_filename: str) -> Dict[str, A
     # Chamar modelo de IA - Priorizar OpenMind.org
     # Usa OPENMIND_ORG_API_KEY ou OPENMIND_AI_API_KEY como fallback (mesma chave!)
     org_api_key = settings.OPENMIND_ORG_API_KEY or settings.OPENMIND_AI_API_KEY
+    logger.info(f"Configuração OpenMind.org: API_KEY={'✅ Configurada' if org_api_key else '❌ Não configurada'}, BASE_URL={settings.OPENMIND_ORG_BASE_URL}")
+    
     if org_api_key and settings.OPENMIND_ORG_BASE_URL:
+        logger.info("Usando OpenMind.org para análise")
         return _analyze_with_openmind_org(img, base64_image, org_api_key)
     elif OPENAI_AVAILABLE and settings.OPENAI_API_KEY:
+        logger.warning("Usando OpenAI como fallback (OpenMind.org não configurado)")
         return _analyze_with_openai(img, base64_image)
     else:
+        logger.error(f"FALLBACK: Nenhum serviço configurado. OPENMIND_ORG_API_KEY={bool(settings.OPENMIND_ORG_API_KEY)}, OPENMIND_AI_API_KEY={bool(settings.OPENMIND_AI_API_KEY)}, OPENAI_API_KEY={bool(settings.OPENAI_API_KEY)}")
         # Fallback: retornar estrutura básica
         return {
             "nome_produto": "Produto identificado",
