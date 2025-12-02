@@ -50,10 +50,12 @@ OPENAI_API_KEY=sk-sua-chave-aqui
 # =============================================================================
 # OPENMIND AI - Servidor SinapUm (Opcional - para substituir OpenAI)
 # =============================================================================
-AI_SERVICE=openmind  # ou "openai" para usar OpenAI | "openmind" para usar servidor próprio
-OPENMIND_AI_URL=http://69.169.102.84:8000/api/v1  # URL do servidor SinapUm
+# Configuração Unificada - Use estas mesmas variáveis no Railway!
+AI_SERVICE=openmind
+OPENMIND_AI_URL=http://69.169.102.84:8000/api/v1
 OPENMIND_AI_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
 OPENMIND_AI_TIMEOUT=30
+OPENMIND_ORG_MODEL=qwen2.5-vl-72b-instruct
 
 # =============================================================================
 # SERVIDOR SINAPUM - SSH (Para deploy/manutenção)

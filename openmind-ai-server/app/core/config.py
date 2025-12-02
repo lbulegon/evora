@@ -9,12 +9,18 @@ from typing import List
 class Settings(BaseSettings):
     """Configurações da aplicação"""
     
-    # API
+    # API - Autenticação do servidor (usada também como fallback para OpenMind.org)
     OPENMIND_AI_API_KEY: str
     OPENMIND_AI_HOST: str = "0.0.0.0"
     OPENMIND_AI_PORT: int = 8000
     
-    # IA Backend
+    # OpenMind.org - LLM principal (você já pagou por isso!)
+    # Se não configurado, usa OPENMIND_AI_API_KEY como fallback
+    OPENMIND_ORG_API_KEY: str = ""
+    OPENMIND_ORG_BASE_URL: str = "https://api.openmind.org/api/core/openai"
+    OPENMIND_ORG_MODEL: str = "qwen2.5-vl-72b-instruct"  # Padrão Railway
+    
+    # IA Backend (fallback)
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o"
     

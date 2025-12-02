@@ -1,0 +1,44 @@
+# =============================================================================
+# VARIÁVEIS PADRONIZADAS - LISTA SIMPLIFICADA
+# =============================================================================
+
+# =============================================================================
+# 1. ÉVORA - Local e Railway (MESMAS VARIÁVEIS)
+# =============================================================================
+
+AI_SERVICE=openmind
+OPENMIND_AI_URL=http://69.169.102.84:8000/api/v1
+OPENMIND_AI_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+OPENMIND_AI_TIMEOUT=30
+OPENMIND_ORG_MODEL=qwen2.5-vl-72b-instruct
+
+
+# =============================================================================
+# 2. SERVIDOR OPENMIND AI - SinapUm (SIMPLIFICADO - Apenas 3 variáveis!)
+# =============================================================================
+
+# Apenas a chave (usa para autenticação do servidor E para OpenMind.org)
+OPENMIND_AI_API_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+
+# OpenMind.org - LLM principal
+OPENMIND_ORG_BASE_URL=https://api.openmind.org/api/core/openai
+OPENMIND_ORG_MODEL=qwen2.5-vl-72b-instruct
+
+
+# =============================================================================
+# RESUMO SIMPLIFICADO
+# =============================================================================
+
+# ÉVORA (Local/Railway): 5 variáveis
+# SinapUm: APENAS 3 variáveis! ✨
+
+# Notas:
+# - HOST e PORT já têm valores padrão (0.0.0.0:8000)
+# - OPENMIND_AI_API_KEY é usada também para OpenMind.org (mesma chave!)
+# - Se quiser usar chave diferente para OpenMind.org, adicione OPENMIND_ORG_API_KEY
+
+# Chave OpenMind (mesma para tudo):
+# om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+
+# Modelo de visão:
+# qwen2.5-vl-72b-instruct

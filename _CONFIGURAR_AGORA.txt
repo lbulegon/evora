@@ -1,0 +1,56 @@
+# =============================================================================
+# CONFIGURAÇÃO UNIFICADA - PASSO A PASSO
+# =============================================================================
+
+# =============================================================================
+# PASSO 1: .env LOCAL (ÉVORA)
+# =============================================================================
+
+# 1. Criar arquivo .env na raiz do projeto ÉVORA
+# 2. Adicionar estas variáveis:
+
+AI_SERVICE=openmind
+OPENMIND_AI_URL=http://69.169.102.84:8000/api/v1
+OPENMIND_AI_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+OPENMIND_AI_TIMEOUT=30
+OPENMIND_ORG_MODEL=qwen2.5-vl-72b-instruct
+
+
+# =============================================================================
+# PASSO 2: .env SERVIDOR SINAPUM
+# =============================================================================
+
+# 1. Conectar ao servidor:
+#    ssh root@69.169.102.84
+
+# 2. Ir para o diretório:
+#    cd /opt/openmind-ai
+
+# 3. Editar arquivo .env:
+#    nano .env
+
+# 4. Adicionar estas variáveis:
+
+OPENMIND_AI_API_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+OPENMIND_ORG_BASE_URL=https://api.openmind.org/api/core/openai
+OPENMIND_ORG_MODEL=qwen2.5-vl-72b-instruct
+
+# 5. Salvar: Ctrl+O, Enter, Ctrl+X
+
+# 6. Reiniciar serviço:
+#    systemctl restart openmind-ai
+
+
+# =============================================================================
+# PASSO 3: RAILWAY
+# =============================================================================
+
+# 1. Ir no Railway Dashboard
+# 2. Projeto ÉVORA → Variables
+# 3. Adicionar estas 5 variáveis (uma por uma):
+
+AI_SERVICE=openmind
+OPENMIND_AI_URL=http://69.169.102.84:8000/api/v1
+OPENMIND_AI_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
+OPENMIND_AI_TIMEOUT=30
+OPENMIND_ORG_MODEL=qwen2.5-vl-72b-instruct
