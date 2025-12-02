@@ -624,7 +624,7 @@ async function analyzePhoto(blob) {
         });
         
         const data = await response.json();
-        console.log('Resposta da API:', data);
+        console.log('Resposta completa da API:', JSON.stringify(data, null, 2));
         hideLoading();
         
         if (data.success) {
@@ -632,8 +632,17 @@ async function analyzePhoto(blob) {
             extractedData = data.evora_json || {};
             currentImageUrl = data.image_url;
             
+            console.log('Dados extraídos:', extractedData);
+            console.log('Product data:', data.product_data);
+            
             // Preencher formulário com dados simplificados
-            fillForm(data.product_data || {});
+            if (data.product_data && Object.keys(data.product_data).length > 0) {
+                fillForm(data.product_data);
+            } else {
+                console.warn('Product data vazio ou não disponível');
+                showError('Dados extraídos estão vazios. A IA não conseguiu analisar a imagem.');
+                return;
+            }
             
             // Preencher campos adicionais do JSON ÉVORA
             if (extractedData) {

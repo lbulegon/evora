@@ -129,14 +129,26 @@ def detect_product_by_photo(request):
         image_file.seek(0)  # Resetar para ler novamente
         result = extract_product_data_from_image(image_file)
         
+        logger.info(f"Resultado da análise: success={result.get('success')}, has_error={bool(result.get('error'))}, has_data={bool(result.get('data'))}")
+        
         if result.get('error'):
+            logger.error(f"Erro na análise: {result['error']}")
             return JsonResponse({
                 'error': result['error'],
                 'image_url': image_url  # Retornar URL mesmo se IA falhar
             }, status=400)
         
+        # Verificar se tem dados
+        if not result.get('success') or not result.get('data'):
+            logger.error(f"Análise não retornou dados: {result}")
+            return JsonResponse({
+                'error': 'Análise não retornou dados válidos. Verifique se o servidor OpenMind AI está funcionando.',
+                'debug': result
+            }, status=400)
+        
         # Formatar dados no padrão ÉVORA
         ai_data = result['data']
+        logger.info(f"Dados extraídos: nome={ai_data.get('nome_produto', 'N/A')}, categoria={ai_data.get('categoria', 'N/A')}")
         evora_json = format_evora_json(ai_data, image_url)
         
         # Retornar JSON ÉVORA completo + dados simplificados para formulário

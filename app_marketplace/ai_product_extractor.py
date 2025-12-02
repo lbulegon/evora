@@ -204,16 +204,22 @@ def _extract_with_openmind_ai(image_file):
         # Verificar resposta
         if response.status_code == 200:
             result = response.json()
+            logger.info(f"Resposta do servidor OpenMind AI: success={result.get('success')}, has_data={bool(result.get('data'))}")
             
             if result.get('success'):
+                data = result.get('data', {})
+                logger.info(f"Dados recebidos do servidor: keys={list(data.keys()) if isinstance(data, dict) else 'not a dict'}")
+                
                 # OpenMind AI já retorna no formato ÉVORA
                 return {
                     'success': True,
-                    'data': result.get('data', {})
+                    'data': data
                 }
             else:
+                error_msg = result.get('error', 'Erro desconhecido do OpenMind AI')
+                logger.error(f"Erro do servidor OpenMind AI: {error_msg}")
                 return {
-                    'error': result.get('error', 'Erro desconhecido do OpenMind AI'),
+                    'error': error_msg,
                     'error_code': result.get('error_code', 'UNKNOWN')
                 }
         elif response.status_code == 401:
