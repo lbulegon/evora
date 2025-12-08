@@ -96,20 +96,12 @@ def detect_product_by_photo(request):
             if not image_file.content_type.startswith('image/'):
                 return JsonResponse({'error': f'O arquivo "{image_file.name}" deve ser uma imagem.'}, status=400)
         
-        # Salvar todas as imagens no servidor
-        upload_dir = Path(settings.MEDIA_ROOT) / 'uploads'
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        
-        saved_images = []  # Lista de imagens salvas com seus caminhos
+        # NÃO salvar imagens localmente - serão salvas no SinapUm
+        # Preparar imagens para envio (sem salvar)
+        saved_images = []  # Lista de imagens preparadas (sem salvar localmente)
         
         for image_file in image_files:
-            file_extension = os.path.splitext(image_file.name)[1]
-            unique_filename = f"{uuid.uuid4()}{file_extension}"
-            file_path = upload_dir / unique_filename
-            image_path = f"media/uploads/{unique_filename}"
-            image_url = f"{settings.MEDIA_URL}uploads/{unique_filename}"
-            
-            # Processar e otimizar imagem
+            # Processar e otimizar imagem em memória (sem salvar)
             img = Image.open(image_file)
             
             # Converter para RGB se necessário
@@ -120,21 +112,28 @@ def detect_product_by_photo(request):
                 background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
                 img = background
             
-            # Salvar imagem processada
+            # Salvar imagem processada em memória
             output = BytesIO()
             img.save(output, format='JPEG', quality=90, optimize=True)
             output.seek(0)
             
-            # Salvar arquivo
-            with open(file_path, 'wb+') as destination:
-                destination.write(output.read())
+            # Criar arquivo em memória para envio
+            from django.core.files.uploadedfile import InMemoryUploadedFile
+            from django.core.files.base import ContentFile
+            
+            processed_file = InMemoryUploadedFile(
+                ContentFile(output.read()),
+                None,
+                image_file.name,
+                'image/jpeg',
+                output.tell(),
+                None
+            )
             
             saved_images.append({
-                'file': image_file,
+                'file': processed_file,
                 'filename': image_file.name,
-                'saved_filename': unique_filename,
-                'image_path': image_path,
-                'image_url': image_url
+                'original_file': image_file  # Manter referência ao original
             })
         
         # Analisar imagens
@@ -145,7 +144,8 @@ def detect_product_by_photo(request):
             result = analyze_image_with_openmind(image_file)
             
             produto_data = result.get('data', {})
-            image_path = saved_images[0]['image_path']
+            # Usar URL retornada pelo SinapUm (se disponível)
+            image_url_from_sinapum = result.get('image_url')
             
             # Transformar e adicionar caminho da imagem
             if produto_data and result.get('success'):
@@ -154,27 +154,27 @@ def detect_product_by_photo(request):
                     produto_data = transform_evora_to_modelo_json(
                         produto_data,
                         image_filename=image_file.name,
-                        image_path=image_path
+                        image_path=image_url_from_sinapum  # Usar URL do SinapUm
                     )
                 
                 # Garantir que o array de imagens existe e contém a imagem atual
                 if 'produto' in produto_data:
                     if 'imagens' not in produto_data['produto']:
                         produto_data['produto']['imagens'] = []
-                    # Adicionar imagem se não estiver presente
-                    if image_path not in produto_data['produto']['imagens']:
-                        produto_data['produto']['imagens'].insert(0, image_path)
+                    # Adicionar URL do SinapUm se disponível
+                    if image_url_from_sinapum:
+                        if image_url_from_sinapum not in produto_data['produto']['imagens']:
+                            produto_data['produto']['imagens'].insert(0, image_url_from_sinapum)
                     # Se o array estiver vazio, garantir que tem pelo menos esta imagem
-                    if not produto_data['produto']['imagens']:
-                        produto_data['produto']['imagens'] = [image_path]
+                    if not produto_data['produto']['imagens'] and image_url_from_sinapum:
+                        produto_data['produto']['imagens'] = [image_url_from_sinapum]
             
-            # Preparar imagens para JSON (sem objetos file)
+            # Preparar imagens para JSON (usando URL do SinapUm)
             saved_images_json = [{
-                'filename': img['filename'],
-                'saved_filename': img['saved_filename'],
-                'image_path': img['image_path'],
-                'image_url': img['image_url']
-            } for img in saved_images]
+                'filename': saved_images[0]['filename'],
+                'image_url': image_url_from_sinapum or '',  # URL do SinapUm
+                'saved_on': 'sinapum' if image_url_from_sinapum else 'none'
+            }]
             
             # Extrair dados simplificados para formulário
             produto = produto_data.get('produto', {}) if produto_data else {}
@@ -192,7 +192,7 @@ def detect_product_by_photo(request):
                 'success': True,
                 'produto_json': produto_data,  # JSON completo no formato modelo.json
                 'product_data': product_data,  # Dados simplificados para formulário
-                'image_url': saved_images[0]['image_url'],
+                'image_url': image_url_from_sinapum or '',  # URL do SinapUm
                 'saved_images': saved_images_json,
                 'multiple_images': False
             })
@@ -201,22 +201,29 @@ def detect_product_by_photo(request):
             image_files_list = [img['file'] for img in saved_images]
             result = analyze_multiple_images(image_files_list)
             
-            # Adicionar caminhos das imagens salvas
+            # Extrair URLs das imagens retornadas pelo SinapUm
+            image_urls = []
+            if result.get('analises_individuais'):
+                for analise in result['analises_individuais']:
+                    if analise.get('result', {}).get('image_url'):
+                        image_urls.append(analise['result']['image_url'])
+            
+            # Adicionar URLs das imagens salvas no SinapUm
             if result.get('mesmo_produto') and result.get('produto_consolidado'):
                 produto_data = result['produto_consolidado']
-                # Adicionar todos os caminhos das imagens salvas
+                # Adicionar todas as URLs retornadas pelo SinapUm
                 if 'produto' in produto_data:
                     if 'imagens' not in produto_data['produto']:
                         produto_data['produto']['imagens'] = []
-                    # Adicionar caminhos de todas as imagens salvas (garantir ordem)
-                    for img_info in saved_images:
-                        if img_info['image_path'] not in produto_data['produto']['imagens']:
-                            produto_data['produto']['imagens'].append(img_info['image_path'])
+                    # Adicionar URLs do SinapUm
+                    for img_url in image_urls:
+                        if img_url and img_url not in produto_data['produto']['imagens']:
+                            produto_data['produto']['imagens'].append(img_url)
                 # Se não tiver produto, criar estrutura básica
                 elif not produto_data:
                     produto_data = {
                         'produto': {
-                            'imagens': [img['image_path'] for img in saved_images]
+                            'imagens': image_urls
                         }
                     }
             else:
@@ -226,25 +233,27 @@ def detect_product_by_photo(request):
                 if 'produto' in produto_data:
                     if 'imagens' not in produto_data['produto']:
                         produto_data['produto']['imagens'] = []
-                    # Adicionar todas as imagens salvas
-                    for img_info in saved_images:
-                        if img_info['image_path'] not in produto_data['produto']['imagens']:
-                            produto_data['produto']['imagens'].append(img_info['image_path'])
+                    # Adicionar URLs do SinapUm
+                    for img_url in image_urls:
+                        if img_url and img_url not in produto_data['produto']['imagens']:
+                            produto_data['produto']['imagens'].append(img_url)
                 else:
                     # Criar estrutura básica com todas as imagens
                     produto_data = {
                         'produto': {
-                            'imagens': [img['image_path'] for img in saved_images]
+                            'imagens': image_urls
                         }
                     }
             
-            # Preparar imagens para JSON (sem objetos file)
-            saved_images_for_template = [{
-                'filename': img['filename'],
-                'saved_filename': img['saved_filename'],
-                'image_path': img['image_path'],
-                'image_url': img['image_url']
-            } for img in saved_images]
+            # Preparar imagens para JSON (usando URLs do SinapUm)
+            saved_images_for_template = []
+            for idx, img_info in enumerate(saved_images):
+                img_url = image_urls[idx] if idx < len(image_urls) else ''
+                saved_images_for_template.append({
+                    'filename': img_info['filename'],
+                    'image_url': img_url,  # URL do SinapUm
+                    'saved_on': 'sinapum' if img_url else 'none'
+                })
             
             # Extrair dados simplificados para formulário
             produto = produto_data.get('produto', {}) if produto_data else {}

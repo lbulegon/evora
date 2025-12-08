@@ -19,6 +19,8 @@ from django.urls import path, include
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.cache import never_cache
+from django.conf import settings
+from django.conf.urls.static import static
 
 @csrf_exempt
 @never_cache
@@ -54,3 +56,11 @@ urlpatterns = [
     path('', include('app_whatsapp_integration.urls')),  # WhatsApp Integration
     path('', include('app_marketplace.urls')),
 ]
+
+# Servir arquivos de mídia em desenvolvimento e produção
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+else:
+    # Em produção (Railway), também servir arquivos de mídia
+    # Nota: Para produção em escala, considere usar S3 ou similar
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

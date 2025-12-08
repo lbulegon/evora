@@ -255,6 +255,10 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para Railway
 # Static files directories (para desenvolvimento)
 STATICFILES_DIRS = [BASE_DIR / "app_marketplace" / "static"]
 
+# Media files (uploads de imagens)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # WhiteNoise para servir arquivos estáticos em produção (Railway)
 if IS_RAILWAY:
     # Usar storage simples do WhiteNoise para evitar problemas com manifest

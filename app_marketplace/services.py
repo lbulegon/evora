@@ -439,15 +439,22 @@ def analyze_image_with_openmind(image_file):
                     result = response.json()
                     logger.info(f"Análise concluída com sucesso: {result.get('success', False)}")
                     
+                    # Extrair URL da imagem salva no SinapUm (se retornada)
+                    image_url = result.get('image_url') or result.get('saved_image_url')
+                    
                     # Transformar dados ÉVORA para formato modelo.json
                     if result.get('success') and result.get('data'):
                         try:
                             modelo_json = transform_evora_to_modelo_json(
                                 result['data'],
-                                image_file.name
+                                image_file.name,
+                                image_path=image_url  # Usar URL do SinapUm se disponível
                             )
                             # Substituir data pelo formato modelo.json
                             result['data'] = modelo_json
+                            # Adicionar URL da imagem salva no SinapUm
+                            if image_url:
+                                result['image_url'] = image_url
                             logger.info("Dados transformados para formato modelo.json")
                         except Exception as transform_error:
                             logger.error(f"Erro ao transformar dados: {str(transform_error)}", exc_info=True)
@@ -460,14 +467,21 @@ def analyze_image_with_openmind(image_file):
                         result = response.json()
                         logger.info(f"Análise concluída com sucesso: {result.get('success', False)}")
                         
+                        # Extrair URL da imagem salva no SinapUm (se retornada)
+                        image_url = result.get('image_url') or result.get('saved_image_url')
+                        
                         # Transformar dados ÉVORA para formato modelo.json
                         if result.get('success') and result.get('data'):
                             try:
                                 modelo_json = transform_evora_to_modelo_json(
                                     result['data'],
-                                    image_file.name
+                                    image_file.name,
+                                    image_path=image_url  # Usar URL do SinapUm se disponível
                                 )
                                 result['data'] = modelo_json
+                                # Adicionar URL da imagem salva no SinapUm
+                                if image_url:
+                                    result['image_url'] = image_url
                                 logger.info("Dados transformados para formato modelo.json")
                             except Exception as transform_error:
                                 logger.error(f"Erro ao transformar dados: {str(transform_error)}", exc_info=True)
