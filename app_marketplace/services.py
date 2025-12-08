@@ -439,8 +439,13 @@ def analyze_image_with_openmind(image_file):
                     result = response.json()
                     logger.info(f"Análise concluída com sucesso: {result.get('success', False)}")
                     
-                    # Extrair URL da imagem salva no SinapUm (se retornada)
+                    # Extrair informações da imagem salva no SinapUm (se retornada)
                     image_url = result.get('image_url') or result.get('saved_image_url')
+                    image_path = result.get('image_path')  # Caminho relativo (ex: media/uploads/uuid.jpg)
+                    saved_filename = result.get('saved_filename')  # Nome do arquivo salvo
+                    
+                    # Usar image_path no JSON do produto (caminho relativo) e image_url para acesso
+                    image_path_for_json = image_path or image_url
                     
                     # Transformar dados ÉVORA para formato modelo.json
                     if result.get('success') and result.get('data'):
@@ -448,14 +453,18 @@ def analyze_image_with_openmind(image_file):
                             modelo_json = transform_evora_to_modelo_json(
                                 result['data'],
                                 image_file.name,
-                                image_path=image_url  # Usar URL do SinapUm se disponível
+                                image_path=image_path_for_json  # Usar image_path (relativo) ou image_url (completo)
                             )
                             # Substituir data pelo formato modelo.json
                             result['data'] = modelo_json
-                            # Adicionar URL da imagem salva no SinapUm
+                            # Adicionar informações da imagem salva no SinapUm
                             if image_url:
                                 result['image_url'] = image_url
-                            logger.info("Dados transformados para formato modelo.json")
+                            if image_path:
+                                result['image_path'] = image_path
+                            if saved_filename:
+                                result['saved_filename'] = saved_filename
+                            logger.info(f"Dados transformados para formato modelo.json. Imagem salva: {image_url or 'não retornada'}")
                         except Exception as transform_error:
                             logger.error(f"Erro ao transformar dados: {str(transform_error)}", exc_info=True)
                             # Continuar com dados originais se houver erro na transformação
@@ -467,8 +476,13 @@ def analyze_image_with_openmind(image_file):
                         result = response.json()
                         logger.info(f"Análise concluída com sucesso: {result.get('success', False)}")
                         
-                        # Extrair URL da imagem salva no SinapUm (se retornada)
+                        # Extrair informações da imagem salva no SinapUm (se retornada)
                         image_url = result.get('image_url') or result.get('saved_image_url')
+                        image_path = result.get('image_path')  # Caminho relativo (ex: media/uploads/uuid.jpg)
+                        saved_filename = result.get('saved_filename')  # Nome do arquivo salvo
+                        
+                        # Usar image_path no JSON do produto (caminho relativo) e image_url para acesso
+                        image_path_for_json = image_path or image_url
                         
                         # Transformar dados ÉVORA para formato modelo.json
                         if result.get('success') and result.get('data'):
@@ -476,13 +490,17 @@ def analyze_image_with_openmind(image_file):
                                 modelo_json = transform_evora_to_modelo_json(
                                     result['data'],
                                     image_file.name,
-                                    image_path=image_url  # Usar URL do SinapUm se disponível
+                                    image_path=image_path_for_json  # Usar image_path (relativo) ou image_url (completo)
                                 )
                                 result['data'] = modelo_json
-                                # Adicionar URL da imagem salva no SinapUm
+                                # Adicionar informações da imagem salva no SinapUm
                                 if image_url:
                                     result['image_url'] = image_url
-                                logger.info("Dados transformados para formato modelo.json")
+                                if image_path:
+                                    result['image_path'] = image_path
+                                if saved_filename:
+                                    result['saved_filename'] = saved_filename
+                                logger.info(f"Dados transformados para formato modelo.json. Imagem salva: {image_url or 'não retornada'}")
                             except Exception as transform_error:
                                 logger.error(f"Erro ao transformar dados: {str(transform_error)}", exc_info=True)
                         

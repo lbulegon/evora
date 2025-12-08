@@ -144,8 +144,13 @@ def detect_product_by_photo(request):
             result = analyze_image_with_openmind(image_file)
             
             produto_data = result.get('data', {})
-            # Usar URL retornada pelo SinapUm (se disponível)
-            image_url_from_sinapum = result.get('image_url')
+            # Extrair informações da imagem retornada pelo SinapUm
+            image_url_from_sinapum = result.get('image_url')  # URL completa
+            image_path_from_sinapum = result.get('image_path')  # Caminho relativo (preferido para JSON)
+            saved_filename = result.get('saved_filename')  # Nome do arquivo salvo
+            
+            # Usar image_path (relativo) no JSON do produto, image_url para acesso/exibição
+            image_path_for_json = image_path_from_sinapum or image_url_from_sinapum
             
             # Transformar e adicionar caminho da imagem
             if produto_data and result.get('success'):
@@ -154,25 +159,27 @@ def detect_product_by_photo(request):
                     produto_data = transform_evora_to_modelo_json(
                         produto_data,
                         image_filename=image_file.name,
-                        image_path=image_url_from_sinapum  # Usar URL do SinapUm
+                        image_path=image_path_for_json  # Usar image_path (relativo) preferencialmente
                     )
                 
                 # Garantir que o array de imagens existe e contém a imagem atual
                 if 'produto' in produto_data:
                     if 'imagens' not in produto_data['produto']:
                         produto_data['produto']['imagens'] = []
-                    # Adicionar URL do SinapUm se disponível
-                    if image_url_from_sinapum:
-                        if image_url_from_sinapum not in produto_data['produto']['imagens']:
-                            produto_data['produto']['imagens'].insert(0, image_url_from_sinapum)
+                    # Adicionar image_path (relativo) preferencialmente, ou image_url se não houver
+                    if image_path_for_json:
+                        if image_path_for_json not in produto_data['produto']['imagens']:
+                            produto_data['produto']['imagens'].insert(0, image_path_for_json)
                     # Se o array estiver vazio, garantir que tem pelo menos esta imagem
-                    if not produto_data['produto']['imagens'] and image_url_from_sinapum:
-                        produto_data['produto']['imagens'] = [image_url_from_sinapum]
+                    if not produto_data['produto']['imagens'] and image_path_for_json:
+                        produto_data['produto']['imagens'] = [image_path_for_json]
             
-            # Preparar imagens para JSON (usando URL do SinapUm)
+            # Preparar imagens para JSON (usando informações do SinapUm)
             saved_images_json = [{
                 'filename': saved_images[0]['filename'],
-                'image_url': image_url_from_sinapum or '',  # URL do SinapUm
+                'image_url': image_url_from_sinapum or '',  # URL completa para exibição
+                'image_path': image_path_from_sinapum or '',  # Caminho relativo para JSON
+                'saved_filename': saved_filename or '',
                 'saved_on': 'sinapum' if image_url_from_sinapum else 'none'
             }]
             
@@ -192,7 +199,9 @@ def detect_product_by_photo(request):
                 'success': True,
                 'produto_json': produto_data,  # JSON completo no formato modelo.json
                 'product_data': product_data,  # Dados simplificados para formulário
-                'image_url': image_url_from_sinapum or '',  # URL do SinapUm
+                'image_url': image_url_from_sinapum or '',  # URL completa do SinapUm (para exibição)
+                'image_path': image_path_from_sinapum or '',  # Caminho relativo (para JSON)
+                'saved_filename': saved_filename or '',  # Nome do arquivo salvo
                 'saved_images': saved_images_json,
                 'multiple_images': False
             })
@@ -201,29 +210,40 @@ def detect_product_by_photo(request):
             image_files_list = [img['file'] for img in saved_images]
             result = analyze_multiple_images(image_files_list)
             
-            # Extrair URLs das imagens retornadas pelo SinapUm
-            image_urls = []
+            # Extrair informações das imagens retornadas pelo SinapUm
+            image_urls = []  # URLs completas (para exibição)
+            image_paths = []  # Caminhos relativos (para JSON do produto)
+            saved_filenames = []  # Nomes dos arquivos salvos
+            
             if result.get('analises_individuais'):
                 for analise in result['analises_individuais']:
-                    if analise.get('result', {}).get('image_url'):
-                        image_urls.append(analise['result']['image_url'])
+                    analise_result = analise.get('result', {})
+                    if analise_result.get('image_url'):
+                        image_urls.append(analise_result['image_url'])
+                    if analise_result.get('image_path'):
+                        image_paths.append(analise_result['image_path'])
+                    if analise_result.get('saved_filename'):
+                        saved_filenames.append(analise_result['saved_filename'])
             
-            # Adicionar URLs das imagens salvas no SinapUm
+            # Usar image_paths (relativos) preferencialmente no JSON do produto
+            image_paths_for_json = image_paths if image_paths else image_urls
+            
+            # Adicionar caminhos das imagens salvas no SinapUm
             if result.get('mesmo_produto') and result.get('produto_consolidado'):
                 produto_data = result['produto_consolidado']
-                # Adicionar todas as URLs retornadas pelo SinapUm
+                # Adicionar todos os caminhos retornados pelo SinapUm
                 if 'produto' in produto_data:
                     if 'imagens' not in produto_data['produto']:
                         produto_data['produto']['imagens'] = []
-                    # Adicionar URLs do SinapUm
-                    for img_url in image_urls:
-                        if img_url and img_url not in produto_data['produto']['imagens']:
-                            produto_data['produto']['imagens'].append(img_url)
+                    # Adicionar image_paths (relativos) preferencialmente
+                    for img_path in image_paths_for_json:
+                        if img_path and img_path not in produto_data['produto']['imagens']:
+                            produto_data['produto']['imagens'].append(img_path)
                 # Se não tiver produto, criar estrutura básica
                 elif not produto_data:
                     produto_data = {
                         'produto': {
-                            'imagens': image_urls
+                            'imagens': image_paths_for_json
                         }
                     }
             else:
@@ -233,25 +253,29 @@ def detect_product_by_photo(request):
                 if 'produto' in produto_data:
                     if 'imagens' not in produto_data['produto']:
                         produto_data['produto']['imagens'] = []
-                    # Adicionar URLs do SinapUm
-                    for img_url in image_urls:
-                        if img_url and img_url not in produto_data['produto']['imagens']:
-                            produto_data['produto']['imagens'].append(img_url)
+                    # Adicionar image_paths (relativos) preferencialmente
+                    for img_path in image_paths_for_json:
+                        if img_path and img_path not in produto_data['produto']['imagens']:
+                            produto_data['produto']['imagens'].append(img_path)
                 else:
                     # Criar estrutura básica com todas as imagens
                     produto_data = {
                         'produto': {
-                            'imagens': image_urls
+                            'imagens': image_paths_for_json
                         }
                     }
             
-            # Preparar imagens para JSON (usando URLs do SinapUm)
+            # Preparar imagens para JSON (usando informações do SinapUm)
             saved_images_for_template = []
             for idx, img_info in enumerate(saved_images):
                 img_url = image_urls[idx] if idx < len(image_urls) else ''
+                img_path = image_paths[idx] if idx < len(image_paths) else ''
+                saved_filename = saved_filenames[idx] if idx < len(saved_filenames) else ''
                 saved_images_for_template.append({
                     'filename': img_info['filename'],
-                    'image_url': img_url,  # URL do SinapUm
+                    'image_url': img_url,  # URL completa do SinapUm (para exibição)
+                    'image_path': img_path,  # Caminho relativo (para JSON)
+                    'saved_filename': saved_filename,  # Nome do arquivo salvo
                     'saved_on': 'sinapum' if img_url else 'none'
                 })
             
