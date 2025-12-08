@@ -20,9 +20,12 @@ from io import BytesIO
 
 from .models import (
     WhatsappGroup, WhatsappParticipant, WhatsappProduct,
-    Categoria, Empresa
+    Categoria, Empresa, ProdutoJSON
 )
-from .ai_product_extractor import extract_product_data_from_image, format_evora_json, generate_sku_interno
+from .services import analyze_image_with_openmind, analyze_multiple_images
+from .utils import transform_evora_to_modelo_json
+from pathlib import Path
+import uuid
 import logging
 
 logger = logging.getLogger(__name__)
@@ -61,17 +64,22 @@ def product_photo_create(request):
 @require_http_methods(["POST"])
 def detect_product_by_photo(request):
     """
-    API para detectar produto por foto
+    API para detectar produto por foto (suporta múltiplas imagens)
     POST /api/produtos/detectar_por_foto/
     
-    Similar ao app de nutrição: analisa foto e retorna dados sugeridos
+    Adaptado das melhorias do SinapUm: usa OpenMind AI melhorado e suporta múltiplas imagens
     """
     if not (request.user.is_shopper or request.user.is_address_keeper):
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
-        # Verificar se há arquivo na requisição
-        if 'image' not in request.FILES:
+        # Verificar se há imagens na requisição (suporta múltiplas)
+        if 'images' in request.FILES:
+            image_files = request.FILES.getlist('images')
+        elif 'image' in request.FILES:
+            # Fallback para compatibilidade com upload único
+            image_files = [request.FILES['image']]
+        else:
             return JsonResponse({
                 'error': 'Imagem é obrigatória',
                 'debug': {
@@ -80,119 +88,191 @@ def detect_product_by_photo(request):
                 }
             }, status=400)
         
-        image_file = request.FILES['image']
+        if not image_files:
+            return JsonResponse({'error': 'Nenhuma imagem fornecida'}, status=400)
         
-        # Validar se o arquivo tem conteúdo
-        if not image_file:
-            return JsonResponse({'error': 'Arquivo de imagem vazio'}, status=400)
-        
-        # Validar tipo (pode ser None se o browser não enviar content_type)
-        if hasattr(image_file, 'content_type') and image_file.content_type:
+        # Validar tipos de arquivo
+        for image_file in image_files:
             if not image_file.content_type.startswith('image/'):
-                return JsonResponse({'error': f'Arquivo deve ser uma imagem. Tipo recebido: {image_file.content_type}'}, status=400)
+                return JsonResponse({'error': f'O arquivo "{image_file.name}" deve ser uma imagem.'}, status=400)
         
-        # Validar tamanho (max 10MB)
-        if image_file.size > 10 * 1024 * 1024:
-            return JsonResponse({'error': 'Imagem muito grande. Máximo 10MB'}, status=400)
+        # Salvar todas as imagens no servidor
+        upload_dir = Path(settings.MEDIA_ROOT) / 'uploads'
+        upload_dir.mkdir(parents=True, exist_ok=True)
         
-        # Validar tamanho mínimo
-        if image_file.size == 0:
-            return JsonResponse({'error': 'Arquivo de imagem está vazio'}, status=400)
+        saved_images = []  # Lista de imagens salvas com seus caminhos
         
-        # Salvar imagem temporariamente para análise e depois recuperar
-        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
-        temp_filename = f"produtos/temp/{request.user.id}/{timestamp}_temp.jpg"
+        for image_file in image_files:
+            file_extension = os.path.splitext(image_file.name)[1]
+            unique_filename = f"{uuid.uuid4()}{file_extension}"
+            file_path = upload_dir / unique_filename
+            image_path = f"media/uploads/{unique_filename}"
+            image_url = f"{settings.MEDIA_URL}uploads/{unique_filename}"
+            
+            # Processar e otimizar imagem
+            img = Image.open(image_file)
+            
+            # Converter para RGB se necessário
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                img = background
+            
+            # Salvar imagem processada
+            output = BytesIO()
+            img.save(output, format='JPEG', quality=90, optimize=True)
+            output.seek(0)
+            
+            # Salvar arquivo
+            with open(file_path, 'wb+') as destination:
+                destination.write(output.read())
+            
+            saved_images.append({
+                'file': image_file,
+                'filename': image_file.name,
+                'saved_filename': unique_filename,
+                'image_path': image_path,
+                'image_url': image_url
+            })
         
-        # Processar e otimizar imagem
-        img = Image.open(image_file)
-        
-        # Converter para RGB se necessário
-        if img.mode in ('RGBA', 'LA', 'P'):
-            background = Image.new('RGB', img.size, (255, 255, 255))
-            if img.mode == 'P':
-                img = img.convert('RGBA')
-            background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
-            img = background
-        
-        # Salvar imagem processada
-        output = BytesIO()
-        img.save(output, format='JPEG', quality=90, optimize=True)
-        output.seek(0)
-        
-        saved_path = default_storage.save(temp_filename, ContentFile(output.read()))
-        image_url = default_storage.url(saved_path)
-        
-        # Analisar imagem com IA
-        image_file.seek(0)  # Resetar para ler novamente
-        result = extract_product_data_from_image(image_file)
-        
-        if result.get('error'):
+        # Analisar imagens
+        if len(saved_images) == 1:
+            # Uma única imagem - usar método simples
+            image_file = saved_images[0]['file']
+            image_file.seek(0)
+            result = analyze_image_with_openmind(image_file)
+            
+            produto_data = result.get('data', {})
+            image_path = saved_images[0]['image_path']
+            
+            # Transformar e adicionar caminho da imagem
+            if produto_data and result.get('success'):
+                # Se os dados já estão no formato modelo.json, não precisa transformar
+                if 'produto' not in produto_data or 'produto_generico_catalogo' not in produto_data:
+                    produto_data = transform_evora_to_modelo_json(
+                        produto_data,
+                        image_filename=image_file.name,
+                        image_path=image_path
+                    )
+                
+                # Garantir que o array de imagens existe e contém a imagem atual
+                if 'produto' in produto_data:
+                    if 'imagens' not in produto_data['produto']:
+                        produto_data['produto']['imagens'] = []
+                    # Adicionar imagem se não estiver presente
+                    if image_path not in produto_data['produto']['imagens']:
+                        produto_data['produto']['imagens'].insert(0, image_path)
+                    # Se o array estiver vazio, garantir que tem pelo menos esta imagem
+                    if not produto_data['produto']['imagens']:
+                        produto_data['produto']['imagens'] = [image_path]
+            
+            # Preparar imagens para JSON (sem objetos file)
+            saved_images_json = [{
+                'filename': img['filename'],
+                'saved_filename': img['saved_filename'],
+                'image_path': img['image_path'],
+                'image_url': img['image_url']
+            } for img in saved_images]
+            
+            # Extrair dados simplificados para formulário
+            produto = produto_data.get('produto', {}) if produto_data else {}
+            product_data = {
+                'nome_sugerido': produto.get('nome', ''),
+                'marca_sugerida': produto.get('marca', ''),
+                'categoria_sugerida': produto.get('categoria', ''),
+                'subcategoria_sugerida': produto.get('subcategoria', ''),
+                'descricao_observacoes': produto.get('descricao', ''),
+                'codigo_barras': produto.get('codigo_barras', ''),
+                'preco_visivel': produto_data.get('produto_viagem', {}).get('preco_venda_brl', ''),
+            }
+            
             return JsonResponse({
-                'error': result['error'],
-                'image_url': image_url  # Retornar URL mesmo se IA falhar
-            }, status=400)
-        
-        # Verificar se tem dados
-        if not result.get('success') or not result.get('data'):
+                'success': True,
+                'produto_json': produto_data,  # JSON completo no formato modelo.json
+                'product_data': product_data,  # Dados simplificados para formulário
+                'image_url': saved_images[0]['image_url'],
+                'saved_images': saved_images_json,
+                'multiple_images': False
+            })
+        else:
+            # Múltiplas imagens - usar análise comparativa
+            image_files_list = [img['file'] for img in saved_images]
+            result = analyze_multiple_images(image_files_list)
+            
+            # Adicionar caminhos das imagens salvas
+            if result.get('mesmo_produto') and result.get('produto_consolidado'):
+                produto_data = result['produto_consolidado']
+                # Adicionar todos os caminhos das imagens salvas
+                if 'produto' in produto_data:
+                    if 'imagens' not in produto_data['produto']:
+                        produto_data['produto']['imagens'] = []
+                    # Adicionar caminhos de todas as imagens salvas (garantir ordem)
+                    for img_info in saved_images:
+                        if img_info['image_path'] not in produto_data['produto']['imagens']:
+                            produto_data['produto']['imagens'].append(img_info['image_path'])
+                # Se não tiver produto, criar estrutura básica
+                elif not produto_data:
+                    produto_data = {
+                        'produto': {
+                            'imagens': [img['image_path'] for img in saved_images]
+                        }
+                    }
+            else:
+                # Produtos diferentes - usar primeiro produto como base e adicionar todas as imagens
+                produto_data = result.get('produtos_diferentes', [{}])[0].get('produto_data', {}) if result.get('produtos_diferentes') else {}
+                # Garantir que todas as imagens estão no array
+                if 'produto' in produto_data:
+                    if 'imagens' not in produto_data['produto']:
+                        produto_data['produto']['imagens'] = []
+                    # Adicionar todas as imagens salvas
+                    for img_info in saved_images:
+                        if img_info['image_path'] not in produto_data['produto']['imagens']:
+                            produto_data['produto']['imagens'].append(img_info['image_path'])
+                else:
+                    # Criar estrutura básica com todas as imagens
+                    produto_data = {
+                        'produto': {
+                            'imagens': [img['image_path'] for img in saved_images]
+                        }
+                    }
+            
+            # Preparar imagens para JSON (sem objetos file)
+            saved_images_for_template = [{
+                'filename': img['filename'],
+                'saved_filename': img['saved_filename'],
+                'image_path': img['image_path'],
+                'image_url': img['image_url']
+            } for img in saved_images]
+            
+            # Extrair dados simplificados para formulário
+            produto = produto_data.get('produto', {}) if produto_data else {}
+            product_data = {
+                'nome_sugerido': produto.get('nome', ''),
+                'marca_sugerida': produto.get('marca', ''),
+                'categoria_sugerida': produto.get('categoria', ''),
+                'subcategoria_sugerida': produto.get('subcategoria', ''),
+                'descricao_observacoes': produto.get('descricao', ''),
+                'codigo_barras': produto.get('codigo_barras', ''),
+                'preco_visivel': produto_data.get('produto_viagem', {}).get('preco_venda_brl', ''),
+            }
+            
             return JsonResponse({
-                'error': 'Análise não retornou dados válidos. Verifique se o servidor OpenMind AI está funcionando.',
-                'debug': result
-            }, status=400)
-        
-        # Formatar dados no padrão ÉVORA
-        ai_data = result['data']
-        evora_json = format_evora_json(ai_data, image_url)
-        
-        # Extrair marca corretamente (pode estar em caracteristicas ou direto)
-        caracteristicas_evora = evora_json.get('caracteristicas', {})
-        caracteristicas_ai = ai_data.get('caracteristicas', {}) if isinstance(ai_data.get('caracteristicas'), dict) else {}
-        
-        marca_sugerida = ''
-        if isinstance(caracteristicas_evora, dict) and caracteristicas_evora.get('marca'):
-            marca_sugerida = caracteristicas_evora.get('marca', '')
-        elif isinstance(caracteristicas_ai, dict) and caracteristicas_ai.get('marca'):
-            marca_sugerida = caracteristicas_ai.get('marca', '')
-        elif ai_data.get('marca'):
-            marca_sugerida = ai_data.get('marca', '')
-        
-        # Extrair código de barras
-        codigo_barras = evora_json.get('codigo_barras') or ai_data.get('codigo_barras')
-        if codigo_barras:
-            codigo_barras = str(codigo_barras)
-        else:
-            codigo_barras = ''
-        
-        # Extrair preço visível
-        preco_visivel = ai_data.get('preco_visivel') or evora_json.get('preco_visivel')
-        if preco_visivel:
-            preco_visivel = str(preco_visivel)
-        else:
-            preco_visivel = ''
-        
-        # Preparar product_data
-        product_data = {
-            'nome_sugerido': evora_json.get('nome_produto', '') or ai_data.get('nome_produto', ''),
-            'marca_sugerida': marca_sugerida,
-            'categoria_sugerida': evora_json.get('categoria', '') or ai_data.get('categoria', ''),
-            'subcategoria_sugerida': evora_json.get('subcategoria', '') or ai_data.get('subcategoria', ''),
-            'descricao_observacoes': evora_json.get('descricao', '') or ai_data.get('descricao', ''),
-            'codigo_barras': codigo_barras,
-            'sku_interno': evora_json.get('sku_interno', '') or ai_data.get('sku_interno', ''),
-            'preco_visivel': preco_visivel,
-        }
-        
-        # Retornar JSON ÉVORA completo + dados simplificados para formulário
-        return JsonResponse({
-            'success': True,
-            'evora_json': evora_json,  # JSON completo no padrão ÉVORA
-            'product_data': product_data,
-            'image_url': image_url,  # URL da imagem salva para uso posterior
-            'temp_path': saved_path  # Para referência
-        })
+                'success': True,
+                'produto_json': produto_data,  # JSON completo no formato modelo.json
+                'product_data': product_data,  # Dados simplificados para formulário
+                'saved_images': saved_images_for_template,
+                'multiple_images': True,
+                'mesmo_produto': result.get('mesmo_produto', False),
+                'consistencia': result.get('consistencia', {}),
+                'aviso': result.get('aviso')
+            })
     
     except Exception as e:
         import traceback
         traceback.print_exc()
+        logger.error(f"Erro ao analisar imagem: {str(e)}", exc_info=True)
         return JsonResponse({
             'error': f'Erro ao analisar imagem: {str(e)}'
         }, status=500)
@@ -340,5 +420,102 @@ def save_product_from_photo(request):
         traceback.print_exc()
         return JsonResponse({
             'error': f'Erro ao criar produto: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def save_product_json(request):
+    """
+    View para salvar produto no banco de dados em formato JSON (PostgreSQL JSONB)
+    Adaptado das melhorias do SinapUm
+    """
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        data = json.loads(request.body)
+        produto_json = data.get('produto_json')
+        
+        if not produto_json:
+            return JsonResponse({
+                'success': False,
+                'error': 'Dados do produto não fornecidos'
+            }, status=400)
+        
+        # Extrair informações básicas para indexação
+        produto = produto_json.get('produto', {})
+        nome_produto = produto.get('nome', 'Produto sem nome')
+        marca = produto.get('marca')
+        categoria = produto.get('categoria')
+        codigo_barras = produto.get('codigo_barras')
+        
+        # Obter caminho da imagem (primeira imagem do array para referência)
+        # Todas as imagens estão no array produto['imagens']
+        imagem_original = None
+        if produto.get('imagens') and len(produto.get('imagens', [])) > 0:
+            # Usar primeira imagem do array como referência principal
+            imagem_original = produto['imagens'][0] if isinstance(produto['imagens'], list) else produto['imagens']
+        elif produto_json.get('cadastro_meta', {}).get('fonte'):
+            # Fallback: tentar extrair do campo fonte se não houver no array
+            fonte = produto_json.get('cadastro_meta', {}).get('fonte', '')
+            if 'imagem' in fonte.lower():
+                imagem_original = fonte.split(':')[-1].strip() if ':' in fonte else fonte
+        
+        # Verificar se produto já existe pelo código de barras
+        produto_existente = None
+        if codigo_barras:
+            produto_existente = ProdutoJSON.objects.filter(codigo_barras=codigo_barras).first()
+            if produto_existente:
+                # Atualizar produto existente
+                produto_existente.dados_json = produto_json
+                produto_existente.nome_produto = nome_produto
+                produto_existente.marca = marca
+                produto_existente.categoria = categoria
+                produto_existente.imagem_original = imagem_original
+                produto_existente.criado_por = request.user
+                produto_existente.save()
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Produto atualizado com sucesso!',
+                    'action': 'updated',
+                    'produto_id': produto_existente.id
+                })
+        
+        # Criar novo produto
+        grupo_id = data.get('grupo_id')
+        grupo = None
+        if grupo_id:
+            grupo = WhatsappGroup.objects.filter(id=grupo_id, owner=request.user).first()
+        
+        novo_produto = ProdutoJSON.objects.create(
+            dados_json=produto_json,
+            nome_produto=nome_produto,
+            marca=marca,
+            categoria=categoria,
+            codigo_barras=codigo_barras,
+            imagem_original=imagem_original,
+            criado_por=request.user,
+            grupo_whatsapp=grupo
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Produto salvo com sucesso!',
+            'action': 'created',
+            'produto_id': novo_produto.id
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Formato JSON inválido'
+        }, status=400)
+    except Exception as e:
+        logger.error(f"Erro ao salvar produto JSON: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
         }, status=500)
 

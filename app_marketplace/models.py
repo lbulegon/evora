@@ -2422,3 +2422,63 @@ class EngajamentoAgora(models.Model):
     def __str__(self):
         usuario_str = self.usuario.username if self.usuario else "Anônimo"
         return f"{usuario_str} - {self.get_tipo_display()} - {self.publicacao}"
+
+
+# ============================================================================
+# MODELO PRODUTO JSON - Armazenamento em JSON (PostgreSQL JSONB)
+# ============================================================================
+
+class ProdutoJSON(models.Model):
+    """
+    Model para armazenar produtos completos em formato JSON (PostgreSQL JSONB ou SQLite JSON).
+    Baseado nas melhorias do SinapUm para qualidade de dados e layout DJOS.
+    """
+    dados_json = models.JSONField(help_text="Dados completos do produto no formato modelo.json")
+    nome_produto = models.CharField(max_length=500, db_index=True, help_text="Nome do produto para busca rápida")
+    marca = models.CharField(max_length=200, db_index=True, null=True, blank=True)
+    categoria = models.CharField(max_length=100, db_index=True, null=True, blank=True)
+    codigo_barras = models.CharField(max_length=50, unique=True, null=True, blank=True, db_index=True)
+    imagem_original = models.CharField(max_length=500, null=True, blank=True, help_text="Caminho do arquivo de imagem original")
+    
+    # Relacionamento com shopper que criou
+    criado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='produtos_json_criados',
+        help_text="Shopper que criou este produto"
+    )
+    
+    # Relacionamento com grupo WhatsApp (opcional)
+    grupo_whatsapp = models.ForeignKey(
+        'WhatsappGroup',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='produtos_json',
+        help_text="Grupo WhatsApp onde o produto foi postado"
+    )
+    
+    criado_em = models.DateTimeField(auto_now_add=True, db_index=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Produto JSON"
+        verbose_name_plural = "Produtos JSON"
+        ordering = ['-criado_em']
+        indexes = [
+            models.Index(fields=['nome_produto', 'marca']),
+            models.Index(fields=['categoria']),
+            models.Index(fields=['criado_por', '-criado_em']),
+        ]
+    
+    def __str__(self):
+        return f"{self.nome_produto} ({self.marca}) - {self.criado_em.strftime('%d/%m/%Y')}"
+    
+    def get_produto_data(self):
+        """Retorna os dados do produto em formato dict"""
+        if isinstance(self.dados_json, str):
+            import json
+            return json.loads(self.dados_json)
+        return self.dados_json or {}

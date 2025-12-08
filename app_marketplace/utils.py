@@ -1,0 +1,320 @@
+"""
+Utilitários para transformação de dados de produtos
+Adaptado das melhorias do SinapUm para qualidade de informações geradas no JSON
+"""
+from datetime import datetime
+from typing import Dict, Any, Optional
+import re
+
+
+def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: str = None, image_path: str = None) -> Dict[str, Any]:
+    """
+    Transforma dados no formato ÉVORA para o formato modelo.json
+    
+    Args:
+        evora_data: Dados no formato ÉVORA retornados pelo OpenMind AI
+        image_filename: Nome do arquivo de imagem (opcional)
+        image_path: Caminho completo da imagem salva no servidor (ex: "media/uploads/nome.jpg")
+    
+    Returns:
+        dict: Dados no formato modelo.json
+    """
+    # Extrair dados do formato ÉVORA
+    nome_produto = evora_data.get('nome_produto', 'Produto não identificado')
+    
+    # Características pode ser dict ou list
+    caracteristicas = evora_data.get('caracteristicas', {})
+    if isinstance(caracteristicas, list):
+        # Se for lista, tentar extrair informações de strings
+        caracteristicas_dict = {}
+        for item in caracteristicas:
+            if isinstance(item, str):
+                # Tentar identificar informações nas strings
+                if 'kg' in item.lower():
+                    try:
+                        match = re.search(r'(\d+(?:\.\d+)?)\s*kg', item, re.IGNORECASE)
+                        if match:
+                            caracteristicas_dict['peso_kg'] = float(match.group(1))
+                    except:
+                        pass
+        marca = evora_data.get('marca', 'Marca não identificada')
+        caracteristicas = caracteristicas_dict
+    else:
+        marca = caracteristicas.get('marca') if isinstance(caracteristicas, dict) else None
+        marca = marca or evora_data.get('marca', 'Marca não identificada')
+    
+    descricao = evora_data.get('descricao', 'Descrição não disponível')
+    categoria = evora_data.get('categoria', 'Não categorizado')
+    subcategoria = evora_data.get('subcategoria', '')
+    codigo_barras = evora_data.get('codigo_barras')
+    
+    # Extrair informações específicas de produto
+    volume_ml = None
+    peso_kg = None
+    tipo = None
+    familia_olfativa = None
+    
+    # Tentar extrair volume (para perfumaria)
+    if isinstance(caracteristicas, dict) and caracteristicas.get('volume_ml'):
+        volume_ml = caracteristicas.get('volume_ml')
+    else:
+        # Procurar por volume em diferentes campos
+        for key, value in evora_data.items():
+            if isinstance(value, str) and 'ml' in value.lower():
+                try:
+                    match = re.search(r'(\d+)\s*ml', value, re.IGNORECASE)
+                    if match:
+                        volume_ml = int(match.group(1))
+                        break
+                except:
+                    pass
+    
+    # Extrair peso em kg (e converter para gramas se necessário)
+    peso_embalagem_gramas = evora_data.get('peso_embalagem_gramas')
+    
+    if isinstance(caracteristicas, dict):
+        peso_kg = caracteristicas.get('peso_kg')
+        if peso_kg:
+            try:
+                peso_kg = float(peso_kg)
+                peso_embalagem_gramas = int(peso_kg * 1000)
+            except:
+                pass
+    
+    # Se temos peso_embalagem_gramas mas não está convertido
+    if not peso_embalagem_gramas:
+        # Tentar extrair de strings como "4kg"
+        for key, value in evora_data.items():
+            if isinstance(value, str):
+                match = re.search(r'(\d+(?:\.\d+)?)\s*kg', value, re.IGNORECASE)
+                if match:
+                    try:
+                        peso_kg = float(match.group(1))
+                        peso_embalagem_gramas = int(peso_kg * 1000)
+                        break
+                    except:
+                        pass
+    
+    # Extrair tipo de produto
+    if isinstance(caracteristicas, dict):
+        tipo = caracteristicas.get('tipo')
+    
+    # Tentar identificar tipo de produto
+    if categoria.lower() in ['perfumaria', 'cosméticos', 'cosmeticos']:
+        # Para perfumes
+        tipo_indicadores = ['parfum', 'eau de parfum', 'eau de toilette', 'eau de cologne']
+        descricao_lower = descricao.lower()
+        for indicador in tipo_indicadores:
+            if indicador in descricao_lower:
+                tipo = indicador.title()
+                break
+        
+        # Tentar extrair família olfativa
+        if 'olfativa' in str(evora_data).lower() or 'fragrância' in descricao_lower:
+            # Procurar por família olfativa no texto
+            pass  # Implementar extração se necessário
+    
+    # Preparar lista de imagens
+    imagens = []
+    # Priorizar caminho completo da imagem, depois nome do arquivo
+    if image_path:
+        imagens.append(image_path)
+    elif image_filename:
+        # Se não tiver caminho completo, usar apenas o nome do arquivo
+        imagens.append(image_filename)
+    elif evora_data.get('imagens'):
+        if isinstance(evora_data['imagens'], list):
+            imagens = [img.get('descricao', '') if isinstance(img, dict) else str(img) for img in evora_data['imagens']]
+        else:
+            imagens = [str(evora_data['imagens'])]
+    
+    # Construir nome completo do produto (nome + marca se não estiver incluído)
+    nome_completo = nome_produto
+    if marca and marca.lower() not in nome_completo.lower():
+        nome_completo = f"{nome_produto} – {marca}"
+    
+    # Extrair tipo de descrição ou características
+    if not tipo:
+        # Tentar identificar tipo a partir da descrição ou subcategoria
+        if 'sabão' in descricao.lower() or 'detergente' in descricao.lower():
+            tipo = descricao.split()[0] if descricao else subcategoria
+        elif subcategoria:
+            tipo = subcategoria
+        else:
+            tipo = None
+    
+    # Construir estrutura produto
+    produto = {
+        "nome": nome_completo,
+        "marca": marca,
+        "descricao": descricao if descricao and len(descricao) > 20 else f"{subcategoria} {marca}. {descricao}" if descricao else f"{nome_produto} da marca {marca}.",
+        "categoria": categoria,
+        "subcategoria": subcategoria,
+        "familia_olfativa": familia_olfativa,
+        "volume_ml": volume_ml,
+        "tipo": tipo,
+        "codigo_barras": codigo_barras if codigo_barras else None,
+        "imagens": imagens if imagens else []
+    }
+    
+    # Adicionar peso se disponível
+    if peso_embalagem_gramas:
+        # Converter gramas para kg se for muito grande (>1000g)
+        if peso_embalagem_gramas >= 1000:
+            produto["peso"] = f"{peso_embalagem_gramas/1000:.0f}kg"
+    
+    # Produto genérico do catálogo
+    # Extrair nome genérico (sem especificações como volume, tipo, peso, etc.)
+    nome_generico = nome_produto
+    # Remover indicadores de volume, tipo, peso
+    nome_generico = re.sub(r'\d+\s*ml', '', nome_generico, flags=re.IGNORECASE)
+    nome_generico = re.sub(r'\d+\s*kg', '', nome_generico, flags=re.IGNORECASE)
+    nome_generico = re.sub(r'(parfum|eau de parfum|eau de toilette|eau de cologne)', '', nome_generico, flags=re.IGNORECASE)
+    nome_generico = re.sub(r'–\s*' + re.escape(marca), '', nome_generico, flags=re.IGNORECASE)
+    nome_generico = ' '.join(nome_generico.split()).strip()
+    
+    if not nome_generico:
+        nome_generico = nome_produto
+    
+    # Criar nome do catálogo: "Marca Nome Genérico"
+    nome_catalogo = f"{marca} {nome_generico}" if marca and marca.lower() not in nome_generico.lower() else nome_generico
+    
+    # Extrair variantes
+    variantes = []
+    if volume_ml:
+        variantes.append(f"{volume_ml}ml")
+    if peso_kg:
+        variantes.append(f"{peso_kg:.0f}kg" if peso_kg >= 1 else f"{int(peso_kg * 1000)}g")
+    elif peso_embalagem_gramas and peso_embalagem_gramas >= 1000:
+        variantes.append(f"{peso_embalagem_gramas/1000:.0f}kg")
+    
+    # Adicionar características das variantes se disponíveis
+    if isinstance(evora_data.get('caracteristicas'), list):
+        for item in evora_data.get('caracteristicas', []):
+            if isinstance(item, str) and item not in variantes:
+                # Adicionar características relevantes como variantes
+                if any(keyword in item.lower() for keyword in ['perfume', 'intenso', 'mático', 'matic', 'limão', 'coco']):
+                    variantes.append(item)
+    
+    produto_generico_catalogo = {
+        "nome": nome_catalogo,
+        "marca": marca,
+        "categoria": categoria,
+        "subcategoria": subcategoria,
+        "variantes": variantes if variantes else []
+    }
+    
+    # Produto viagem (valores padrão - podem ser preenchidos depois)
+    produto_viagem = {
+        "preco_compra_usd": None,
+        "preco_compra_brl": None,
+        "margem_lucro_percentual": None,
+        "preco_venda_usd": None,
+        "preco_venda_brl": None
+    }
+    
+    # Tentar extrair preço se disponível
+    preco_visivel = evora_data.get('preco_visivel')
+    if preco_visivel:
+        try:
+            # Tentar converter para float
+            preco = float(str(preco_visivel).replace(',', '.').replace('$', '').strip())
+            produto_viagem["preco_venda_brl"] = preco
+        except:
+            pass
+    
+    # Verificar se há preço sugerido do enriquecimento
+    if evora_data.get('produto_viagem') and isinstance(evora_data['produto_viagem'], dict):
+        if evora_data['produto_viagem'].get('preco_venda_brl'):
+            produto_viagem["preco_venda_brl"] = evora_data['produto_viagem']['preco_venda_brl']
+        if evora_data['produto_viagem'].get('preco_compra_brl'):
+            produto_viagem["preco_compra_brl"] = evora_data['produto_viagem']['preco_compra_brl']
+        if evora_data['produto_viagem'].get('margem_lucro_percentual'):
+            produto_viagem["margem_lucro_percentual"] = evora_data['produto_viagem']['margem_lucro_percentual']
+    
+    # Estabelecimento (padrão vazio - será preenchido depois)
+    estabelecimento = {
+        "nome": None,
+        "endereco": None,
+        "localizacao_geografica": {
+            "latitude": None,
+            "longitude": None
+        },
+        "observacao": None
+    }
+    
+    # Campanha (padrão vazio - será preenchido depois)
+    campanha = {
+        "id": None,
+        "nome": None,
+        "data_registro": None
+    }
+    
+    # Shopper (padrão vazio - será preenchido depois)
+    shopper = {
+        "id": None,
+        "nome": None,
+        "pais": None
+    }
+    
+    # Cadastro meta
+    cadastro_meta = {
+        "capturado_por": "VitrineZap (IA Évora)",
+        "data_captura": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "fonte": f"Análise automática de imagem: {image_path or image_filename or 'uploaded_image'}",
+        "confianca_da_leitura": 0.95,  # Valor padrão, pode ser ajustado
+        "detalhes_rotulo": {}
+    }
+    
+    # Adicionar informações enriquecidas do cadastro_meta se disponíveis
+    if evora_data.get('cadastro_meta') and isinstance(evora_data['cadastro_meta'], dict):
+        if evora_data['cadastro_meta'].get('detalhes_rotulo'):
+            cadastro_meta['detalhes_rotulo'] = evora_data['cadastro_meta']['detalhes_rotulo']
+    
+    # Extrair detalhes do rótulo do formato ÉVORA
+    detalhes_rotulo = {}
+    
+    # Procurar por informações de origem
+    pais_origem = evora_data.get('pais_origem') or evora_data.get('caracteristicas', {}).get('fabricacao', {}).get('pais')
+    if pais_origem:
+        detalhes_rotulo['origem'] = pais_origem
+    
+    # Procurar por informações em caracteristicas ou outros campos
+    fabricante = evora_data.get('fabricante')
+    if fabricante:
+        detalhes_rotulo['fabricante'] = fabricante
+    
+    # Extrair informações adicionais que possam estar em caracteristicas
+    caracteristicas_texto = str(caracteristicas).lower()
+    if 'vegan' in caracteristicas_texto or 'vegano' in caracteristicas_texto:
+        detalhes_rotulo['vegano'] = True
+    if 'organic' in caracteristicas_texto or 'orgânico' in caracteristicas_texto:
+        detalhes_rotulo['organico'] = True
+    if 'conscious' in caracteristicas_texto or 'consciente' in caracteristicas_texto:
+        detalhes_rotulo['frase'] = "conscious & vegan formula"
+    
+    # Extrair duração se mencionada (especialmente para perfumes)
+    if 'duração' in descricao.lower() or 'duration' in descricao.lower() or 'lasting' in descricao.lower():
+        match = re.search(r'(long-lasting|duração longa|muito duradouro)', descricao, re.IGNORECASE)
+        if match:
+            detalhes_rotulo['duracao'] = match.group(1)
+    
+    cadastro_meta["detalhes_rotulo"] = detalhes_rotulo if detalhes_rotulo else {
+        "frase": None,
+        "origem": None,
+        "duracao": None
+    }
+    
+    # Construir resposta final no formato modelo.json
+    resultado = {
+        "produto": produto,
+        "produto_generico_catalogo": produto_generico_catalogo,
+        "produto_viagem": produto_viagem,
+        "estabelecimento": estabelecimento,
+        "campanha": campanha,
+        "shopper": shopper,
+        "cadastro_meta": cadastro_meta
+    }
+    
+    return resultado
+

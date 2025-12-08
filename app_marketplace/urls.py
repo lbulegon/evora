@@ -77,6 +77,7 @@ urlpatterns = [
       path('products/cadastrar-por-foto/', product_photo_views.product_photo_create, name='product_photo_create'),
       path('api/produtos/detectar_por_foto/', product_photo_views.detect_product_by_photo, name='api_detect_product_by_photo'),
       path('api/produtos/salvar_por_foto/', product_photo_views.save_product_from_photo, name='api_save_product_from_photo'),
+      path('api/produtos/salvar_json/', product_photo_views.save_product_json, name='api_save_product_json'),
     
     # Dashboard Específico do Shopper
     path('shopper/dashboard/', shopper_dashboard_views.shopper_dashboard, name='shopper_dashboard'),
