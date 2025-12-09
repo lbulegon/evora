@@ -240,6 +240,21 @@ class AddressKeeper(models.Model):
     aceita_retirada = models.BooleanField(default=True)
     aceita_envio    = models.BooleanField(default=True)
     
+    # Idioma preferido para respostas da IA
+    idioma = models.CharField(
+        max_length=10,
+        default='pt-BR',
+        choices=[
+            ('pt-BR', 'Português (Brasil)'),
+            ('en-US', 'English (US)'),
+            ('es-ES', 'Español (España)'),
+            ('fr-FR', 'Français'),
+            ('de-DE', 'Deutsch'),
+            ('it-IT', 'Italiano'),
+        ],
+        help_text="Idioma preferido para respostas da IA"
+    )
+    
     # Status
     verificado = models.BooleanField(default=False)
     ativo      = models.BooleanField(default=True)

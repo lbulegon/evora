@@ -400,6 +400,36 @@ def _get_openmind_config():
     return OPENMIND_AI_URL, OPENMIND_AI_KEY
 
 
+def _detect_user_language(user):
+    """
+    Detecta o idioma preferido do usuário a partir do perfil (PersonalShopper ou AddressKeeper).
+    
+    Args:
+        user: Usuário Django
+    
+    Returns:
+        str: Código do idioma (ex: 'pt-BR', 'en-US') ou None
+    """
+    if not user or not user.is_authenticated:
+        return None
+    
+    try:
+        # Tentar obter do PersonalShopper
+        if hasattr(user, 'personalshopper'):
+            return user.personalshopper.idioma
+    except Exception:
+        pass
+    
+    try:
+        # Tentar obter do AddressKeeper
+        if hasattr(user, 'address_keeper'):
+            return user.address_keeper.idioma
+    except Exception:
+        pass
+    
+    return None
+
+
 def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
     """
     Analisa uma imagem usando o OpenMind AI Server.
