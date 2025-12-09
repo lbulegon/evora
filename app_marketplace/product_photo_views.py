@@ -62,6 +62,259 @@ def product_photo_create(request):
 @login_required
 @csrf_exempt
 @require_http_methods(["POST"])
+def verificar_produto_fotos(request):
+    """
+    API para verificar se múltiplas fotos são do mesmo produto (primeira análise).
+    POST /api/produtos/verificar_produto/
+    
+    Recebe múltiplas imagens e verifica se são do mesmo produto.
+    Não gera JSON completo, apenas verifica consistência.
+    """
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        # Verificar se há imagens na requisição
+        if 'images' in request.FILES:
+            image_files = request.FILES.getlist('images')
+        elif 'image' in request.FILES:
+            image_files = [request.FILES['image']]
+        else:
+            return JsonResponse({
+                'error': 'Imagens são obrigatórias',
+                'debug': {
+                    'files_keys': list(request.FILES.keys()),
+                }
+            }, status=400)
+        
+        if not image_files:
+            return JsonResponse({'error': 'Nenhuma imagem fornecida'}, status=400)
+        
+        # Validar tipos de arquivo
+        for image_file in image_files:
+            if not image_file.content_type.startswith('image/'):
+                return JsonResponse({'error': f'O arquivo "{image_file.name}" deve ser uma imagem.'}, status=400)
+        
+        # Processar imagens em memória (sem salvar)
+        processed_images = []
+        for image_file in image_files:
+            # Processar e otimizar imagem em memória
+            img = Image.open(image_file)
+            
+            # Converter para RGB se necessário
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                img = background
+            
+            # Salvar imagem processada em memória
+            output = BytesIO()
+            img.save(output, format='JPEG', quality=90, optimize=True)
+            output.seek(0)
+            
+            # Criar arquivo em memória para envio
+            from django.core.files.uploadedfile import InMemoryUploadedFile
+            from django.core.files.base import ContentFile
+            
+            processed_file = InMemoryUploadedFile(
+                ContentFile(output.read()),
+                None,
+                image_file.name,
+                'image/jpeg',
+                output.tell(),
+                None
+            )
+            
+            processed_images.append(processed_file)
+        
+        # Verificar se são do mesmo produto (análise rápida)
+        result = analyze_multiple_images(processed_images)
+        
+        # Retornar apenas informações de verificação (sem JSON completo)
+        return JsonResponse({
+            'success': True,
+            'mesmo_produto': result.get('mesmo_produto', False),
+            'consistencia': result.get('consistencia', {}),
+            'total_imagens': len(processed_images),
+            'aviso': result.get('aviso'),
+            'produtos_identificados': len(result.get('produtos_diferentes', [])) if not result.get('mesmo_produto') else 1
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        logger.error(f"Erro ao verificar produto: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'error': f'Erro ao verificar produto: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def analise_completa_produto(request):
+    """
+    API para análise completa de múltiplas fotos do mesmo produto (segunda análise).
+    POST /api/produtos/analise_completa/
+    
+    Recebe múltiplas imagens do mesmo produto e gera JSON completo.
+    """
+    if not (request.user.is_shopper or request.user.is_address_keeper):
+        return JsonResponse({'error': 'Acesso restrito'}, status=403)
+    
+    try:
+        # Verificar se há imagens na requisição
+        if 'images' in request.FILES:
+            image_files = request.FILES.getlist('images')
+        elif 'image' in request.FILES:
+            image_files = [request.FILES['image']]
+        else:
+            return JsonResponse({
+                'error': 'Imagens são obrigatórias',
+                'debug': {
+                    'files_keys': list(request.FILES.keys()),
+                }
+            }, status=400)
+        
+        if not image_files:
+            return JsonResponse({'error': 'Nenhuma imagem fornecida'}, status=400)
+        
+        # Validar tipos de arquivo
+        for image_file in image_files:
+            if not image_file.content_type.startswith('image/'):
+                return JsonResponse({'error': f'O arquivo "{image_file.name}" deve ser uma imagem.'}, status=400)
+        
+        # Processar imagens em memória (sem salvar)
+        processed_images = []
+        for image_file in image_files:
+            # Processar e otimizar imagem em memória
+            img = Image.open(image_file)
+            
+            # Converter para RGB se necessário
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                img = background
+            
+            # Salvar imagem processada em memória
+            output = BytesIO()
+            img.save(output, format='JPEG', quality=90, optimize=True)
+            output.seek(0)
+            
+            # Criar arquivo em memória para envio
+            from django.core.files.uploadedfile import InMemoryUploadedFile
+            from django.core.files.base import ContentFile
+            
+            processed_file = InMemoryUploadedFile(
+                ContentFile(output.read()),
+                None,
+                image_file.name,
+                'image/jpeg',
+                output.tell(),
+                None
+            )
+            
+            processed_images.append(processed_file)
+        
+        # Análise completa (gera JSON)
+        if len(processed_images) == 1:
+            # Uma única imagem
+            image_file = processed_images[0]
+            image_file.seek(0)
+            result = analyze_image_with_openmind(image_file)
+            
+            produto_data = result.get('data', {})
+            image_url_from_sinapum = result.get('image_url')
+            image_path_from_sinapum = result.get('image_path')
+            saved_filename = result.get('saved_filename')
+            
+            # Garantir que o array de imagens existe
+            if produto_data and result.get('success'):
+                if 'produto' in produto_data:
+                    if 'imagens' not in produto_data['produto']:
+                        produto_data['produto']['imagens'] = []
+                    image_path_for_json = image_path_from_sinapum or image_url_from_sinapum
+                    if image_path_for_json and image_path_for_json not in produto_data['produto']['imagens']:
+                        produto_data['produto']['imagens'].insert(0, image_path_for_json)
+                    if not produto_data['produto']['imagens'] and image_path_for_json:
+                        produto_data['produto']['imagens'] = [image_path_for_json]
+            
+            return JsonResponse({
+                'success': True,
+                'produto_json': produto_data,
+                'image_url': image_url_from_sinapum or '',
+                'image_path': image_path_from_sinapum or '',
+                'saved_filename': saved_filename or '',
+                'total_imagens': 1
+            })
+        else:
+            # Múltiplas imagens - análise completa
+            result = analyze_multiple_images(processed_images)
+            
+            # Extrair informações das imagens retornadas pelo SinapUm
+            image_urls = []
+            image_paths = []
+            saved_filenames = []
+            
+            if result.get('analises_individuais'):
+                for analise in result['analises_individuais']:
+                    analise_result = analise.get('result', {})
+                    if analise_result.get('image_url'):
+                        image_urls.append(analise_result['image_url'])
+                    if analise_result.get('image_path'):
+                        image_paths.append(analise_result['image_path'])
+                    if analise_result.get('saved_filename'):
+                        saved_filenames.append(analise_result['saved_filename'])
+            
+            # Usar image_paths (relativos) preferencialmente no JSON do produto
+            image_paths_for_json = image_paths if image_paths else image_urls
+            
+            # Adicionar caminhos das imagens salvas no SinapUm
+            if result.get('mesmo_produto') and result.get('produto_consolidado'):
+                produto_data = result['produto_consolidado']
+                if 'produto' in produto_data:
+                    if 'imagens' not in produto_data['produto']:
+                        produto_data['produto']['imagens'] = []
+                    for img_path in image_paths_for_json:
+                        if img_path and img_path not in produto_data['produto']['imagens']:
+                            produto_data['produto']['imagens'].append(img_path)
+            else:
+                # Produtos diferentes - usar primeiro produto como base
+                produto_data = result.get('produtos_diferentes', [{}])[0].get('produto_data', {}) if result.get('produtos_diferentes') else {}
+                if 'produto' in produto_data:
+                    if 'imagens' not in produto_data['produto']:
+                        produto_data['produto']['imagens'] = []
+                    for img_path in image_paths_for_json:
+                        if img_path and img_path not in produto_data['produto']['imagens']:
+                            produto_data['produto']['imagens'].append(img_path)
+            
+            return JsonResponse({
+                'success': True,
+                'produto_json': produto_data,
+                'mesmo_produto': result.get('mesmo_produto', False),
+                'image_urls': image_urls,
+                'image_paths': image_paths,
+                'saved_filenames': saved_filenames,
+                'total_imagens': len(processed_images),
+                'aviso': result.get('aviso')
+            })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        logger.error(f"Erro na análise completa: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'error': f'Erro na análise completa: {str(e)}'
+        }, status=500)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
 def detect_product_by_photo(request):
     """
     API para detectar produto por foto (suporta múltiplas imagens)
