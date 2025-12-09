@@ -471,8 +471,8 @@
                 </div>
                 
                 <div class="mb-3">
-                    <label class="form-label">Grupo WhatsApp *</label>
-                    <select name="group_id" id="inputGroupId" class="form-select" required>
+                    <label class="form-label">Grupo WhatsApp</label>
+                    <select name="group_id" id="inputGroupId" class="form-select">
                         <option value="">Selecione um grupo...</option>
                         {% for group in groups %}
                         <option value="{{ group.id }}">{{ group.name }}</option>
@@ -787,21 +787,36 @@ function handleAnalysisResult(result) {
 
 // Salvar produto
 async function saveProduct() {
+    console.log('saveProduct() chamado');
+    
     if (!validateForm()) {
+        console.log('Validação do formulário falhou');
         return;
     }
     
     showLoading('Salvando produto no banco de dados...');
     hideError();
     
+    // Verificar se produtoJson existe
+    if (!produtoJson) {
+        console.error('produtoJson está vazio ou undefined');
+        showError('Erro: Dados do produto não encontrados. Por favor, faça a análise novamente.');
+        hideLoading();
+        return;
+    }
+    
     // Obter JSON editado
     let jsonData = produtoJson;
     try {
         const jsonEditorValue = document.getElementById('jsonEditor').value;
-        if (jsonEditorValue) {
+        if (jsonEditorValue && jsonEditorValue.trim()) {
+            console.log('Usando JSON do editor');
             jsonData = JSON.parse(jsonEditorValue);
+        } else {
+            console.log('Usando produtoJson original');
         }
     } catch (e) {
+        console.error('Erro ao parsear JSON:', e);
         showError('JSON inválido. Corrija antes de salvar.');
         hideLoading();
         return;
@@ -816,10 +831,32 @@ async function saveProduct() {
         jsonData.produto.descricao = document.getElementById('inputDescription').value.trim() || jsonData.produto.descricao;
     }
     
+    // Obter grupo_id (opcional)
+    const grupoIdInput = document.getElementById('inputGroupId');
+    const grupoIdValue = grupoIdInput ? grupoIdInput.value : '';
+    let grupoId = null;
+    
+    if (grupoIdValue && grupoIdValue.trim()) {
+        grupoId = parseInt(grupoIdValue);
+        if (isNaN(grupoId)) {
+            console.warn('grupo_id inválido, continuando sem grupo:', grupoIdValue);
+            grupoId = null;
+        }
+    }
+    
     const saveData = {
-        produto_json: jsonData,
-        grupo_id: parseInt(document.getElementById('inputGroupId').value)
+        produto_json: jsonData
     };
+    
+    // Adicionar grupo_id apenas se válido
+    if (grupoId) {
+        saveData.grupo_id = grupoId;
+    }
+    
+    console.log('Enviando dados para salvar:', {
+        has_produto_json: !!saveData.produto_json,
+        grupo_id: saveData.grupo_id
+    });
     
     try {
         const response = await fetch('{% url "api_save_product_json" %}', {
@@ -831,16 +868,31 @@ async function saveProduct() {
             body: JSON.stringify(saveData)
         });
         
+        console.log('Resposta recebida, status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Erro na resposta:', errorText);
+            throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
+        }
+        
         const data = await response.json();
+        console.log('Dados recebidos:', data);
         hideLoading();
         
         if (data.success) {
-            document.getElementById('successProductName').textContent = jsonData.produto?.nome || 'Produto';
+            const productName = jsonData.produto?.nome || 'Produto';
+            const successElement = document.getElementById('successProductName');
+            if (successElement) {
+                successElement.textContent = productName;
+            }
             goToStep(5);
         } else {
+            console.error('Erro do servidor:', data.error);
             showError(data.error || 'Erro ao salvar produto');
         }
     } catch (error) {
+        console.error('Erro ao salvar produto:', error);
         hideLoading();
         showError('Erro ao salvar produto: ' + error.message);
     }
@@ -849,15 +901,9 @@ async function saveProduct() {
 // Validar formulário
 function validateForm() {
     const name = document.getElementById('inputName').value.trim();
-    const groupId = document.getElementById('inputGroupId').value;
     
     if (!name) {
         showError('Nome do produto é obrigatório');
-        return false;
-    }
-    
-    if (!groupId) {
-        showError('Grupo WhatsApp é obrigatório');
         return false;
     }
     

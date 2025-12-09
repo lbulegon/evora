@@ -856,7 +856,14 @@ def save_product_json(request):
         grupo_id = data.get('grupo_id')
         grupo = None
         if grupo_id:
-            grupo = WhatsappGroup.objects.filter(id=grupo_id, owner=request.user).first()
+            try:
+                grupo_id_int = int(grupo_id) if grupo_id else None
+                if grupo_id_int:
+                    grupo = WhatsappGroup.objects.filter(id=grupo_id_int, owner=request.user).first()
+                    if not grupo:
+                        logger.warning(f"Grupo {grupo_id_int} não encontrado ou não pertence ao usuário {request.user.id}")
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Erro ao processar grupo_id {grupo_id}: {str(e)}")
         
         novo_produto = ProdutoJSON.objects.create(
             dados_json=produto_json,
