@@ -175,6 +175,21 @@ class PersonalShopper(models.Model):
     youtube   = models.URLField(blank=True)
     instagram = models.URLField(blank=True)
     
+    # Idioma preferido para respostas da IA
+    idioma = models.CharField(
+        max_length=10,
+        default='pt-BR',
+        choices=[
+            ('pt-BR', 'Português (Brasil)'),
+            ('en-US', 'English (US)'),
+            ('es-ES', 'Español (España)'),
+            ('fr-FR', 'Français'),
+            ('de-DE', 'Deutsch'),
+            ('it-IT', 'Italiano'),
+        ],
+        help_text="Idioma preferido para respostas da IA"
+    )
+    
     empresa   = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True, related_name='personal_shoppers')
     ativo     = models.BooleanField(default=True)
     criado_em = models.DateTimeField(auto_now_add=True)

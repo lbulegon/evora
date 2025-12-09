@@ -37,11 +37,16 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
                             caracteristicas_dict['peso_kg'] = float(match.group(1))
                     except:
                         pass
-        marca = evora_data.get('marca', 'Marca não identificada')
+        marca = evora_data.get('marca') or 'Marca não identificada'
         caracteristicas = caracteristicas_dict
     else:
         marca = caracteristicas.get('marca') if isinstance(caracteristicas, dict) else None
-        marca = marca or evora_data.get('marca', 'Marca não identificada')
+        marca = marca or evora_data.get('marca') or 'Marca não identificada'
+    
+    # Garantir que marca sempre seja uma string, nunca None
+    if not marca or marca == 'None':
+        marca = 'Marca não identificada'
+    marca = str(marca).strip()
     
     descricao = evora_data.get('descricao', 'Descrição não disponível')
     categoria = evora_data.get('categoria', 'Não categorizado')
@@ -170,7 +175,9 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
     nome_generico = re.sub(r'\d+\s*ml', '', nome_generico, flags=re.IGNORECASE)
     nome_generico = re.sub(r'\d+\s*kg', '', nome_generico, flags=re.IGNORECASE)
     nome_generico = re.sub(r'(parfum|eau de parfum|eau de toilette|eau de cologne)', '', nome_generico, flags=re.IGNORECASE)
-    nome_generico = re.sub(r'–\s*' + re.escape(marca), '', nome_generico, flags=re.IGNORECASE)
+    # Remover marca apenas se não for None
+    if marca:
+        nome_generico = re.sub(r'–\s*' + re.escape(str(marca)), '', nome_generico, flags=re.IGNORECASE)
     nome_generico = ' '.join(nome_generico.split()).strip()
     
     if not nome_generico:

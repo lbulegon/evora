@@ -15,6 +15,7 @@ from django.utils import timezone
 from decimal import Decimal
 import json
 import os
+import requests
 from PIL import Image
 from io import BytesIO
 
@@ -130,16 +131,36 @@ def verificar_produto_fotos(request):
             processed_images.append(processed_file)
         
         # Verificar se são do mesmo produto (análise rápida)
-        result = analyze_multiple_images(processed_images)
+        # Passar usuário para detectar idioma
+        result = analyze_multiple_images(processed_images, user=request.user)
         
-        # Retornar apenas informações de verificação (sem JSON completo)
+        # Extrair URLs das imagens salvas no SinapUm (para reutilizar na análise completa)
+        image_urls = []
+        image_paths = []
+        saved_filenames = []
+        
+        if result.get('analises_individuais'):
+            for analise in result['analises_individuais']:
+                analise_result = analise.get('result', {})
+                if analise_result.get('image_url'):
+                    image_urls.append(analise_result['image_url'])
+                if analise_result.get('image_path'):
+                    image_paths.append(analise_result['image_path'])
+                if analise_result.get('saved_filename'):
+                    saved_filenames.append(analise_result['saved_filename'])
+        
+        # Retornar informações de verificação + URLs das imagens salvas
         return JsonResponse({
             'success': True,
             'mesmo_produto': result.get('mesmo_produto', False),
             'consistencia': result.get('consistencia', {}),
             'total_imagens': len(processed_images),
             'aviso': result.get('aviso'),
-            'produtos_identificados': len(result.get('produtos_diferentes', [])) if not result.get('mesmo_produto') else 1
+            'produtos_identificados': len(result.get('produtos_diferentes', [])) if not result.get('mesmo_produto') else 1,
+            # URLs das imagens salvas no SinapUm (para reutilizar)
+            'image_urls': image_urls,
+            'image_paths': image_paths,
+            'saved_filenames': saved_filenames
         })
         
     except Exception as e:
@@ -160,19 +181,81 @@ def analise_completa_produto(request):
     POST /api/produtos/analise_completa/
     
     Recebe múltiplas imagens do mesmo produto e gera JSON completo.
+    Pode receber:
+    - images[] (arquivos) - se for primeira vez
+    - image_urls[] (JSON) - se as imagens já foram salvas no SinapUm (otimização)
     """
     if not (request.user.is_shopper or request.user.is_address_keeper):
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
-        # Verificar se há imagens na requisição
+        # Verificar se recebeu URLs das imagens já salvas (otimização)
+        data = {}
+        if request.content_type and 'application/json' in request.content_type:
+            try:
+                data = json.loads(request.body)
+            except:
+                pass
+        
+        image_urls = data.get('image_urls', [])
+        image_paths = data.get('image_paths', [])
+        
+        # Se tiver URLs, baixar imagens do SinapUm e usar (evita reenvio)
+        if image_urls or image_paths:
+            logger.info(f"Análise completa usando URLs já salvas: {len(image_urls or image_paths)} imagens")
+            urls_to_use = image_urls if image_urls else image_paths
+            # Construir URLs completas se necessário
+            urls_completas = []
+            for url in urls_to_use:
+                if url.startswith('http'):
+                    urls_completas.append(url)
+                else:
+                    # Se for path relativo, construir URL completa
+                    base_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:5000')
+                    if '/api/v1' in base_url:
+                        base_url = base_url.replace('/api/v1', '')
+                    urls_completas.append(f"{base_url}/{url.lstrip('/')}")
+            
+            # Baixar imagens das URLs e fazer análise
+            try:
+                from django.core.files.uploadedfile import InMemoryUploadedFile
+                from django.core.files.base import ContentFile
+                
+                downloaded_images = []
+                for idx, url in enumerate(urls_completas):
+                    logger.info(f"Baixando imagem {idx + 1}/{len(urls_completas)} de {url}")
+                    response = requests.get(url, timeout=30)
+                    if response.status_code == 200:
+                        # Criar arquivo em memória
+                        file_obj = InMemoryUploadedFile(
+                            ContentFile(response.content),
+                            None,
+                            f"image_{idx}.jpg",
+                            'image/jpeg',
+                            len(response.content),
+                            None
+                        )
+                        downloaded_images.append(file_obj)
+                    else:
+                        logger.warning(f"Erro ao baixar imagem {url}: status {response.status_code}")
+                
+                if downloaded_images:
+                    # Usar imagens baixadas para análise
+                    processed_images = downloaded_images
+                else:
+                    return JsonResponse({'error': 'Erro ao baixar imagens das URLs'}, status=400)
+            except Exception as e:
+                logger.error(f"Erro ao baixar imagens: {str(e)}", exc_info=True)
+                return JsonResponse({'error': f'Erro ao baixar imagens: {str(e)}'}, status=500)
+        
+        # Caso contrário, receber arquivos normalmente
         if 'images' in request.FILES:
             image_files = request.FILES.getlist('images')
         elif 'image' in request.FILES:
             image_files = [request.FILES['image']]
         else:
             return JsonResponse({
-                'error': 'Imagens são obrigatórias',
+                'error': 'Imagens são obrigatórias (arquivos ou URLs)',
                 'debug': {
                     'files_keys': list(request.FILES.keys()),
                 }
@@ -225,7 +308,7 @@ def analise_completa_produto(request):
             # Uma única imagem
             image_file = processed_images[0]
             image_file.seek(0)
-            result = analyze_image_with_openmind(image_file)
+            result = analyze_image_with_openmind(image_file, user=request.user)
             
             produto_data = result.get('data', {})
             image_url_from_sinapum = result.get('image_url')
@@ -253,7 +336,7 @@ def analise_completa_produto(request):
             })
         else:
             # Múltiplas imagens - análise completa
-            result = analyze_multiple_images(processed_images)
+            result = analyze_multiple_images(processed_images, user=request.user)
             
             # Extrair informações das imagens retornadas pelo SinapUm
             image_urls = []
@@ -394,7 +477,7 @@ def detect_product_by_photo(request):
             # Uma única imagem - usar método simples
             image_file = saved_images[0]['file']
             image_file.seek(0)
-            result = analyze_image_with_openmind(image_file)
+            result = analyze_image_with_openmind(image_file, user=request.user)
             
             produto_data = result.get('data', {})
             # Extrair informações da imagem retornada pelo SinapUm
@@ -461,7 +544,7 @@ def detect_product_by_photo(request):
         else:
             # Múltiplas imagens - usar análise comparativa
             image_files_list = [img['file'] for img in saved_images]
-            result = analyze_multiple_images(image_files_list)
+            result = analyze_multiple_images(image_files_list, user=request.user)
             
             # Extrair informações das imagens retornadas pelo SinapUm
             image_urls = []  # URLs completas (para exibição)

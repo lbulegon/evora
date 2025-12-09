@@ -400,23 +400,34 @@ def _get_openmind_config():
     return OPENMIND_AI_URL, OPENMIND_AI_KEY
 
 
-def analyze_image_with_openmind(image_file):
+def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
     """
     Analisa uma imagem usando o OpenMind AI Server.
     
     Args:
         image_file: Arquivo de imagem (Django UploadedFile)
+        language: Código do idioma (ex: 'pt-BR', 'en-US', 'es-ES'). Padrão: 'pt-BR'
+        user: Usuário Django (opcional) - para detectar idioma do perfil
     
     Returns:
         dict: Resposta da API do OpenMind AI
     """
     try:
+        # Detectar idioma do usuário se fornecido
+        if user:
+            detected_lang = _detect_user_language(user)
+            if detected_lang:
+                language = detected_lang
+        
         url_base, api_key = _get_openmind_config()
         # Construir URL do endpoint - verificar se já inclui /api/v1
         if '/api/v1' in url_base:
             url = f"{url_base}/analyze-product-image"
         else:
             url = f"{url_base}/api/v1/analyze-product-image"
+        
+        # Adicionar parâmetro de idioma na URL
+        url = f"{url}?language={language}"
         
         headers = {}
         if api_key:
@@ -426,7 +437,7 @@ def analyze_image_with_openmind(image_file):
             'image': (image_file.name, image_file.read(), image_file.content_type)
         }
         
-        logger.info(f"Enviando imagem para análise: {image_file.name}")
+        logger.info(f"Enviando imagem para análise: {image_file.name} (idioma: {language})")
         response = requests.post(url, files=files, headers=headers, timeout=60)
         
         # Verificar se a resposta é JSON válido
@@ -556,12 +567,14 @@ def analyze_image_with_openmind(image_file):
         }
 
 
-def analyze_multiple_images(image_files):
+def analyze_multiple_images(image_files, language='pt-BR', user=None):
     """
     Analisa múltiplas imagens e verifica se são do mesmo produto.
     
     Args:
         image_files: Lista de arquivos de imagem (Django UploadedFile)
+        language: Código do idioma (ex: 'pt-BR', 'en-US', 'es-ES'). Padrão: 'pt-BR'
+        user: Usuário Django (opcional) - para detectar idioma do perfil
     
     Returns:
         dict: Resultado da análise com informações sobre consistência dos produtos
@@ -569,14 +582,20 @@ def analyze_multiple_images(image_files):
     results = []
     produtos_identificados = []
     
+    # Detectar idioma do usuário se fornecido
+    if user:
+        detected_lang = _detect_user_language(user)
+        if detected_lang:
+            language = detected_lang
+    
     for idx, image_file in enumerate(image_files):
         logger.info(f"Analisando imagem {idx + 1}/{len(image_files)}: {image_file.name}")
         
         # Resetar ponteiro do arquivo
         image_file.seek(0)
         
-        # Analisar imagem
-        result = analyze_image_with_openmind(image_file)
+        # Analisar imagem com idioma
+        result = analyze_image_with_openmind(image_file, language=language, user=user)
         
         if result.get('success') and result.get('data'):
             produto_data = result['data']
