@@ -52,9 +52,10 @@ admin.site.index_title = "Administração VitrineZap"
 
 urlpatterns = [
     path('health/', health_check, name='health_check'),
+    # Incluir app_marketplace.urls ANTES do admin para capturar /admin/dashboard/
+    path('', include('app_marketplace.urls')),
     path('admin/', admin.site.urls),
     path('', include('app_whatsapp_integration.urls')),  # WhatsApp Integration
-    path('', include('app_marketplace.urls')),
 ]
 
 # Servir arquivos de mídia em desenvolvimento e produção
