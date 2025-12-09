@@ -920,18 +920,28 @@ async function saveProduct() {
         }
         
         const data = await response.json();
-        console.log('Dados recebidos:', data);
+        console.log('[SAVE_PRODUCT] Dados recebidos do servidor:', data);
+        console.log('[SAVE_PRODUCT] data.success:', data.success);
         hideLoading();
         
         if (data.success) {
+            console.log('[SAVE_PRODUCT] Sucesso! Navegando para etapa 5...');
             const productName = jsonData.produto?.nome || 'Produto';
+            console.log('[SAVE_PRODUCT] Nome do produto:', productName);
+            
             const successElement = document.getElementById('successProductName');
             if (successElement) {
                 successElement.textContent = productName;
+                console.log('[SAVE_PRODUCT] Elemento successProductName atualizado');
+            } else {
+                console.warn('[SAVE_PRODUCT] Elemento successProductName não encontrado!');
             }
+            
+            console.log('[SAVE_PRODUCT] Chamando goToStep(5)...');
             goToStep(5);
+            console.log('[SAVE_PRODUCT] goToStep(5) executado');
         } else {
-            console.error('Erro do servidor:', data.error);
+            console.error('[SAVE_PRODUCT] Erro do servidor:', data.error);
             showError(data.error || 'Erro ao salvar produto');
         }
     } catch (error) {
@@ -957,20 +967,33 @@ function validateForm() {
 
 // Navegar entre etapas
 function goToStep(step) {
+    console.log(`[goToStep] Navegando para etapa ${step}, currentStep atual: ${currentStep}`);
+    
     // Se for etapa 5 (confirmação), apenas mostrar sem atualizar indicadores
     if (step === 5) {
+        console.log('[goToStep] Etapa 5 - Ocultando etapas principais...');
         // Ocultar todas as etapas principais
         for (let i = 1; i <= 3; i++) {
             const card = document.getElementById(`stepCard${i}`);
-            if (card) card.classList.remove('active');
+            if (card) {
+                card.classList.remove('active');
+                console.log(`[goToStep] Etapa ${i} ocultada`);
+            } else {
+                console.warn(`[goToStep] Etapa ${i} não encontrada`);
+            }
         }
         // Mostrar etapa de confirmação
         const confirmCard = document.getElementById('stepCard5');
         if (confirmCard) {
+            console.log('[goToStep] Mostrando etapa de confirmação...');
             confirmCard.style.display = 'block';
             confirmCard.classList.add('active');
+            console.log('[goToStep] Etapa 5 exibida com sucesso');
+        } else {
+            console.error('[goToStep] Elemento stepCard5 não encontrado!');
         }
         currentStep = 5;
+        console.log(`[goToStep] currentStep atualizado para ${currentStep}`);
         return;
     }
     

@@ -19,7 +19,7 @@ from decimal import Decimal
 from .models import (
     PersonalShopper, WhatsappGroup, WhatsappParticipant, 
     WhatsappMessage, WhatsappProduct, WhatsappOrder,
-    Cliente, Produto, Categoria, Empresa
+    Cliente, Produto, Categoria, Empresa, ProdutoJSON
 )
 from .whatsapp_views import send_message, send_reaction
 
@@ -306,17 +306,17 @@ def shopper_group_detail(request, group_id):
 
 @login_required
 def shopper_products(request):
-    """Catálogo de produtos do shopper"""
+    """Catálogo de produtos do shopper - usando ProdutoJSON"""
     if not request.user.is_shopper:
         messages.error(request, "Acesso restrito a Personal Shoppers.")
         return redirect('home')
     
-    # Base: todos os produtos do shopper
-    base_products = WhatsappProduct.objects.filter(group__owner=request.user).order_by('-created_at')
+    # Base: todos os produtos do shopper (ProdutoJSON)
+    base_products = ProdutoJSON.objects.filter(criado_por=request.user).order_by('-criado_em')
     
     # Categorias e marcas disponíveis - BUSCAR ANTES DOS FILTROS para mostrar todas
-    categories = base_products.values_list('category', flat=True).distinct().exclude(category='').exclude(category__isnull=True)
-    brands = base_products.values_list('brand', flat=True).distinct().exclude(brand='').exclude(brand__isnull=True)
+    categories = base_products.values_list('categoria', flat=True).distinct().exclude(categoria='').exclude(categoria__isnull=True)
+    brands = base_products.values_list('marca', flat=True).distinct().exclude(marca='').exclude(marca__isnull=True)
     
     # Aplicar filtros
     products = base_products
@@ -325,7 +325,7 @@ def shopper_products(request):
     group_id = request.GET.get('group', '')
     if group_id:
         try:
-            products = products.filter(group_id=group_id)
+            products = products.filter(grupo_whatsapp_id=group_id)
         except ValueError:
             pass  # Se não for um ID válido, ignora
     
@@ -333,36 +333,25 @@ def shopper_products(request):
     search = request.GET.get('search', '')
     category = request.GET.get('category', '')
     brand = request.GET.get('brand', '')
-    availability = request.GET.get('availability', '')
-    featured = request.GET.get('featured', '')
     
     if search:
         products = products.filter(
-            Q(name__icontains=search) | 
-            Q(description__icontains=search) |
-            Q(brand__icontains=search)
+            Q(nome_produto__icontains=search) | 
+            Q(marca__icontains=search) |
+            Q(categoria__icontains=search)
         )
     
     if category:
-        products = products.filter(category=category)
+        products = products.filter(categoria=category)
     
     if brand:
-        products = products.filter(brand=brand)
-    
-    if availability == 'available':
-        products = products.filter(is_available=True)
-    elif availability == 'unavailable':
-        products = products.filter(is_available=False)
-    
-    if featured == 'yes':
-        products = products.filter(is_featured=True)
-    elif featured == 'no':
-        products = products.filter(is_featured=False)
+        products = products.filter(marca=brand)
     
     # Estatísticas (base total do shopper)
     total_products = base_products.count()
-    available_products = base_products.filter(is_available=True).count()
-    featured_products = base_products.filter(is_featured=True).count()
+    # Para ProdutoJSON, não temos is_available ou is_featured, então usamos total
+    available_products = total_products
+    featured_products = 0
     
     # Estabelecimentos disponíveis (base geral)
     estabelecimentos = Empresa.objects.filter(ativo=True).order_by('nome')
@@ -370,10 +359,73 @@ def shopper_products(request):
     # Grupos do shopper para o modal de criação (OBRIGATÓRIO para o dropdown)
     groups = WhatsappGroup.objects.filter(owner=request.user).order_by('name')
     
-    # Paginação
+    # Paginação do QuerySet primeiro
     paginator = Paginator(products, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    
+    # Converter ProdutoJSON para formato compatível com o template
+    # O template espera campos como name, brand, image_urls, etc.
+    produtos_adaptados = []
+    for produto_json in page_obj:
+        dados = produto_json.get_produto_data()
+        produto_data = dados.get('produto', {})
+        
+        # Extrair imagens
+        imagens = produto_data.get('imagens', [])
+        image_urls = []
+        if imagens:
+            for img in imagens:
+                if isinstance(img, str):
+                    # Se for string, pode ser URL ou path
+                    if img.startswith('http'):
+                        image_urls.append(img)
+                    elif img.startswith('/'):
+                        # Path relativo - construir URL completa se necessário
+                        image_urls.append(img)
+                    else:
+                        # Apenas nome do arquivo
+                        image_urls.append(f"/media/{img}")
+        
+        # Extrair preço do produto_viagem se disponível
+        produto_viagem = dados.get('produto_viagem', {})
+        price = produto_viagem.get('preco_venda_brl') or produto_viagem.get('preco_venda_usd')
+        currency = 'BRL' if produto_viagem.get('preco_venda_brl') else 'USD'
+        
+        # Criar objeto adaptado
+        produto_adaptado = type('ProdutoAdaptado', (), {
+            'id': produto_json.id,
+            'name': produto_json.nome_produto,
+            'brand': produto_json.marca or produto_data.get('marca', ''),
+            'description': produto_data.get('descricao', ''),
+            'category': produto_json.categoria or produto_data.get('categoria', ''),
+            'image_urls': image_urls,
+            'price': price,
+            'currency': currency,
+            'is_available': True,  # ProdutoJSON sempre disponível por padrão
+            'is_featured': False,  # ProdutoJSON não tem featured por padrão
+            'group': produto_json.grupo_whatsapp,
+            'estabelecimento': None,  # ProdutoJSON não tem estabelecimento direto
+            'localizacao_especifica': None,
+            'created_at': produto_json.criado_em,
+            'dados_json': dados,  # Manter dados completos para acesso
+        })()
+        produtos_adaptados.append(produto_adaptado)
+    
+    # Substituir page_obj.object_list com produtos adaptados
+    # Criar um objeto mock que simula o Page mas com produtos adaptados
+    class AdaptedPage:
+        def __init__(self, original_page, adapted_objects):
+            self.original_page = original_page
+            self.object_list = adapted_objects
+            self.number = original_page.number
+            self.paginator = original_page.paginator
+            self.has_previous = original_page.has_previous
+            self.has_next = original_page.has_next
+            self.previous_page_number = original_page.previous_page_number
+            self.next_page_number = original_page.next_page_number
+    
+    page_obj = AdaptedPage(page_obj, produtos_adaptados)
     
     context = {
         'page_obj': page_obj,
