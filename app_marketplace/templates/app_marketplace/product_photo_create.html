@@ -6,7 +6,7 @@
 {% block extra_css %}
 <style>
     .photo-container {
-        max-width: 900px;
+        max-width: 1000px;
         margin: 2rem auto;
     }
     
@@ -27,13 +27,14 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        gap: 1rem;
+        gap: 0.5rem;
         margin-bottom: 2rem;
+        flex-wrap: wrap;
     }
     
     .step-dot {
-        width: 40px;
-        height: 40px;
+        width: 45px;
+        height: 45px;
         border-radius: 50%;
         background: #e0e0e0;
         color: #999;
@@ -41,12 +42,15 @@
         align-items: center;
         justify-content: center;
         font-weight: bold;
+        font-size: 1.1rem;
         position: relative;
+        transition: all 0.3s;
     }
     
     .step-dot.active {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
+        transform: scale(1.1);
     }
     
     .step-dot.completed {
@@ -55,14 +59,30 @@
     }
     
     .step-line {
-        width: 100px;
+        width: 80px;
         height: 3px;
         background: #e0e0e0;
-        margin: 0 -10px;
+        transition: all 0.3s;
     }
     
     .step-line.completed {
         background: #28a745;
+    }
+    
+    .step-label {
+        position: absolute;
+        top: 50px;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        font-size: 0.75rem;
+        color: #666;
+        font-weight: normal;
+    }
+    
+    .step-dot.active .step-label {
+        color: #667eea;
+        font-weight: bold;
     }
     
     /* Câmera */
@@ -107,6 +127,7 @@
         justify-content: center;
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         transition: transform 0.2s;
+        cursor: pointer;
     }
     
     .btn-camera:active {
@@ -118,37 +139,57 @@
         color: white;
     }
     
-    .btn-retake {
-        background: #ffc107;
-        color: #212529;
-    }
-    
     .btn-close-camera {
         background: #dc3545;
         color: white;
     }
     
-    /* Formulário */
-    .form-section {
-        display: none;
+    /* Grid de Fotos */
+    .photos-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
     }
     
-    .form-section.active {
-        display: block;
-    }
-    
-    .image-preview-container {
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    
-    .image-preview {
-        max-width: 100%;
+    .photo-item {
+        position: relative;
         border-radius: 10px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        max-height: 400px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        aspect-ratio: 1;
     }
     
+    .photo-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .photo-item .remove-btn {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: rgba(220, 53, 69, 0.9);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+    
+    .photo-item .remove-btn:hover {
+        background: rgba(220, 53, 69, 1);
+        transform: scale(1.1);
+    }
+    
+    /* Loading */
     .loading-overlay {
         display: none;
         position: fixed;
@@ -215,13 +256,23 @@
         margin: 1rem 0;
     }
     
-    .ai-analysis-badge {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        display: inline-block;
-        margin-bottom: 1rem;
+    .verification-result {
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        text-align: center;
+    }
+    
+    .verification-result.success {
+        background: #d4edda;
+        border: 2px solid #28a745;
+        color: #155724;
+    }
+    
+    .verification-result.warning {
+        background: #fff3cd;
+        border: 2px solid #ffc107;
+        color: #856404;
     }
     
     .json-editor {
@@ -234,14 +285,20 @@
         min-height: 300px;
         max-height: 500px;
         overflow-y: auto;
+        width: 100%;
     }
     
-    .extracted-data-badge {
-        background: #e3f2fd;
-        border-left: 4px solid #2196f3;
-        padding: 0.5rem;
-        margin-bottom: 0.5rem;
-        border-radius: 4px;
+    .image-preview-container {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .image-preview {
+        max-width: 100%;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        max-height: 400px;
+        margin: 0.5rem;
     }
 </style>
 {% endblock %}
@@ -258,23 +315,37 @@
             </a>
         </div>
         
-        <!-- Indicador de Passos -->
+        <!-- Indicador de Passos (4 etapas) -->
         <div class="step-indicator">
-            <div class="step-dot active" id="step1">1</div>
+            <div class="step-dot active" id="step1">
+                1
+                <span class="step-label">Capturar</span>
+            </div>
             <div class="step-line" id="line1"></div>
-            <div class="step-dot" id="step2">2</div>
+            <div class="step-dot" id="step2">
+                2
+                <span class="step-label">Verificar</span>
+            </div>
             <div class="step-line" id="line2"></div>
-            <div class="step-dot" id="step3">3</div>
+            <div class="step-dot" id="step3">
+                3
+                <span class="step-label">Analisar</span>
+            </div>
+            <div class="step-line" id="line3"></div>
+            <div class="step-dot" id="step4">
+                4
+                <span class="step-label">Salvar</span>
+            </div>
         </div>
         
         <!-- Mensagens -->
         <div class="error-message" id="errorMessage"></div>
         <div class="success-message" id="successMessage"></div>
         
-        <!-- PASSO 1: Captura de Foto -->
+        <!-- ETAPA 1: Captura de Múltiplas Fotos -->
         <div class="step-card active" id="stepCard1">
-            <h4 class="mb-3">📷 Passo 1: Tire uma foto do produto</h4>
-            <p class="text-muted">Posicione o produto para capturar o rótulo ou etiqueta com clareza</p>
+            <h4 class="mb-3">📷 Etapa 1: Capture fotos do produto</h4>
+            <p class="text-muted">Capture múltiplas fotos do mesmo produto. Você pode remover ou adicionar mais fotos antes de verificar.</p>
             
             <div class="permission-prompt" id="permissionPrompt">
                 <i class="fas fa-camera" style="font-size: 3rem; color: #ffc107;"></i>
@@ -306,23 +377,84 @@
                 </button>
             </div>
             
-            <canvas id="captureCanvas" style="display: none;"></canvas>
-            <input type="file" id="galleryInput" accept="image/*" style="display: none;" onchange="handleGallerySelect(event)">
-        </div>
-        
-        <!-- PASSO 2: Análise e Edição -->
-        <div class="step-card" id="stepCard2">
-            <h4 class="mb-3">
-                <span class="ai-analysis-badge">🤖 Análise com IA</span>
-                Passo 2: Confirme e ajuste os dados
-            </h4>
-            <p class="text-muted">A IA extraiu os dados do rótulo. Revise e ajuste conforme necessário.</p>
-            
-            <div class="image-preview-container">
-                <img id="step2ImagePreview" src="" alt="Preview" class="image-preview" style="display: none;">
+            <!-- Grid de Fotos Capturadas -->
+            <div id="photosGridContainer" style="display: none;">
+                <h5 class="mt-4 mb-3">Fotos Capturadas (<span id="photoCount">0</span>)</h5>
+                <div class="photos-grid" id="photosGrid"></div>
+                <div class="d-flex gap-2 justify-content-center mt-3">
+                    <button class="btn btn-outline-primary" onclick="selectFromGallery()">
+                        <i class="fas fa-plus"></i> Adicionar Mais Fotos
+                    </button>
+                    <button class="btn btn-primary" onclick="verifyProduct()" id="btnVerify" disabled>
+                        <i class="fas fa-check"></i> Verificar Produto
+                    </button>
+                </div>
             </div>
             
-            <!-- Formulário de Dados Extraídos -->
+            <canvas id="captureCanvas" style="display: none;"></canvas>
+            <input type="file" id="galleryInput" accept="image/*" multiple style="display: none;" onchange="handleGallerySelect(event)">
+        </div>
+        
+        <!-- ETAPA 2: Verificação (Primeira Análise) -->
+        <div class="step-card" id="stepCard2">
+            <h4 class="mb-3">🔍 Etapa 2: Verificando se são do mesmo produto</h4>
+            <p class="text-muted">Analisando as fotos para verificar se todas são do mesmo produto...</p>
+            
+            <div id="verificationLoading" class="text-center py-5">
+                <div class="loading-spinner"></div>
+                <p class="mt-3">Verificando consistência das fotos...</p>
+            </div>
+            
+            <div id="verificationResult" style="display: none;">
+                <div class="verification-result" id="verificationResultContent"></div>
+                <div class="d-flex gap-2 justify-content-center mt-4">
+                    <button class="btn btn-secondary" onclick="goToStep(1)" id="btnBackToCapture">
+                        <i class="fas fa-arrow-left"></i> Voltar e Remover Fotos
+                    </button>
+                    <button class="btn btn-primary" onclick="analyzeComplete()" id="btnAnalyzeComplete" style="display: none;">
+                        <i class="fas fa-robot"></i> Análise Completa
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ETAPA 3: Análise Completa (Segunda Análise) -->
+        <div class="step-card" id="stepCard3">
+            <h4 class="mb-3">🤖 Etapa 3: Análise completa com IA</h4>
+            <p class="text-muted">Gerando JSON completo do produto com todas as informações extraídas...</p>
+            
+            <div id="analysisLoading" class="text-center py-5">
+                <div class="loading-spinner"></div>
+                <p class="mt-3" id="analysisProgress">Analisando imagens e gerando dados do produto...</p>
+            </div>
+            
+            <div id="analysisResult" style="display: none;">
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> Análise completa concluída!
+                </div>
+                <div class="d-flex gap-2 justify-content-center mt-4">
+                    <button class="btn btn-secondary" onclick="goToStep(2)">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </button>
+                    <button class="btn btn-primary" onclick="goToStep(4)">
+                        <i class="fas fa-eye"></i> Revisar e Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ETAPA 4: Revisão e Salvamento -->
+        <div class="step-card" id="stepCard4">
+            <h4 class="mb-3">✅ Etapa 4: Revisar e Salvar</h4>
+            <p class="text-muted">Revise os dados extraídos e salve o produto no banco de dados.</p>
+            
+            <!-- Preview de Imagens -->
+            <div id="imagesPreviewContainer" class="mb-4">
+                <h5>Imagens do Produto</h5>
+                <div class="image-preview-container" id="imagesPreview"></div>
+            </div>
+            
+            <!-- Formulário de Dados -->
             <form id="productForm">
                 {% csrf_token %}
                 
@@ -335,22 +467,13 @@
                     </div>
                     <div class="col-md-4">
                         <div class="mb-3">
-                            <label class="form-label">Preço *</label>
-                            <div class="input-group">
-                                <span class="input-group-text">R$</span>
-                                <input type="number" name="price" id="inputPrice" class="form-control" step="0.01" min="0" placeholder="0.00" required>
-                            </div>
+                            <label class="form-label">Marca</label>
+                            <input type="text" name="brand" id="inputBrand" class="form-control">
                         </div>
                     </div>
                 </div>
                 
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Marca</label>
-                            <input type="text" name="brand" id="inputBrand" class="form-control">
-                        </div>
-                    </div>
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label">Categoria</label>
@@ -362,26 +485,17 @@
                             </select>
                         </div>
                     </div>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">Descrição</label>
-                    <textarea name="description" id="inputDescription" class="form-control" rows="3"></textarea>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Peso/Volume</label>
-                            <input type="text" name="peso_volume" id="inputPesoVolume" class="form-control" placeholder="Ex: 250g, 1L, M, P">
-                        </div>
-                    </div>
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label">Código de Barras</label>
                             <input type="text" name="codigo_barras" id="inputCodigoBarras" class="form-control">
                         </div>
                     </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Descrição</label>
+                    <textarea name="description" id="inputDescription" class="form-control" rows="3"></textarea>
                 </div>
                 
                 <div class="mb-3">
@@ -392,43 +506,15 @@
                         <option value="{{ group.id }}">{{ group.name }}</option>
                         {% endfor %}
                     </select>
-                    <small class="text-muted">Produto será adicionado ao grupo selecionado</small>
                 </div>
                 
-                <div class="mb-3">
-                    <label class="form-label">Empresa/Estabelecimento (Opcional)</label>
-                    <select name="empresa_id" id="inputEmpresaId" class="form-select">
-                        <option value="">Nenhuma</option>
-                        {% for empresa in empresas %}
-                        <option value="{{ empresa.id }}">{{ empresa.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <!-- Campos adicionais do padrão ÉVORA -->
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">Subcategoria</label>
-                            <input type="text" name="subcategoria" id="inputSubcategoria" class="form-control" placeholder="Ex: Fones de Ouvido, Lingerie">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label class="form-label">SKU Interno (ÉVORA)</label>
-                            <input type="text" name="sku_interno" id="inputSkuInterno" class="form-control" placeholder="EVR-XXX-XXX" readonly>
-                            <small class="text-muted">Gerado automaticamente no padrão ÉVORA</small>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Editor JSON ÉVORA (Avançado) -->
+                <!-- Editor JSON -->
                 <div class="mb-3">
                     <label class="form-label">
-                        <i class="fas fa-code"></i> JSON ÉVORA Completo
-                        <small class="text-muted">Edite o JSON completo no padrão ÉVORA se necessário</small>
+                        <i class="fas fa-code"></i> JSON Completo (modelo.json)
+                        <small class="text-muted">Edite se necessário</small>
                     </label>
-                    <textarea id="jsonEditor" class="json-editor" readonly></textarea>
+                    <textarea id="jsonEditor" class="json-editor"></textarea>
                     <div class="d-flex gap-2 mt-2">
                         <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleJsonEditor()">
                             <i class="fas fa-edit"></i> Editar JSON
@@ -436,30 +522,23 @@
                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="validateJson()">
                             <i class="fas fa-check"></i> Validar JSON
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-info" onclick="copyJson()">
-                            <i class="fas fa-copy"></i> Copiar JSON
-                        </button>
                     </div>
                 </div>
                 
-                <input type="hidden" name="image_url" id="hiddenImageUrl">
-                <input type="hidden" name="currency" value="BRL">
-                <input type="hidden" name="evora_json" id="hiddenEvoraJson">
-                
                 <div class="d-flex gap-2 justify-content-between">
-                    <button type="button" class="btn btn-secondary" onclick="goToStep(1)">
+                    <button type="button" class="btn btn-secondary" onclick="goToStep(3)">
                         <i class="fas fa-arrow-left"></i> Voltar
                     </button>
-                    <button type="button" class="btn btn-primary" onclick="goToStep(3)">
-                        <i class="fas fa-save"></i> Salvar Produto
+                    <button type="button" class="btn btn-primary" onclick="saveProduct()">
+                        <i class="fas fa-save"></i> Salvar no Banco
                     </button>
                 </div>
             </form>
         </div>
         
-        <!-- PASSO 3: Confirmação -->
-        <div class="step-card" id="stepCard3">
-            <h4 class="mb-3">✅ Passo 3: Produto Cadastrado!</h4>
+        <!-- ETAPA 5: Confirmação -->
+        <div class="step-card" id="stepCard5" style="display: none;">
+            <h4 class="mb-3">✅ Produto Cadastrado!</h4>
             <div class="text-center">
                 <i class="fas fa-check-circle" style="font-size: 5rem; color: #28a745;"></i>
                 <h5 class="mt-3" id="successProductName"></h5>
@@ -482,25 +561,31 @@
     <div class="loading-content">
         <div class="loading-spinner"></div>
         <h5 class="text-white">Processando...</h5>
-        <p class="text-white-50" id="loadingMessage">Analisando imagem com IA...</p>
+        <p class="text-white-50" id="loadingMessage">Aguarde...</p>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+// Variáveis globais
 let stream = null;
-let capturedBlob = null;
-let currentImageUrl = null;
-let extractedData = null;
+let capturedPhotos = [];  // Array de {id, blob, preview}
 let currentStep = 1;
+let verificationResult = null;
+let produtoJson = null;
+let imageUrls = [];
+let imagePaths = [];
 const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+let photoIdCounter = 0;
 
 // Verificar suporte
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     document.getElementById('permissionPrompt').innerHTML = 
         '<p class="text-danger">Câmera não suportada neste navegador</p>';
 }
+
+// ========== ETAPA 1: CAPTURA ==========
 
 // Iniciar câmera
 async function startCamera() {
@@ -534,25 +619,6 @@ async function startCamera() {
     }
 }
 
-// Escolher da galeria
-function selectFromGallery() {
-    document.getElementById('galleryInput').click();
-}
-
-function handleGallerySelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const preview = document.getElementById('cameraPreview');
-            preview.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; border-radius: 10px;">`;
-            capturedBlob = file;
-            document.getElementById('permissionPrompt').style.display = 'none';
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
 // Parar câmera
 function stopCamera() {
     if (stream) {
@@ -565,7 +631,33 @@ function stopCamera() {
     document.getElementById('permissionPrompt').style.display = 'block';
 }
 
-// Capturar foto
+// Escolher da galeria
+function selectFromGallery() {
+    document.getElementById('galleryInput').click();
+}
+
+function handleGallerySelect(event) {
+    const files = Array.from(event.target.files);
+    files.forEach(file => {
+        if (file.type.startsWith('image/')) {
+            addPhotoFromFile(file);
+        }
+    });
+    // Limpar input para permitir selecionar o mesmo arquivo novamente
+    event.target.value = '';
+}
+
+// Adicionar foto do arquivo
+function addPhotoFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const blob = file;
+        addPhotoToArray(blob, e.target.result);
+    };
+    reader.readAsDataURL(file);
+}
+
+// Capturar foto da câmera
 function capturePhoto() {
     const video = document.getElementById('cameraVideo');
     if (!video) {
@@ -581,161 +673,266 @@ function capturePhoto() {
     ctx.drawImage(video, 0, 0);
     
     canvas.toBlob((blob) => {
-        capturedBlob = blob;
-        analyzePhoto(blob);
+        const preview = URL.createObjectURL(blob);
+        addPhotoToArray(blob, preview);
     }, 'image/jpeg', 0.9);
 }
 
-// Analisar foto com IA
-async function analyzePhoto(blob) {
-    if (!capturedBlob) {
-        showError('Por favor, capture uma foto primeiro');
+// Adicionar foto ao array
+function addPhotoToArray(blob, preview) {
+    const photo = {
+        id: photoIdCounter++,
+        blob: blob,
+        preview: preview
+    };
+    capturedPhotos.push(photo);
+    renderPhotoGrid();
+    updateVerifyButton();
+}
+
+// Remover foto
+function removePhoto(id) {
+    capturedPhotos = capturedPhotos.filter(p => p.id !== id);
+    renderPhotoGrid();
+    updateVerifyButton();
+}
+
+// Renderizar grid de fotos
+function renderPhotoGrid() {
+    const grid = document.getElementById('photosGrid');
+    const container = document.getElementById('photosGridContainer');
+    const count = document.getElementById('photoCount');
+    
+    if (capturedPhotos.length === 0) {
+        container.style.display = 'none';
         return;
     }
     
-    showLoading('Analisando imagem com IA...');
+    container.style.display = 'block';
+    count.textContent = capturedPhotos.length;
+    
+    grid.innerHTML = capturedPhotos.map(photo => `
+        <div class="photo-item">
+            <img src="${photo.preview}" alt="Foto ${photo.id}">
+            <button class="remove-btn" onclick="removePhoto(${photo.id})" title="Remover foto">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+// Atualizar botão de verificar
+function updateVerifyButton() {
+    const btn = document.getElementById('btnVerify');
+    btn.disabled = capturedPhotos.length === 0;
+}
+
+// ========== ETAPA 2: VERIFICAÇÃO ==========
+
+// Verificar produto (primeira análise)
+async function verifyProduct() {
+    if (capturedPhotos.length === 0) {
+        showError('Capture pelo menos uma foto antes de verificar');
+        return;
+    }
+    
+    goToStep(2);
+    showLoading('Verificando se as fotos são do mesmo produto...');
     hideError();
     
-    // Verificar se o blob é válido
-    if (!blob || blob.size === 0) {
-        showError('Erro: Imagem capturada está vazia. Tente novamente.');
-        return;
-    }
-    
     const formData = new FormData();
-    // Criar um File a partir do Blob para garantir nome e tipo
-    const imageFile = new File([blob], 'captured_image.jpg', { type: 'image/jpeg' });
-    formData.append('image', imageFile);
-    
-    console.log('Enviando imagem:', {
-        size: imageFile.size,
-        type: imageFile.type,
-        name: imageFile.name
+    capturedPhotos.forEach((photo, index) => {
+        const file = new File([photo.blob], `photo_${photo.id}.jpg`, { type: 'image/jpeg' });
+        formData.append('images', file);
     });
     
     try {
-        const response = await fetch('{% url "api_detect_product_by_photo" %}', {
+        const response = await fetch('{% url "api_verificar_produto" %}', {
             method: 'POST',
             body: formData,
             headers: {
                 'X-CSRFToken': csrfToken
-                // NÃO definir Content-Type manualmente - deixar o browser definir com boundary
             }
         });
         
         const data = await response.json();
-        console.log('Resposta completa da API:', JSON.stringify(data, null, 2));
         hideLoading();
         
         if (data.success) {
-            // Armazenar JSON ÉVORA completo
-            extractedData = data.evora_json || {};
-            currentImageUrl = data.image_url;
-            
-            console.log('Dados extraídos:', extractedData);
-            console.log('Product data:', data.product_data);
-            
-            // Preencher formulário com dados simplificados
-            if (data.product_data && Object.keys(data.product_data).length > 0) {
-                fillForm(data.product_data);
-            } else {
-                console.warn('Product data vazio ou não disponível');
-                showError('Dados extraídos estão vazios. A IA não conseguiu analisar a imagem.');
-                return;
-            }
-            
-            // Preencher campos adicionais do JSON ÉVORA
-            if (extractedData) {
-                document.getElementById('inputSubcategoria').value = extractedData.subcategoria || '';
-                document.getElementById('inputSkuInterno').value = extractedData.sku_interno || '';
-            }
-            
-            // Mostrar preview da imagem
-            const imgPreview = document.getElementById('step2ImagePreview');
-            imgPreview.src = currentImageUrl;
-            imgPreview.style.display = 'block';
-            
-            // Atualizar JSON editor com JSON ÉVORA completo
-            document.getElementById('jsonEditor').value = JSON.stringify(extractedData, null, 2);
-            document.getElementById('hiddenImageUrl').value = currentImageUrl;
-            document.getElementById('hiddenEvoraJson').value = JSON.stringify(extractedData);
-            
-            // Ir para passo 2
-            goToStep(2);
-            
+            verificationResult = data;
+            handleVerificationResult(data);
         } else {
-            // Mostrar erro mais detalhado
-            const errorMsg = data.error || 'Erro ao analisar imagem';
-            const debugInfo = data.debug ? ` (Debug: ${JSON.stringify(data.debug)})` : '';
-            showError(errorMsg + debugInfo);
+            showError(data.error || 'Erro ao verificar produto');
+            goToStep(1);
         }
-        
     } catch (error) {
         hideLoading();
-        console.error('Erro ao analisar imagem:', error);
-        showError('Erro ao analisar imagem: ' + error.message);
+        showError('Erro ao verificar produto: ' + error.message);
+        goToStep(1);
     }
 }
 
-// Preencher formulário com dados extraídos
-function fillForm(data) {
-    document.getElementById('inputName').value = data.nome_sugerido || '';
-    document.getElementById('inputBrand').value = data.marca_sugerida || '';
-    document.getElementById('inputPrice').value = data.preco_visivel || '';
-    document.getElementById('inputDescription').value = data.descricao_observacoes || '';
-    document.getElementById('inputPesoVolume').value = data.peso_volume || '';
-    document.getElementById('inputCodigoBarras').value = data.codigo_barras || '';
-    document.getElementById('inputSkuInterno').value = data.sku_interno || '';
+// Processar resultado da verificação
+function handleVerificationResult(result) {
+    const loading = document.getElementById('verificationLoading');
+    const resultDiv = document.getElementById('verificationResult');
+    const resultContent = document.getElementById('verificationResultContent');
+    const btnAnalyze = document.getElementById('btnAnalyzeComplete');
     
-    // Selecionar categoria se encontrada
-    if (data.categoria_sugerida) {
-        const categorySelect = document.getElementById('inputCategory');
-        for (let option of categorySelect.options) {
-            if (option.text.toLowerCase().includes(data.categoria_sugerida.toLowerCase()) || 
-                data.categoria_sugerida.toLowerCase().includes(option.text.toLowerCase())) {
-                option.selected = true;
-                break;
-            }
-        }
+    loading.style.display = 'none';
+    resultDiv.style.display = 'block';
+    
+    if (result.mesmo_produto) {
+        resultContent.className = 'verification-result success';
+        resultContent.innerHTML = `
+            <i class="fas fa-check-circle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+            <h5>Todas as fotos são do mesmo produto!</h5>
+            <p>Confiança: ${(result.consistencia.confianca * 100).toFixed(0)}%</p>
+            <p class="mb-0">Você pode prosseguir para a análise completa.</p>
+        `;
+        btnAnalyze.style.display = 'block';
+    } else {
+        resultContent.className = 'verification-result warning';
+        resultContent.innerHTML = `
+            <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+            <h5>Produtos diferentes detectados!</h5>
+            <p>As fotos parecem ser de produtos diferentes.</p>
+            <p class="mb-0">Por favor, remova as fotos de produtos diferentes e tente novamente.</p>
+        `;
+        btnAnalyze.style.display = 'none';
     }
 }
 
-// Navegar entre passos
-function goToStep(step) {
-    // Validar antes de avançar
-    if (step === 3) {
-        if (!validateForm()) {
-            return;
-        }
-        saveProduct();
+// ========== ETAPA 3: ANÁLISE COMPLETA ==========
+
+// Análise completa (segunda análise)
+async function analyzeComplete() {
+    if (capturedPhotos.length === 0) {
+        showError('Nenhuma foto disponível');
         return;
     }
     
-    // Atualizar indicadores
-    for (let i = 1; i <= 3; i++) {
-        const card = document.getElementById(`stepCard${i}`);
-        const dot = document.getElementById(`step${i}`);
+    goToStep(3);
+    showLoading('Realizando análise completa com IA...');
+    hideError();
+    
+    const formData = new FormData();
+    capturedPhotos.forEach((photo, index) => {
+        const file = new File([photo.blob], `photo_${photo.id}.jpg`, { type: 'image/jpeg' });
+        formData.append('images', file);
+    });
+    
+    try {
+        const response = await fetch('{% url "api_analise_completa" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        });
         
-        if (i < step) {
-            dot.classList.remove('active');
-            dot.classList.add('completed');
-            card.classList.remove('active');
-        } else if (i === step) {
-            dot.classList.add('active');
-            dot.classList.remove('completed');
-            card.classList.add('active');
+        const data = await response.json();
+        hideLoading();
+        
+        if (data.success) {
+            produtoJson = data.produto_json;
+            imageUrls = data.image_urls || [];
+            imagePaths = data.image_paths || [];
+            handleAnalysisResult(data);
         } else {
-            dot.classList.remove('active', 'completed');
-            card.classList.remove('active');
+            showError(data.error || 'Erro na análise completa');
+            goToStep(2);
         }
-        
-        // Atualizar linhas
-        if (i < step && i < 3) {
-            document.getElementById(`line${i}`).classList.add('completed');
-        }
+    } catch (error) {
+        hideLoading();
+        showError('Erro na análise completa: ' + error.message);
+        goToStep(2);
+    }
+}
+
+// Processar resultado da análise
+function handleAnalysisResult(result) {
+    const loading = document.getElementById('analysisLoading');
+    const resultDiv = document.getElementById('analysisResult');
+    
+    loading.style.display = 'none';
+    resultDiv.style.display = 'block';
+    
+    // Preencher formulário com dados extraídos
+    if (result.produto_json && result.produto_json.produto) {
+        const produto = result.produto_json.produto;
+        document.getElementById('inputName').value = produto.nome || '';
+        document.getElementById('inputBrand').value = produto.marca || '';
+        document.getElementById('inputCategory').value = produto.categoria || '';
+        document.getElementById('inputCodigoBarras').value = produto.codigo_barras || '';
+        document.getElementById('inputDescription').value = produto.descricao || '';
     }
     
-    currentStep = step;
+    // Atualizar JSON editor
+    document.getElementById('jsonEditor').value = JSON.stringify(result.produto_json, null, 2);
+}
+
+// ========== ETAPA 4: SALVAMENTO ==========
+
+// Salvar produto
+async function saveProduct() {
+    if (!validateForm()) {
+        return;
+    }
+    
+    showLoading('Salvando produto no banco de dados...');
+    hideError();
+    
+    // Obter JSON editado
+    let jsonData = produtoJson;
+    try {
+        const jsonEditorValue = document.getElementById('jsonEditor').value;
+        if (jsonEditorValue) {
+            jsonData = JSON.parse(jsonEditorValue);
+        }
+    } catch (e) {
+        showError('JSON inválido. Corrija antes de salvar.');
+        hideLoading();
+        return;
+    }
+    
+    // Atualizar JSON com dados do formulário
+    if (jsonData && jsonData.produto) {
+        jsonData.produto.nome = document.getElementById('inputName').value.trim();
+        jsonData.produto.marca = document.getElementById('inputBrand').value.trim();
+        jsonData.produto.categoria = document.getElementById('inputCategory').value || jsonData.produto.categoria;
+        jsonData.produto.codigo_barras = document.getElementById('inputCodigoBarras').value.trim() || jsonData.produto.codigo_barras;
+        jsonData.produto.descricao = document.getElementById('inputDescription').value.trim() || jsonData.produto.descricao;
+    }
+    
+    const saveData = {
+        produto_json: jsonData,
+        grupo_id: parseInt(document.getElementById('inputGroupId').value)
+    };
+    
+    try {
+        const response = await fetch('{% url "api_save_product_json" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(saveData)
+        });
+        
+        const data = await response.json();
+        hideLoading();
+        
+        if (data.success) {
+            document.getElementById('successProductName').textContent = jsonData.produto?.nome || 'Produto';
+            goToStep(5);
+        } else {
+            showError(data.error || 'Erro ao salvar produto');
+        }
+    } catch (error) {
+        hideLoading();
+        showError('Erro ao salvar produto: ' + error.message);
+    }
 }
 
 // Validar formulário
@@ -756,81 +953,72 @@ function validateForm() {
     return true;
 }
 
-// Salvar produto
-async function saveProduct() {
-    if (!validateForm()) {
-        return;
-    }
-    
-    showLoading('Salvando produto...');
-    hideError();
-    
-    // Obter JSON ÉVORA editado ou usar o original
-    let evoraJsonData = extractedData;
-    try {
-        const jsonEditorValue = document.getElementById('jsonEditor').value;
-        if (jsonEditorValue) {
-            evoraJsonData = JSON.parse(jsonEditorValue);
-        }
-    } catch (e) {
-        console.warn('Erro ao parsear JSON editado, usando original');
-    }
-    
-    // Atualizar JSON ÉVORA com dados do formulário
-    if (evoraJsonData) {
-        evoraJsonData.nome_produto = document.getElementById('inputName').value.trim();
-        evoraJsonData.categoria = document.getElementById('inputCategory').value || evoraJsonData.categoria;
-        evoraJsonData.subcategoria = document.getElementById('inputSubcategoria').value.trim() || evoraJsonData.subcategoria;
-        evoraJsonData.descricao = document.getElementById('inputDescription').value.trim() || evoraJsonData.descricao;
-        evoraJsonData.codigo_barras = document.getElementById('inputCodigoBarras').value.trim() || evoraJsonData.codigo_barras;
-        evoraJsonData.sku_interno = document.getElementById('inputSkuInterno').value.trim() || evoraJsonData.sku_interno;
+// ========== NAVEGAÇÃO ==========
+
+// Navegar entre etapas
+function goToStep(step) {
+    // Atualizar indicadores
+    for (let i = 1; i <= 4; i++) {
+        const card = document.getElementById(`stepCard${i}`);
+        const dot = document.getElementById(`step${i}`);
         
-        if (!evoraJsonData.caracteristicas) {
-            evoraJsonData.caracteristicas = {};
-        }
-        evoraJsonData.caracteristicas.marca = document.getElementById('inputBrand').value.trim() || evoraJsonData.caracteristicas.marca;
-    }
-    
-    const formData = {
-        name: document.getElementById('inputName').value.trim(),
-        group_id: parseInt(document.getElementById('inputGroupId').value),
-        image_url: currentImageUrl,
-        price: document.getElementById('inputPrice').value,
-        brand: document.getElementById('inputBrand').value.trim(),
-        category: document.getElementById('inputCategory').value,
-        description: document.getElementById('inputDescription').value.trim(),
-        codigo_barras: document.getElementById('inputCodigoBarras').value.trim(),
-        sku: document.getElementById('inputSkuInterno').value.trim(),
-        currency: 'BRL',
-        empresa_id: document.getElementById('inputEmpresaId').value || null,
-        evora_json: evoraJsonData  // JSON ÉVORA completo
-    };
-    
-    try {
-        const response = await fetch('{% url "api_save_product_from_photo" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
-            },
-            body: JSON.stringify(formData)
-        });
-        
-        const data = await response.json();
-        hideLoading();
-        
-        if (data.success) {
-            document.getElementById('successProductName').textContent = data.product.name;
-            goToStep(3);
+        if (i < step) {
+            dot.classList.remove('active');
+            dot.classList.add('completed');
+            card.classList.remove('active');
+        } else if (i === step) {
+            dot.classList.add('active');
+            dot.classList.remove('completed');
+            card.classList.add('active');
         } else {
-            showError(data.error || 'Erro ao salvar produto');
+            dot.classList.remove('active', 'completed');
+            card.classList.remove('active');
         }
         
-    } catch (error) {
-        hideLoading();
-        showError('Erro ao salvar produto: ' + error.message);
+        // Atualizar linhas
+        if (i < step && i < 4) {
+            const line = document.getElementById(`line${i}`);
+            if (line) line.classList.add('completed');
+        } else if (i < 4) {
+            const line = document.getElementById(`line${i}`);
+            if (line) line.classList.remove('completed');
+        }
+    }
+    
+    currentStep = step;
+    
+    // Ações específicas por etapa
+    if (step === 4) {
+        renderImagesPreview();
     }
 }
+
+// Renderizar preview de imagens na etapa 4
+function renderImagesPreview() {
+    const container = document.getElementById('imagesPreview');
+    container.innerHTML = '';
+    
+    if (imageUrls.length > 0) {
+        imageUrls.forEach(url => {
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = 'image-preview';
+            img.alt = 'Imagem do produto';
+            container.appendChild(img);
+        });
+    } else if (imagePaths.length > 0) {
+        // Se não tiver URLs completas, usar paths (será construída URL base)
+        imagePaths.forEach(path => {
+            const img = document.createElement('img');
+            img.src = path.startsWith('http') ? path : `http://69.169.102.84:5000/${path}`;
+            img.className = 'image-preview';
+            img.alt = 'Imagem do produto';
+            container.appendChild(img);
+        });
+    }
+}
+
+// ========== UTILITÁRIOS ==========
 
 // Toggle editor JSON
 function toggleJsonEditor() {
@@ -845,45 +1033,6 @@ function toggleJsonEditor() {
         editor.setAttribute('readonly', 'true');
         editor.style.background = '#f8f9fa';
         editor.style.border = '1px solid #dee2e6';
-        
-        // Atualizar dados do formulário se JSON foi editado
-        try {
-            const editedData = JSON.parse(editor.value);
-            
-            // Atualizar campos do formulário com dados do JSON ÉVORA
-            if (editedData.nome_produto) {
-                document.getElementById('inputName').value = editedData.nome_produto;
-            }
-            if (editedData.caracteristicas && editedData.caracteristicas.marca) {
-                document.getElementById('inputBrand').value = editedData.caracteristicas.marca;
-            }
-            if (editedData.categoria) {
-                const categorySelect = document.getElementById('inputCategory');
-                for (let option of categorySelect.options) {
-                    if (option.text.toLowerCase().includes(editedData.categoria.toLowerCase())) {
-                        option.selected = true;
-                        break;
-                    }
-                }
-            }
-            if (editedData.subcategoria) {
-                document.getElementById('inputSubcategoria').value = editedData.subcategoria;
-            }
-            if (editedData.descricao) {
-                document.getElementById('inputDescription').value = editedData.descricao;
-            }
-            if (editedData.codigo_barras) {
-                document.getElementById('inputCodigoBarras').value = editedData.codigo_barras;
-            }
-            if (editedData.sku_interno) {
-                document.getElementById('inputSkuInterno').value = editedData.sku_interno;
-            }
-            
-            extractedData = editedData;
-            document.getElementById('hiddenEvoraJson').value = JSON.stringify(editedData);
-        } catch (e) {
-            showError('JSON inválido. Revise a sintaxe: ' + e.message);
-        }
     }
 }
 
@@ -899,31 +1048,27 @@ function validateJson() {
     }
 }
 
-// Copiar JSON
-function copyJson() {
-    const editor = document.getElementById('jsonEditor');
-    editor.select();
-    document.execCommand('copy');
-    showSuccess('JSON copiado para a área de transferência!');
-    setTimeout(() => hideSuccess(), 2000);
-}
-
 // Resetar formulário
 function resetForm() {
     currentStep = 1;
-    capturedBlob = null;
-    currentImageUrl = null;
-    extractedData = null;
+    capturedPhotos = [];
+    verificationResult = null;
+    produtoJson = null;
+    imageUrls = [];
+    imagePaths = [];
+    photoIdCounter = 0;
     
     document.getElementById('productForm').reset();
     document.getElementById('jsonEditor').value = '';
-    document.getElementById('hiddenEvoraJson').value = '';
-    document.getElementById('step2ImagePreview').style.display = 'none';
+    document.getElementById('photosGrid').innerHTML = '';
+    document.getElementById('photosGridContainer').style.display = 'none';
+    document.getElementById('imagesPreview').innerHTML = '';
     
-    // Resetar indicadores de passos
-    for (let i = 1; i <= 3; i++) {
+    // Resetar indicadores
+    for (let i = 1; i <= 4; i++) {
         document.getElementById(`step${i}`).classList.remove('active', 'completed');
-        document.getElementById(`line${i}`).classList.remove('completed');
+        const line = document.getElementById(`line${i}`);
+        if (line) line.classList.remove('completed');
     }
     document.getElementById('step1').classList.add('active');
     
@@ -969,4 +1114,3 @@ window.addEventListener('beforeunload', () => {
 });
 </script>
 {% endblock %}
-
