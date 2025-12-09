@@ -185,7 +185,13 @@ def analise_completa_produto(request):
     - images[] (arquivos) - se for primeira vez
     - image_urls[] (JSON) - se as imagens já foram salvas no SinapUm (otimização)
     """
+    logger.info(f"[ANALISE_COMPLETA] Iniciando - Usuário: {request.user.id} ({request.user.username})")
+    logger.info(f"[ANALISE_COMPLETA] Content-Type: {request.content_type}")
+    logger.info(f"[ANALISE_COMPLETA] Método: {request.method}")
+    logger.info(f"[ANALISE_COMPLETA] FILES keys: {list(request.FILES.keys())}")
+    
     if not (request.user.is_shopper or request.user.is_address_keeper):
+        logger.warning(f"[ANALISE_COMPLETA] Acesso negado - Usuário: {request.user.id}")
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
@@ -193,16 +199,20 @@ def analise_completa_produto(request):
         data = {}
         if request.content_type and 'application/json' in request.content_type:
             try:
+                logger.info(f"[ANALISE_COMPLETA] Lendo JSON do body - Tamanho: {len(request.body)} bytes")
                 data = json.loads(request.body)
-            except:
+                logger.info(f"[ANALISE_COMPLETA] JSON parseado - Chaves: {list(data.keys())}")
+            except Exception as e:
+                logger.warning(f"[ANALISE_COMPLETA] Erro ao parsear JSON: {str(e)}")
                 pass
         
         image_urls = data.get('image_urls', [])
         image_paths = data.get('image_paths', [])
+        logger.info(f"[ANALISE_COMPLETA] image_urls: {len(image_urls)}, image_paths: {len(image_paths)}")
         
         # Se tiver URLs, baixar imagens do SinapUm e usar (evita reenvio)
         if image_urls or image_paths:
-            logger.info(f"Análise completa usando URLs já salvas: {len(image_urls or image_paths)} imagens")
+            logger.info(f"[ANALISE_COMPLETA] Usando URLs já salvas: {len(image_urls or image_paths)} imagens")
             urls_to_use = image_urls if image_urls else image_paths
             # Construir URLs completas se necessário
             urls_completas = []
@@ -251,9 +261,12 @@ def analise_completa_produto(request):
         # Caso contrário, receber arquivos normalmente
         if 'images' in request.FILES:
             image_files = request.FILES.getlist('images')
+            logger.info(f"[ANALISE_COMPLETA] Recebidos {len(image_files)} arquivos via 'images'")
         elif 'image' in request.FILES:
             image_files = [request.FILES['image']]
+            logger.info(f"[ANALISE_COMPLETA] Recebido 1 arquivo via 'image'")
         else:
+            logger.error(f"[ANALISE_COMPLETA] Nenhuma imagem fornecida - FILES keys: {list(request.FILES.keys())}")
             return JsonResponse({
                 'error': 'Imagens são obrigatórias (arquivos ou URLs)',
                 'debug': {
@@ -262,7 +275,10 @@ def analise_completa_produto(request):
             }, status=400)
         
         if not image_files:
+            logger.error("[ANALISE_COMPLETA] image_files está vazio")
             return JsonResponse({'error': 'Nenhuma imagem fornecida'}, status=400)
+        
+        logger.info(f"[ANALISE_COMPLETA] Processando {len(image_files)} imagens")
         
         # Validar tipos de arquivo
         for image_file in image_files:
@@ -800,18 +816,27 @@ def save_product_json(request):
     View para salvar produto no banco de dados em formato JSON (PostgreSQL JSONB)
     Adaptado das melhorias do SinapUm
     """
+    logger.info(f"[SAVE_PRODUCT] Iniciando salvamento - Usuário: {request.user.id} ({request.user.username})")
+    
     if not (request.user.is_shopper or request.user.is_address_keeper):
+        logger.warning(f"[SAVE_PRODUCT] Acesso negado - Usuário: {request.user.id}")
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
     try:
+        logger.info(f"[SAVE_PRODUCT] Lendo body da requisição - Tamanho: {len(request.body)} bytes")
         data = json.loads(request.body)
+        logger.info(f"[SAVE_PRODUCT] JSON parseado - Chaves: {list(data.keys())}")
+        
         produto_json = data.get('produto_json')
         
         if not produto_json:
+            logger.error("[SAVE_PRODUCT] produto_json não fornecido nos dados")
             return JsonResponse({
                 'success': False,
                 'error': 'Dados do produto não fornecidos'
             }, status=400)
+        
+        logger.info(f"[SAVE_PRODUCT] produto_json recebido - Tipo: {type(produto_json)}, Tem 'produto': {'produto' in produto_json if isinstance(produto_json, dict) else False}")
         
         # Extrair informações básicas para indexação
         produto = produto_json.get('produto', {})
@@ -820,23 +845,32 @@ def save_product_json(request):
         categoria = produto.get('categoria')
         codigo_barras = produto.get('codigo_barras')
         
+        logger.info(f"[SAVE_PRODUCT] Dados extraídos - Nome: {nome_produto}, Marca: {marca}, Categoria: {categoria}, Código: {codigo_barras}")
+        
         # Obter caminho da imagem (primeira imagem do array para referência)
         # Todas as imagens estão no array produto['imagens']
         imagem_original = None
         if produto.get('imagens') and len(produto.get('imagens', [])) > 0:
             # Usar primeira imagem do array como referência principal
             imagem_original = produto['imagens'][0] if isinstance(produto['imagens'], list) else produto['imagens']
+            logger.info(f"[SAVE_PRODUCT] Imagem original encontrada no array: {imagem_original}")
         elif produto_json.get('cadastro_meta', {}).get('fonte'):
             # Fallback: tentar extrair do campo fonte se não houver no array
             fonte = produto_json.get('cadastro_meta', {}).get('fonte', '')
             if 'imagem' in fonte.lower():
                 imagem_original = fonte.split(':')[-1].strip() if ':' in fonte else fonte
+                logger.info(f"[SAVE_PRODUCT] Imagem original extraída da fonte: {imagem_original}")
+        
+        if not imagem_original:
+            logger.warning("[SAVE_PRODUCT] Nenhuma imagem original encontrada")
         
         # Verificar se produto já existe pelo código de barras
         produto_existente = None
         if codigo_barras:
+            logger.info(f"[SAVE_PRODUCT] Verificando produto existente com código: {codigo_barras}")
             produto_existente = ProdutoJSON.objects.filter(codigo_barras=codigo_barras).first()
             if produto_existente:
+                logger.info(f"[SAVE_PRODUCT] Produto existente encontrado - ID: {produto_existente.id}, atualizando...")
                 # Atualizar produto existente
                 produto_existente.dados_json = produto_json
                 produto_existente.nome_produto = nome_produto
@@ -845,26 +879,34 @@ def save_product_json(request):
                 produto_existente.imagem_original = imagem_original
                 produto_existente.criado_por = request.user
                 produto_existente.save()
+                logger.info(f"[SAVE_PRODUCT] Produto atualizado com sucesso - ID: {produto_existente.id}")
                 return JsonResponse({
                     'success': True,
                     'message': 'Produto atualizado com sucesso!',
                     'action': 'updated',
                     'produto_id': produto_existente.id
                 })
+            else:
+                logger.info(f"[SAVE_PRODUCT] Nenhum produto existente com código: {codigo_barras}")
         
         # Criar novo produto
         grupo_id = data.get('grupo_id')
+        logger.info(f"[SAVE_PRODUCT] grupo_id recebido: {grupo_id} (tipo: {type(grupo_id)})")
         grupo = None
         if grupo_id:
             try:
                 grupo_id_int = int(grupo_id) if grupo_id else None
                 if grupo_id_int:
+                    logger.info(f"[SAVE_PRODUCT] Buscando grupo com ID: {grupo_id_int} para usuário: {request.user.id}")
                     grupo = WhatsappGroup.objects.filter(id=grupo_id_int, owner=request.user).first()
                     if not grupo:
-                        logger.warning(f"Grupo {grupo_id_int} não encontrado ou não pertence ao usuário {request.user.id}")
+                        logger.warning(f"[SAVE_PRODUCT] Grupo {grupo_id_int} não encontrado ou não pertence ao usuário {request.user.id}")
+                    else:
+                        logger.info(f"[SAVE_PRODUCT] Grupo encontrado: {grupo.name}")
             except (ValueError, TypeError) as e:
-                logger.warning(f"Erro ao processar grupo_id {grupo_id}: {str(e)}")
+                logger.warning(f"[SAVE_PRODUCT] Erro ao processar grupo_id {grupo_id}: {str(e)}")
         
+        logger.info(f"[SAVE_PRODUCT] Criando novo produto no banco de dados...")
         novo_produto = ProdutoJSON.objects.create(
             dados_json=produto_json,
             nome_produto=nome_produto,
@@ -876,6 +918,8 @@ def save_product_json(request):
             grupo_whatsapp=grupo
         )
         
+        logger.info(f"[SAVE_PRODUCT] Produto criado com sucesso - ID: {novo_produto.id}, Nome: {nome_produto}")
+        
         return JsonResponse({
             'success': True,
             'message': 'Produto salvo com sucesso!',
@@ -883,13 +927,14 @@ def save_product_json(request):
             'produto_id': novo_produto.id
         })
         
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error(f"[SAVE_PRODUCT] Erro ao decodificar JSON: {str(e)}")
         return JsonResponse({
             'success': False,
             'error': 'Formato JSON inválido'
         }, status=400)
     except Exception as e:
-        logger.error(f"Erro ao salvar produto JSON: {str(e)}", exc_info=True)
+        logger.error(f"[SAVE_PRODUCT] Erro ao salvar produto JSON: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
             'error': str(e)

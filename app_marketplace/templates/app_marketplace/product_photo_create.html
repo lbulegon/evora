@@ -704,7 +704,11 @@ function updateAnalyzeButton() {
 
 // Análise completa
 async function analyzeComplete() {
+    console.log('[ANALISE_COMPLETA] Iniciando análise completa');
+    console.log('[ANALISE_COMPLETA] Fotos capturadas:', capturedPhotos.length);
+    
     if (capturedPhotos.length === 0) {
+        console.error('[ANALISE_COMPLETA] Nenhuma foto capturada');
         showError('Capture pelo menos uma foto antes de analisar');
         return;
     }
@@ -718,8 +722,10 @@ async function analyzeComplete() {
     capturedPhotos.forEach((photo, index) => {
         const file = new File([photo.blob], `photo_${photo.id}.jpg`, { type: 'image/jpeg' });
         formData.append('images', file);
+        console.log(`[ANALISE_COMPLETA] Adicionando foto ${index + 1}/${capturedPhotos.length}: photo_${photo.id}.jpg`);
     });
     
+    console.log('[ANALISE_COMPLETA] Enviando requisição para análise completa...');
     let response;
     try {
         response = await fetch('{% url "api_analise_completa" %}', {
@@ -729,7 +735,9 @@ async function analyzeComplete() {
                 'X-CSRFToken': csrfToken
             }
         });
+        console.log('[ANALISE_COMPLETA] Resposta recebida, status:', response.status);
     } catch (error) {
+        console.error('[ANALISE_COMPLETA] Erro ao fazer upload:', error);
         hideLoading();
         showError('Erro ao fazer upload: ' + error.message);
         goToStep(1);
@@ -738,23 +746,38 @@ async function analyzeComplete() {
     
     try {
         const data = await response.json();
+        console.log('[ANALISE_COMPLETA] Dados recebidos:', {
+            success: data.success,
+            has_produto_json: !!data.produto_json,
+            image_urls: data.image_urls?.length || 0,
+            image_paths: data.image_paths?.length || 0
+        });
         hideLoading();
         
         if (data.success) {
             produtoJson = data.produto_json;
+            console.log('[ANALISE_COMPLETA] produtoJson definido:', {
+                has_produto: !!produtoJson?.produto,
+                produto_nome: produtoJson?.produto?.nome
+            });
+            
             // Atualizar URLs se retornadas
             if (data.image_urls && data.image_urls.length > 0) {
                 imageUrls = data.image_urls;
+                console.log('[ANALISE_COMPLETA] imageUrls atualizado:', imageUrls.length);
             }
             if (data.image_paths && data.image_paths.length > 0) {
                 imagePaths = data.image_paths;
+                console.log('[ANALISE_COMPLETA] imagePaths atualizado:', imagePaths.length);
             }
             handleAnalysisResult(data);
         } else {
+            console.error('[ANALISE_COMPLETA] Erro na resposta:', data.error);
             showError(data.error || 'Erro na análise completa');
             goToStep(1);
         }
     } catch (error) {
+        console.error('[ANALISE_COMPLETA] Erro ao processar resposta:', error);
         hideLoading();
         showError('Erro na análise completa: ' + error.message);
         goToStep(1);
@@ -763,6 +786,12 @@ async function analyzeComplete() {
 
 // Processar resultado da análise
 function handleAnalysisResult(result) {
+    console.log('[HANDLE_ANALYSIS] Processando resultado da análise');
+    console.log('[HANDLE_ANALYSIS] Result:', {
+        has_produto_json: !!result.produto_json,
+        has_produto: !!result.produto_json?.produto
+    });
+    
     const loading = document.getElementById('analysisLoading');
     const resultDiv = document.getElementById('analysisResult');
     
@@ -772,15 +801,29 @@ function handleAnalysisResult(result) {
     // Preencher formulário com dados extraídos
     if (result.produto_json && result.produto_json.produto) {
         const produto = result.produto_json.produto;
+        console.log('[HANDLE_ANALYSIS] Preenchendo formulário com:', {
+            nome: produto.nome,
+            marca: produto.marca,
+            categoria: produto.categoria
+        });
+        
         document.getElementById('inputName').value = produto.nome || '';
         document.getElementById('inputBrand').value = produto.marca || '';
         document.getElementById('inputCategory').value = produto.categoria || '';
         document.getElementById('inputCodigoBarras').value = produto.codigo_barras || '';
         document.getElementById('inputDescription').value = produto.descricao || '';
+    } else {
+        console.warn('[HANDLE_ANALYSIS] produto_json ou produto não encontrado no resultado');
     }
     
     // Atualizar JSON editor
-    document.getElementById('jsonEditor').value = JSON.stringify(result.produto_json, null, 2);
+    const jsonEditor = document.getElementById('jsonEditor');
+    if (jsonEditor && result.produto_json) {
+        jsonEditor.value = JSON.stringify(result.produto_json, null, 2);
+        console.log('[HANDLE_ANALYSIS] JSON editor atualizado');
+    } else {
+        console.warn('[HANDLE_ANALYSIS] jsonEditor não encontrado ou produto_json vazio');
+    }
 }
 
 // ========== ETAPA 4: SALVAMENTO ==========
