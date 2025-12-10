@@ -333,6 +333,8 @@ def shopper_products(request):
     search = request.GET.get('search', '')
     category = request.GET.get('category', '')
     brand = request.GET.get('brand', '')
+    availability = request.GET.get('availability', '')
+    featured = request.GET.get('featured', '')
     
     if search:
         products = products.filter(
