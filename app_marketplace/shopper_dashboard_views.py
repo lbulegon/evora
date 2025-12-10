@@ -381,18 +381,51 @@ def shopper_products(request):
         
         # Helper para construir URL correta
         def build_image_url(img_path):
-            """Constrói URL completa para imagem"""
+            """Constrói URL completa para imagem - busca no SinapUm se necessário"""
             if not img_path:
                 return None
             if isinstance(img_path, str):
-                # Se já é URL completa
+                # Se já é URL completa (HTTP/HTTPS), retornar como está
                 if img_path.startswith('http://') or img_path.startswith('https://'):
                     return img_path
-                # Se começa com /, já é path absoluto
+                
+                # Obter URL base do SinapUm
+                openmind_url = getattr(settings, 'OPENMIND_AI_URL', '')
+                
+                # Se o path não começa com /, é provável que seja uma imagem do SinapUm
+                # Imagens salvas no SinapUm durante análise têm paths como:
+                # - "photo_0.jpg"
+                # - "produtos/temp/15/20251202_043814_temp.jpg"
+                if not img_path.startswith('/'):
+                    # É uma imagem do SinapUm - construir URL completa
+                    if openmind_url:
+                        # Remover /api/v1 se existir para obter base URL do servidor
+                        sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
+                        # Construir URL completa: http://69.169.102.84:8000/media/photo_0.jpg
+                        # O SinapUm serve imagens em /media/ ou diretamente
+                        return f"{sinapum_base}/media/{img_path.lstrip('/')}"
+                    else:
+                        # Fallback: tentar construir com IP padrão
+                        return f"http://69.169.102.84:8000/media/{img_path.lstrip('/')}"
+                
+                # Se começa com /, pode ser:
+                # - Path local (tentar MEDIA_URL local primeiro)
+                # - Path do SinapUm que começa com /media/
+                if img_path.startswith('/media/'):
+                    # Pode ser do SinapUm ou local
+                    # Se não começar com http, assumir que é local
+                    if openmind_url and 'produtos/temp' in img_path or 'photo_' in img_path:
+                        # Parece ser do SinapUm (tem padrões típicos)
+                        sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
+                        return f"{sinapum_base}{img_path}"
+                    # Caso contrário, retornar como path local
+                    return img_path
+                
+                # Path absoluto local (sem /media)
                 if img_path.startswith('/'):
                     return img_path
-                # Caso contrário, adicionar MEDIA_URL
-                # Remover MEDIA_URL se já estiver no path
+                
+                # Caso contrário, adicionar MEDIA_URL local
                 if img_path.startswith(media_url.lstrip('/')):
                     return f"/{img_path}"
                 return f"{media_url}{img_path}".replace('//', '/')
