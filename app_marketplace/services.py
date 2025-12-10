@@ -485,6 +485,23 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                     image_path = result.get('image_path')  # Caminho relativo (ex: media/uploads/uuid.jpg)
                     saved_filename = result.get('saved_filename')  # Nome do arquivo salvo
                     
+                    # Corrigir URL malformada (ex: mediauploads -> media/uploads)
+                    if image_url and 'mediauploads' in image_url:
+                        image_url = image_url.replace('mediauploads', 'media/uploads')
+                    
+                    # Se image_url estiver incorreto ou ausente, construir a partir do image_path
+                    if image_path and (not image_url or 'mediauploads' in image_url):
+                        url_base, _ = _get_openmind_config()
+                        sinapum_base = url_base.replace('/api/v1', '').rstrip('/')
+                        # Garantir que image_path começa com media/
+                        if image_path.startswith('media/'):
+                            image_url = f"{sinapum_base}/{image_path}"
+                        elif image_path.startswith('/media/'):
+                            image_url = f"{sinapum_base}{image_path}"
+                        else:
+                            # Adicionar media/ se não tiver
+                            image_url = f"{sinapum_base}/media/{image_path.lstrip('/')}"
+                    
                     # Usar image_path no JSON do produto (caminho relativo) e image_url para acesso
                     image_path_for_json = image_path or image_url
                     
@@ -521,6 +538,23 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                         image_url = result.get('image_url') or result.get('saved_image_url')
                         image_path = result.get('image_path')  # Caminho relativo (ex: media/uploads/uuid.jpg)
                         saved_filename = result.get('saved_filename')  # Nome do arquivo salvo
+                        
+                        # Corrigir URL malformada (ex: mediauploads -> media/uploads)
+                        if image_url and 'mediauploads' in image_url:
+                            image_url = image_url.replace('mediauploads', 'media/uploads')
+                        
+                        # Se image_url estiver incorreto ou ausente, construir a partir do image_path
+                        if image_path and (not image_url or 'mediauploads' in image_url):
+                            url_base, _ = _get_openmind_config()
+                            sinapum_base = url_base.replace('/api/v1', '').rstrip('/')
+                            # Garantir que image_path começa com media/
+                            if image_path.startswith('media/'):
+                                image_url = f"{sinapum_base}/{image_path}"
+                            elif image_path.startswith('/media/'):
+                                image_url = f"{sinapum_base}{image_path}"
+                            else:
+                                # Adicionar media/ se não tiver
+                                image_url = f"{sinapum_base}/media/{image_path.lstrip('/')}"
                         
                         # Usar image_path no JSON do produto (caminho relativo) e image_url para acesso
                         image_path_for_json = image_path or image_url

@@ -393,8 +393,11 @@ def shopper_products(request):
             if not img_path:
                 return None
             if isinstance(img_path, str):
-                # 1. Se já é URL completa (HTTP/HTTPS), retornar como está
+                # 1. Se já é URL completa (HTTP/HTTPS), corrigir se necessário e retornar
                 if img_path.startswith('http://') or img_path.startswith('https://'):
+                    # Corrigir URL malformada (ex: mediauploads -> media/uploads)
+                    if 'mediauploads' in img_path:
+                        img_path = img_path.replace('mediauploads', 'media/uploads')
                     return img_path
                 
                 # 2. Obter URL base do SinapUm
