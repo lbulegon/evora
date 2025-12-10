@@ -371,20 +371,24 @@ def shopper_products(request):
     from django.conf import settings
     
     produtos_adaptados = []
+    import logging
+    logger = logging.getLogger(__name__)
+    
     for produto_json in page_obj:
-        dados = produto_json.get_produto_data()
-        produto_data = dados.get('produto', {})
-        
-        # Extrair imagens - verificar múltiplos locais possíveis
-        image_urls = []
-        media_url = getattr(settings, 'MEDIA_URL', '/media/')
-        
-        # DEBUG: Log para verificar dados do produto
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"[SHOPPER_PRODUCTS] Processando produto ID: {produto_json.id}, Nome: {produto_json.nome_produto}")
-        logger.info(f"[SHOPPER_PRODUCTS] imagem_original: {produto_json.imagem_original}")
-        logger.info(f"[SHOPPER_PRODUCTS] produto_data.imagens: {produto_data.get('imagens', [])}")
+        try:
+            dados = produto_json.get_produto_data()
+            produto_data = dados.get('produto', {})
+            
+            # Extrair imagens - verificar múltiplos locais possíveis
+            image_urls = []
+            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+            
+            # DEBUG: Log para verificar dados do produto
+            logger.info(f"[SHOPPER_PRODUCTS] Processando produto ID: {produto_json.id}, Nome: {produto_json.nome_produto}")
+            logger.info(f"[SHOPPER_PRODUCTS] imagem_original: {produto_json.imagem_original}")
+            logger.info(f"[SHOPPER_PRODUCTS] dados completos (keys): {list(dados.keys()) if dados else 'None'}")
+            logger.info(f"[SHOPPER_PRODUCTS] produto_data (keys): {list(produto_data.keys()) if produto_data else 'None'}")
+            logger.info(f"[SHOPPER_PRODUCTS] produto_data.imagens: {produto_data.get('imagens', [])}")
         
         # Helper para construir URL correta
         def build_image_url(img_path):
@@ -533,14 +537,14 @@ def shopper_products(request):
                 if url:
                     image_urls.append(url)
         
+        # DEBUG: Log das URLs extraídas
+        logger.info(f"[SHOPPER_PRODUCTS] image_urls extraídas: {image_urls}")
+        logger.info(f"[SHOPPER_PRODUCTS] Total de URLs: {len(image_urls)}")
+        
         # Extrair preço do produto_viagem se disponível
         produto_viagem = dados.get('produto_viagem', {})
         price = produto_viagem.get('preco_venda_brl') or produto_viagem.get('preco_venda_usd')
         currency = 'BRL' if produto_viagem.get('preco_venda_brl') else 'USD'
-        
-        # DEBUG: Log das URLs extraídas
-        logger.info(f"[SHOPPER_PRODUCTS] image_urls extraídas: {image_urls}")
-        logger.info(f"[SHOPPER_PRODUCTS] Total de URLs: {len(image_urls)}")
         
         # Criar objeto adaptado
         produto_adaptado = type('ProdutoAdaptado', (), {
@@ -565,6 +569,10 @@ def shopper_products(request):
         logger.info(f"[SHOPPER_PRODUCTS] Objeto criado - image_urls: {produto_adaptado.image_urls}, len: {len(produto_adaptado.image_urls) if produto_adaptado.image_urls else 0}")
         
         produtos_adaptados.append(produto_adaptado)
+        except Exception as e:
+            logger.error(f"[SHOPPER_PRODUCTS] Erro ao processar produto ID {produto_json.id}: {str(e)}", exc_info=True)
+            # Continuar com próximo produto mesmo se houver erro
+            continue
     
     # Substituir page_obj.object_list com produtos adaptados
     # Criar um objeto mock que simula o Page mas com produtos adaptados
