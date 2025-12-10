@@ -838,6 +838,10 @@ def save_product_json(request):
         
         logger.info(f"[SAVE_PRODUCT] produto_json recebido - Tipo: {type(produto_json)}, Tem 'produto': {'produto' in produto_json if isinstance(produto_json, dict) else False}")
         
+        # Log completo do produto_json para debug
+        import json as json_module
+        logger.info(f"[SAVE_PRODUCT] produto_json completo (primeiros 1000 chars): {json_module.dumps(produto_json, indent=2, ensure_ascii=False)[:1000]}")
+        
         # Extrair informações básicas para indexação
         produto = produto_json.get('produto', {})
         nome_produto = produto.get('nome', 'Produto sem nome')
@@ -850,22 +854,36 @@ def save_product_json(request):
         # Obter caminho da imagem (primeira imagem do array para referência)
         # Todas as imagens estão no array produto['imagens']
         imagem_original = None
-        if produto.get('imagens') and len(produto.get('imagens', [])) > 0:
-            # Usar primeira imagem do array como referência principal
-            imagem_original = produto['imagens'][0] if isinstance(produto['imagens'], list) else produto['imagens']
-            logger.info(f"[SAVE_PRODUCT] Imagem original encontrada no array: {imagem_original}")
-            logger.info(f"[SAVE_PRODUCT] Total de imagens no array: {len(produto.get('imagens', []))}")
-            logger.info(f"[SAVE_PRODUCT] Array completo de imagens: {produto.get('imagens', [])}")
+        
+        # Verificar se tem array de imagens
+        imagens = produto.get('imagens')
+        logger.info(f"[SAVE_PRODUCT] produto.get('imagens'): {imagens}")
+        logger.info(f"[SAVE_PRODUCT] Tipo de imagens: {type(imagens)}")
+        
+        if imagens:
+            if isinstance(imagens, list) and len(imagens) > 0:
+                # Usar primeira imagem do array como referência principal
+                imagem_original = imagens[0]
+                logger.info(f"[SAVE_PRODUCT] ✓ Imagem original encontrada no array (lista): {imagem_original}")
+                logger.info(f"[SAVE_PRODUCT] ✓ Total de imagens no array: {len(imagens)}")
+                logger.info(f"[SAVE_PRODUCT] ✓ Array completo de imagens: {imagens}")
+            elif isinstance(imagens, str) and imagens.strip():
+                # Se for string única
+                imagem_original = imagens.strip()
+                logger.info(f"[SAVE_PRODUCT] ✓ Imagem original encontrada (string): {imagem_original}")
+            else:
+                logger.warning(f"[SAVE_PRODUCT] ⚠ imagens existe mas está vazio ou em formato inesperado: {imagens}")
         elif produto_json.get('cadastro_meta', {}).get('fonte'):
             # Fallback: tentar extrair do campo fonte se não houver no array
             fonte = produto_json.get('cadastro_meta', {}).get('fonte', '')
             if 'imagem' in fonte.lower():
                 imagem_original = fonte.split(':')[-1].strip() if ':' in fonte else fonte
-                logger.info(f"[SAVE_PRODUCT] Imagem original extraída da fonte: {imagem_original}")
+                logger.info(f"[SAVE_PRODUCT] ✓ Imagem original extraída da fonte: {imagem_original}")
         
         if not imagem_original:
-            logger.warning("[SAVE_PRODUCT] Nenhuma imagem original encontrada no produto.imagens ou fonte")
-            logger.warning(f"[SAVE_PRODUCT] produto['imagens']: {produto.get('imagens')}")
+            logger.warning("[SAVE_PRODUCT] ⚠⚠⚠ Nenhuma imagem original encontrada no produto.imagens ou fonte")
+            logger.warning(f"[SAVE_PRODUCT] ⚠ produto.get('imagens'): {produto.get('imagens')}")
+            logger.warning(f"[SAVE_PRODUCT] ⚠ produto completo: {json_module.dumps(produto, indent=2, ensure_ascii=False)[:500]}")
         
         # Garantir que o campo imagem_original seja salvo mesmo que seja um caminho relativo do SinapUm
         # Isso permite que a imagem seja encontrada depois na exibição

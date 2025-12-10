@@ -853,64 +853,105 @@ async function saveProduct() {
     try {
         const jsonEditorValue = document.getElementById('jsonEditor').value;
         if (jsonEditorValue && jsonEditorValue.trim()) {
-            console.log('Usando JSON do editor');
+            console.log('[SAVE_PRODUCT] Usando JSON do editor');
             jsonData = JSON.parse(jsonEditorValue);
         } else {
-            console.log('Usando produtoJson original');
+            console.log('[SAVE_PRODUCT] Usando produtoJson original');
         }
     } catch (e) {
-        console.error('Erro ao parsear JSON:', e);
+        console.error('[SAVE_PRODUCT] Erro ao parsear JSON:', e);
         showError('JSON inválido. Corrija antes de salvar.');
         hideLoading();
         return;
     }
     
+    // Garantir estrutura básica do JSON
+    if (!jsonData) {
+        console.error('[SAVE_PRODUCT] jsonData está vazio ou undefined');
+        showError('Erro: Dados do produto não encontrados.');
+        hideLoading();
+        return;
+    }
+    
+    if (!jsonData.produto) {
+        jsonData.produto = {};
+    }
+    
     // Atualizar JSON com dados do formulário
-    if (jsonData && jsonData.produto) {
-        jsonData.produto.nome = document.getElementById('inputName').value.trim();
-        jsonData.produto.marca = document.getElementById('inputBrand').value.trim();
-        jsonData.produto.categoria = document.getElementById('inputCategory').value || jsonData.produto.categoria;
-        jsonData.produto.codigo_barras = document.getElementById('inputCodigoBarras').value.trim() || jsonData.produto.codigo_barras;
-        jsonData.produto.descricao = document.getElementById('inputDescription').value.trim() || jsonData.produto.descricao;
-        
-        // CRÍTICO: Garantir que os caminhos das imagens estejam no array produto.imagens
-        if (!jsonData.produto.imagens) {
-            jsonData.produto.imagens = [];
-        }
-        
-        // Adicionar imagePaths (caminhos relativos do SinapUm) preferencialmente
-        if (imagePaths && imagePaths.length > 0) {
-            imagePaths.forEach(path => {
+    jsonData.produto.nome = document.getElementById('inputName').value.trim();
+    jsonData.produto.marca = document.getElementById('inputBrand').value.trim();
+    jsonData.produto.categoria = document.getElementById('inputCategory').value || jsonData.produto.categoria;
+    jsonData.produto.codigo_barras = document.getElementById('inputCodigoBarras').value.trim() || jsonData.produto.codigo_barras;
+    jsonData.produto.descricao = document.getElementById('inputDescription').value.trim() || jsonData.produto.descricao;
+    
+    // CRÍTICO: Garantir que os caminhos das imagens estejam no array produto.imagens
+    if (!jsonData.produto.imagens) {
+        jsonData.produto.imagens = [];
+        console.log('[SAVE_PRODUCT] Criado array produto.imagens vazio');
+    }
+    
+    console.log('[SAVE_PRODUCT] Estado ANTES de adicionar imagens:');
+    console.log('[SAVE_PRODUCT] - imagePaths disponíveis:', imagePaths);
+    console.log('[SAVE_PRODUCT] - imageUrls disponíveis:', imageUrls);
+    console.log('[SAVE_PRODUCT] - produto.imagens atual:', jsonData.produto.imagens);
+    
+    // Adicionar imagePaths (caminhos relativos do SinapUm) preferencialmente
+    if (imagePaths && imagePaths.length > 0) {
+        console.log('[SAVE_PRODUCT] Adicionando imagePaths ao produto.imagens...');
+        imagePaths.forEach(path => {
+            if (path && path.trim()) {
+                // Limpar path se necessário (remover / no início)
+                const cleanPath = path.trim().replace(/^\/+/, '');
+                if (cleanPath && !jsonData.produto.imagens.includes(cleanPath) && !jsonData.produto.imagens.includes(path)) {
+                    jsonData.produto.imagens.push(cleanPath);
+                    console.log(`[SAVE_PRODUCT] ✓ Adicionado path: ${cleanPath}`);
+                }
+            }
+        });
+        console.log('[SAVE_PRODUCT] ✓ imagePaths processados:', imagePaths);
+    } else {
+        console.warn('[SAVE_PRODUCT] ⚠ imagePaths está vazio ou não disponível');
+    }
+    
+    // Se ainda não tiver imagens, adicionar imageUrls (URLs completas) e extrair paths
+    if (jsonData.produto.imagens.length === 0 && imageUrls && imageUrls.length > 0) {
+        console.log('[SAVE_PRODUCT] Adicionando imageUrls e extraindo paths...');
+        imageUrls.forEach(url => {
+            if (url && url.trim()) {
+                // Extrair caminho relativo da URL completa se possível
+                let path = url.trim();
+                if (url.includes('/media/')) {
+                    path = url.split('/media/')[1];
+                } else if (url.includes('produtos/temp/') || url.includes('produtos/')) {
+                    // Já é um caminho relativo ou tem protocolo
+                    if (url.includes('://')) {
+                        // Remover protocolo e domínio
+                        const urlObj = new URL(url);
+                        path = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+                    } else {
+                        path = url;
+                    }
+                } else if (url.startsWith('http')) {
+                    // URL completa - tentar extrair path
+                    const urlObj = new URL(url);
+                    path = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+                }
+                
+                // Limpar path
+                path = path.replace(/^\/+/, '');
+                
                 if (path && !jsonData.produto.imagens.includes(path)) {
                     jsonData.produto.imagens.push(path);
+                    console.log(`[SAVE_PRODUCT] ✓ Adicionado path extraído de URL: ${path} (de ${url})`);
                 }
-            });
-            console.log('[SAVE_PRODUCT] imagePaths adicionados ao produto.imagens:', imagePaths);
-        }
-        
-        // Se não tiver imagePaths, adicionar imageUrls (URLs completas)
-        if (jsonData.produto.imagens.length === 0 && imageUrls && imageUrls.length > 0) {
-            imageUrls.forEach(url => {
-                if (url) {
-                    // Extrair caminho relativo da URL completa se possível
-                    // Ex: "http://69.169.102.84:8000/media/photo_0.jpg" -> "photo_0.jpg"
-                    let path = url;
-                    if (url.includes('/media/')) {
-                        path = url.split('/media/')[1];
-                    } else if (url.includes('produtos/temp/') || url.includes('produtos/')) {
-                        // Já é um caminho relativo
-                        path = url.includes('://') ? url.split('://')[1].split('/').slice(1).join('/') : url;
-                    }
-                    if (path && !jsonData.produto.imagens.includes(path)) {
-                        jsonData.produto.imagens.push(path);
-                    }
-                }
-            });
-            console.log('[SAVE_PRODUCT] imageUrls processados e adicionados ao produto.imagens:', imageUrls);
-        }
-        
-        console.log('[SAVE_PRODUCT] produto.imagens final:', jsonData.produto.imagens);
+            }
+        });
+        console.log('[SAVE_PRODUCT] ✓ imageUrls processados:', imageUrls);
     }
+    
+    console.log('[SAVE_PRODUCT] Estado FINAL:');
+    console.log('[SAVE_PRODUCT] - produto.imagens final:', jsonData.produto.imagens);
+    console.log('[SAVE_PRODUCT] - Total de imagens no array:', jsonData.produto.imagens.length);
     
     // Obter grupo_id (opcional)
     const grupoIdInput = document.getElementById('inputGroupId');
