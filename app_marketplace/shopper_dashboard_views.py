@@ -368,26 +368,74 @@ def shopper_products(request):
     
     # Converter ProdutoJSON para formato compatível com o template
     # O template espera campos como name, brand, image_urls, etc.
+    from django.conf import settings
+    
     produtos_adaptados = []
     for produto_json in page_obj:
         dados = produto_json.get_produto_data()
         produto_data = dados.get('produto', {})
         
-        # Extrair imagens
-        imagens = produto_data.get('imagens', [])
+        # Extrair imagens - verificar múltiplos locais possíveis
         image_urls = []
-        if imagens:
+        media_url = getattr(settings, 'MEDIA_URL', '/media/')
+        
+        # Helper para construir URL correta
+        def build_image_url(img_path):
+            """Constrói URL completa para imagem"""
+            if not img_path:
+                return None
+            if isinstance(img_path, str):
+                # Se já é URL completa
+                if img_path.startswith('http://') or img_path.startswith('https://'):
+                    return img_path
+                # Se começa com /, já é path absoluto
+                if img_path.startswith('/'):
+                    return img_path
+                # Caso contrário, adicionar MEDIA_URL
+                # Remover MEDIA_URL se já estiver no path
+                if img_path.startswith(media_url.lstrip('/')):
+                    return f"/{img_path}"
+                return f"{media_url}{img_path}".replace('//', '/')
+            return None
+        
+        # 1. Tentar campo imagens (array)
+        imagens = produto_data.get('imagens', [])
+        if imagens and isinstance(imagens, list):
             for img in imagens:
                 if isinstance(img, str):
-                    # Se for string, pode ser URL ou path
-                    if img.startswith('http'):
-                        image_urls.append(img)
-                    elif img.startswith('/'):
-                        # Path relativo - construir URL completa se necessário
-                        image_urls.append(img)
-                    else:
-                        # Apenas nome do arquivo
-                        image_urls.append(f"/media/{img}")
+                    url = build_image_url(img)
+                    if url:
+                        image_urls.append(url)
+                elif isinstance(img, dict):
+                    # Se for objeto, tentar extrair URL
+                    url = img.get('url') or img.get('src') or img.get('path')
+                    if url:
+                        final_url = build_image_url(url)
+                        if final_url:
+                            image_urls.append(final_url)
+        
+        # 2. Tentar campo imagem_original do modelo ProdutoJSON
+        if not image_urls and produto_json.imagem_original:
+            url = build_image_url(produto_json.imagem_original)
+            if url:
+                image_urls.append(url)
+        
+        # 3. Tentar campo imagem (singular) no dados_json
+        if not image_urls:
+            imagem = produto_data.get('imagem') or produto_data.get('image')
+            if imagem:
+                url = build_image_url(imagem)
+                if url:
+                    image_urls.append(url)
+        
+        # 4. Verificar também em produto_viagem
+        if not image_urls:
+            produto_viagem = dados.get('produto_viagem', {})
+            imagem_viagem = produto_viagem.get('imagem') or produto_viagem.get('image')
+            if imagem_viagem:
+                url = build_image_url(imagem_viagem)
+                if url:
+                    image_urls.append(url)
         
         # Extrair preço do produto_viagem se disponível
         produto_viagem = dados.get('produto_viagem', {})
