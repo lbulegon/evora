@@ -395,18 +395,29 @@ def shopper_products(request):
                 # Se o path não começa com /, é provável que seja uma imagem do SinapUm
                 # Imagens salvas no SinapUm durante análise têm paths como:
                 # - "photo_0.jpg"
+                # - "media/uploads/7cc806f7-e22d-45ba-8aab-6513f1715c09.jpg"
                 # - "produtos/temp/15/20251202_043814_temp.jpg"
                 if not img_path.startswith('/'):
                     # É uma imagem do SinapUm - construir URL completa
                     if openmind_url:
                         # Remover /api/v1 se existir para obter base URL do servidor
                         sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
-                        # Construir URL completa: http://69.169.102.84:8000/media/photo_0.jpg
-                        # O SinapUm serve imagens em /media/ ou diretamente
-                        return f"{sinapum_base}/media/{img_path.lstrip('/')}"
+                        # Limpar o path (remover / no início se houver)
+                        clean_path = img_path.lstrip('/')
+                        
+                        # Se o path já começa com "media/", não adicionar /media/ novamente
+                        if clean_path.startswith('media/'):
+                            return f"{sinapum_base}/{clean_path}"
+                        else:
+                            # Caso contrário, adicionar /media/ antes do path
+                            return f"{sinapum_base}/media/{clean_path}"
                     else:
                         # Fallback: tentar construir com IP padrão
-                        return f"http://69.169.102.84:8000/media/{img_path.lstrip('/')}"
+                        clean_path = img_path.lstrip('/')
+                        if clean_path.startswith('media/'):
+                            return f"http://69.169.102.84:8000/{clean_path}"
+                        else:
+                            return f"http://69.169.102.84:8000/media/{clean_path}"
                 
                 # Se começa com /, pode ser:
                 # - Path local (tentar MEDIA_URL local primeiro)
