@@ -389,9 +389,9 @@ def shopper_products(request):
             logger.info(f"[SHOPPER_PRODUCTS] dados completos (keys): {list(dados.keys()) if dados else 'None'}")
             logger.info(f"[SHOPPER_PRODUCTS] produto_data (keys): {list(produto_data.keys()) if produto_data else 'None'}")
             logger.info(f"[SHOPPER_PRODUCTS] produto_data.imagens: {produto_data.get('imagens', [])}")
-        
-        # Helper para construir URL correta
-        def build_image_url(img_path):
+            
+            # Helper para construir URL correta
+            def build_image_url(img_path):
             """
             Constrói URL completa para imagem do SinapUm.
             
@@ -483,71 +483,71 @@ def shopper_products(request):
                 logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (fallback): {url}")
                 return url
             return None
-        
-        # 1. Tentar campo imagens (array) - priorizar image_url completo quando disponível
-        imagens = produto_data.get('imagens', [])
-        logger.info(f"[SHOPPER_PRODUCTS] Campo 'imagens' encontrado: {imagens} (tipo: {type(imagens)})")
-        if imagens and isinstance(imagens, list):
-            for idx, img in enumerate(imagens):
-                logger.info(f"[SHOPPER_PRODUCTS]   Processando imagem {idx + 1}: {img} (tipo: {type(img)})")
-                if isinstance(img, str):
-                    # Se já é URL completa, usar diretamente; senão, construir
-                    if img.startswith('http://') or img.startswith('https://'):
-                        logger.info(f"[SHOPPER_PRODUCTS]     URL completa detectada, adicionando: {img}")
-                        image_urls.append(img)
-                    else:
-                        logger.info(f"[SHOPPER_PRODUCTS]     Construindo URL a partir de: {img}")
-                        url = build_image_url(img)
-                        logger.info(f"[SHOPPER_PRODUCTS]     URL construída: {url}")
-                        if url:
-                            image_urls.append(url)
-                elif isinstance(img, dict):
-                    # Se for objeto, priorizar image_url, depois url, src, path
-                    # Formato esperado do SinapUm: { "image_url": "...", "image_path": "..." }
-                    url = img.get('image_url') or img.get('url') or img.get('src') or img.get('path')
-                    if url:
-                        # Se já é URL completa, usar diretamente
-                        if url.startswith('http://') or url.startswith('https://'):
-                            image_urls.append(url)
+            
+            # 1. Tentar campo imagens (array) - priorizar image_url completo quando disponível
+            imagens = produto_data.get('imagens', [])
+            logger.info(f"[SHOPPER_PRODUCTS] Campo 'imagens' encontrado: {imagens} (tipo: {type(imagens)})")
+            if imagens and isinstance(imagens, list):
+                for idx, img in enumerate(imagens):
+                    logger.info(f"[SHOPPER_PRODUCTS]   Processando imagem {idx + 1}: {img} (tipo: {type(img)})")
+                    if isinstance(img, str):
+                        # Se já é URL completa, usar diretamente; senão, construir
+                        if img.startswith('http://') or img.startswith('https://'):
+                            logger.info(f"[SHOPPER_PRODUCTS]     URL completa detectada, adicionando: {img}")
+                            image_urls.append(img)
                         else:
-                            final_url = build_image_url(url)
-                            if final_url:
-                                image_urls.append(final_url)
-        
-        # 2. Tentar campo imagem_original do modelo ProdutoJSON
-        if not image_urls and produto_json.imagem_original:
-            url = build_image_url(produto_json.imagem_original)
-            if url:
-                image_urls.append(url)
-        
-        # 3. Tentar campo imagem (singular) no dados_json
-        if not image_urls:
-            imagem = produto_data.get('imagem') or produto_data.get('image')
-            if imagem:
-                url = build_image_url(imagem)
+                            logger.info(f"[SHOPPER_PRODUCTS]     Construindo URL a partir de: {img}")
+                            url = build_image_url(img)
+                            logger.info(f"[SHOPPER_PRODUCTS]     URL construída: {url}")
+                            if url:
+                                image_urls.append(url)
+                    elif isinstance(img, dict):
+                        # Se for objeto, priorizar image_url, depois url, src, path
+                        # Formato esperado do SinapUm: { "image_url": "...", "image_path": "..." }
+                        url = img.get('image_url') or img.get('url') or img.get('src') or img.get('path')
+                        if url:
+                            # Se já é URL completa, usar diretamente
+                            if url.startswith('http://') or url.startswith('https://'):
+                                image_urls.append(url)
+                            else:
+                                final_url = build_image_url(url)
+                                if final_url:
+                                    image_urls.append(final_url)
+            
+            # 2. Tentar campo imagem_original do modelo ProdutoJSON
+            if not image_urls and produto_json.imagem_original:
+                url = build_image_url(produto_json.imagem_original)
                 if url:
                     image_urls.append(url)
-        
-        # 4. Verificar também em produto_viagem
-        if not image_urls:
+            
+            # 3. Tentar campo imagem (singular) no dados_json
+            if not image_urls:
+                imagem = produto_data.get('imagem') or produto_data.get('image')
+                if imagem:
+                    url = build_image_url(imagem)
+                    if url:
+                        image_urls.append(url)
+            
+            # 4. Verificar também em produto_viagem
+            if not image_urls:
+                produto_viagem = dados.get('produto_viagem', {})
+                imagem_viagem = produto_viagem.get('imagem') or produto_viagem.get('image')
+                if imagem_viagem:
+                    url = build_image_url(imagem_viagem)
+                    if url:
+                        image_urls.append(url)
+            
+            # DEBUG: Log das URLs extraídas
+            logger.info(f"[SHOPPER_PRODUCTS] image_urls extraídas: {image_urls}")
+            logger.info(f"[SHOPPER_PRODUCTS] Total de URLs: {len(image_urls)}")
+            
+            # Extrair preço do produto_viagem se disponível
             produto_viagem = dados.get('produto_viagem', {})
-            imagem_viagem = produto_viagem.get('imagem') or produto_viagem.get('image')
-            if imagem_viagem:
-                url = build_image_url(imagem_viagem)
-                if url:
-                    image_urls.append(url)
-        
-        # DEBUG: Log das URLs extraídas
-        logger.info(f"[SHOPPER_PRODUCTS] image_urls extraídas: {image_urls}")
-        logger.info(f"[SHOPPER_PRODUCTS] Total de URLs: {len(image_urls)}")
-        
-        # Extrair preço do produto_viagem se disponível
-        produto_viagem = dados.get('produto_viagem', {})
-        price = produto_viagem.get('preco_venda_brl') or produto_viagem.get('preco_venda_usd')
-        currency = 'BRL' if produto_viagem.get('preco_venda_brl') else 'USD'
-        
-        # Criar objeto adaptado
-        produto_adaptado = type('ProdutoAdaptado', (), {
+            price = produto_viagem.get('preco_venda_brl') or produto_viagem.get('preco_venda_usd')
+            currency = 'BRL' if produto_viagem.get('preco_venda_brl') else 'USD'
+            
+            # Criar objeto adaptado
+            produto_adaptado = type('ProdutoAdaptado', (), {
             'id': produto_json.id,
             'name': produto_json.nome_produto,
             'brand': produto_json.marca or produto_data.get('marca', ''),
@@ -562,13 +562,13 @@ def shopper_products(request):
             'estabelecimento': None,  # ProdutoJSON não tem estabelecimento direto
             'localizacao_especifica': None,
             'created_at': produto_json.criado_em,
-            'dados_json': dados,  # Manter dados completos para acesso
-        })()
-        
-        # DEBUG: Verificar objeto criado
-        logger.info(f"[SHOPPER_PRODUCTS] Objeto criado - image_urls: {produto_adaptado.image_urls}, len: {len(produto_adaptado.image_urls) if produto_adaptado.image_urls else 0}")
-        
-        produtos_adaptados.append(produto_adaptado)
+                'dados_json': dados,  # Manter dados completos para acesso
+            })()
+            
+            # DEBUG: Verificar objeto criado
+            logger.info(f"[SHOPPER_PRODUCTS] Objeto criado - image_urls: {produto_adaptado.image_urls}, len: {len(produto_adaptado.image_urls) if produto_adaptado.image_urls else 0}")
+            
+            produtos_adaptados.append(produto_adaptado)
         except Exception as e:
             logger.error(f"[SHOPPER_PRODUCTS] Erro ao processar produto ID {produto_json.id}: {str(e)}", exc_info=True)
             # Continuar com próximo produto mesmo se houver erro
