@@ -426,6 +426,14 @@ def shopper_products(request):
             self.has_next = original_page.has_next
             self.previous_page_number = original_page.previous_page_number
             self.next_page_number = original_page.next_page_number
+        
+        def __iter__(self):
+            """Tornar o objeto iterável para uso em templates Django"""
+            return iter(self.object_list)
+        
+        def __len__(self):
+            """Retornar o tamanho da lista de objetos"""
+            return len(self.object_list)
     
     page_obj = AdaptedPage(page_obj, produtos_adaptados)
     
