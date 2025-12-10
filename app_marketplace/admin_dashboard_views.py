@@ -106,7 +106,7 @@ def admin_dashboard(request):
     # ========== ESTATÍSTICAS DE EVENTOS ==========
     eventos = Evento.objects.all()
     total_eventos = eventos.count()
-    eventos_ativos = eventos.filter(ativo=True).count()
+    eventos_ativos = eventos.filter(status=Evento.Status.ATIVO).count()
     
     # ========== ATIVIDADES RECENTES ==========
     pedidos_recentes = pedidos.order_by('-criado_em')[:10]
