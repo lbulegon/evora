@@ -854,6 +854,8 @@ def save_product_json(request):
             # Usar primeira imagem do array como referência principal
             imagem_original = produto['imagens'][0] if isinstance(produto['imagens'], list) else produto['imagens']
             logger.info(f"[SAVE_PRODUCT] Imagem original encontrada no array: {imagem_original}")
+            logger.info(f"[SAVE_PRODUCT] Total de imagens no array: {len(produto.get('imagens', []))}")
+            logger.info(f"[SAVE_PRODUCT] Array completo de imagens: {produto.get('imagens', [])}")
         elif produto_json.get('cadastro_meta', {}).get('fonte'):
             # Fallback: tentar extrair do campo fonte se não houver no array
             fonte = produto_json.get('cadastro_meta', {}).get('fonte', '')
@@ -862,7 +864,11 @@ def save_product_json(request):
                 logger.info(f"[SAVE_PRODUCT] Imagem original extraída da fonte: {imagem_original}")
         
         if not imagem_original:
-            logger.warning("[SAVE_PRODUCT] Nenhuma imagem original encontrada")
+            logger.warning("[SAVE_PRODUCT] Nenhuma imagem original encontrada no produto.imagens ou fonte")
+            logger.warning(f"[SAVE_PRODUCT] produto['imagens']: {produto.get('imagens')}")
+        
+        # Garantir que o campo imagem_original seja salvo mesmo que seja um caminho relativo do SinapUm
+        # Isso permite que a imagem seja encontrada depois na exibição
         
         # Verificar se produto já existe pelo código de barras
         produto_existente = None
