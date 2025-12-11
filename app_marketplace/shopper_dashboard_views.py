@@ -308,12 +308,17 @@ def shopper_group_detail(request, group_id):
 @login_required
 def shopper_products(request):
     """Catálogo de produtos do shopper - usando ProdutoJSON"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if not request.user.is_shopper:
         messages.error(request, "Acesso restrito a Personal Shoppers.")
         return redirect('home')
     
     # Base: todos os produtos do shopper (ProdutoJSON)
     base_products = ProdutoJSON.objects.filter(criado_por=request.user).order_by('-criado_em')
+    logger.info(f"[SHOPPER_PRODUCTS] Usuário: {request.user.username} (ID: {request.user.id})")
+    logger.info(f"[SHOPPER_PRODUCTS] Total de produtos base: {base_products.count()}")
     
     # Categorias e marcas disponíveis - BUSCAR ANTES DOS FILTROS para mostrar todas
     categories = base_products.values_list('categoria', flat=True).distinct().exclude(categoria='').exclude(categoria__isnull=True)
