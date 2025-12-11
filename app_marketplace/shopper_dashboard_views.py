@@ -376,23 +376,6 @@ def shopper_products(request):
     logger = logging.getLogger(__name__)
     
     for produto_json in page_obj:
-<<<<<<< HEAD
-        dados = produto_json.get_produto_data()
-        produto_data = dados.get('produto', {})
-        
-        # Extrair imagens - verificar múltiplos locais possíveis
-        image_urls = []
-        media_url = getattr(settings, 'MEDIA_URL', '/media/')
-        
-        # Usar função utilitária build_image_url importada de utils
-        
-        # 1. Tentar campo imagens (array)
-        imagens = produto_data.get('imagens', [])
-        if imagens and isinstance(imagens, list):
-            for img in imagens:
-                if isinstance(img, str):
-                    url = build_image_url(img)
-=======
         try:
             dados = produto_json.get_produto_data()
             produto_data = dados.get('produto', {})
@@ -408,101 +391,9 @@ def shopper_products(request):
             logger.info(f"[SHOPPER_PRODUCTS] produto_data (keys): {list(produto_data.keys()) if produto_data else 'None'}")
             logger.info(f"[SHOPPER_PRODUCTS] produto_data.imagens: {produto_data.get('imagens', [])}")
             
-            # Helper para construir URL correta
-            def build_image_url(img_path):
-                """
-                Constrói URL completa para imagem do SinapUm.
-                
-                Baseado na documentação do OpenMind:
-                - image_path: "media/uploads/{uuid}.jpg" (caminho relativo)
-                - image_url: "http://69.169.102.84:8000/media/uploads/{uuid}.jpg" (URL completa)
-                
-                O SinapUm serve imagens em: http://{HOST}:{PORT}/media/{path}
-                
-                IMPORTANTE: Tenta diferentes variações de caminho para resolver divergências.
-                """
-                if not img_path:
-                    return None
-                if isinstance(img_path, str):
-                    # 1. Se já é URL completa (HTTP/HTTPS), corrigir se necessário e retornar
-                    if img_path.startswith('http://') or img_path.startswith('https://'):
-                        # Corrigir URL malformada (ex: mediauploads -> media/uploads)
-                        if 'mediauploads' in img_path:
-                            logger.info(f"[SHOPPER_PRODUCTS] Corrigindo URL malformada: {img_path}")
-                            img_path = img_path.replace('mediauploads', 'media/uploads')
-                        return img_path
-                    
-                    # 2. Obter URL base do SinapUm
-                    openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:8000')
-                    
-                    # Remover /api/v1 se existir para obter base URL do servidor
-                    sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
-                    
-                    # 3. Normalizar o caminho - remover barras duplicadas e normalizar
-                    img_path_clean = img_path.strip().lstrip('/')
-                    
-                    # 4. Tentar diferentes variações de caminho
-                    # Variação 1: "media/uploads/{arquivo}" (formato padrão)
-                    if img_path_clean.startswith('media/uploads/'):
-                        url = f"{sinapum_base}/{img_path_clean}"
-                        logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 1): {url}")
-                        return url
-                    
-                    # Variação 2: "uploads/{arquivo}" (sem media/)
-                    if img_path_clean.startswith('uploads/'):
-                        url = f"{sinapum_base}/media/{img_path_clean}"
-                        logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 2): {url}")
-                        return url
-                    
-                    # Variação 3: Apenas nome do arquivo (ex: "uuid.jpg")
-                    if '/' not in img_path_clean and '.' in img_path_clean:
-                        # Verificar se parece ser um UUID ou nome de arquivo
-                        if any(img_path_clean.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
-                            url = f"{sinapum_base}/media/uploads/{img_path_clean}"
-                            logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 3): {url}")
-                            return url
-                    
-                    # Variação 4: "media/{arquivo}" (sem uploads/)
-                    if img_path_clean.startswith('media/'):
-                        url = f"{sinapum_base}/{img_path_clean}"
-                        logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 4): {url}")
-                        return url
-                    
-                    # Variação 5: Path completo com "/media/uploads/"
-                    if '/media/uploads/' in img_path or '/media/uploads/' in img_path_clean:
-                        # Extrair apenas a parte após /media/uploads/
-                        if '/media/uploads/' in img_path:
-                            filename = img_path.split('/media/uploads/')[-1]
-                        else:
-                            filename = img_path_clean.split('/media/uploads/')[-1]
-                        url = f"{sinapum_base}/media/uploads/{filename}"
-                        logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 5): {url}")
-                        return url
-                    
-                    # Variação 6: Se começa com "/media/" (com barra inicial)
-                    if img_path.startswith('/media/'):
-                        url = f"{sinapum_base}{img_path}"
-                        logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 6): {url}")
-                        return url
-                    
-                    # Variação 7: Path absoluto local (começa com / mas não é /media/)
-                    if img_path.startswith('/'):
-                        # Se parece ser uma imagem, tentar adicionar /media
-                        if '.' in img_path and any(img_path.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
-                            url = f"{sinapum_base}/media{img_path}"
-                            logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 7): {url}")
-                            return url
-                        # Caso contrário, retornar como path local
-                        logger.warning(f"[SHOPPER_PRODUCTS] Path absoluto não reconhecido: {img_path}")
-                        return img_path
-                    
-                    # Fallback: adicionar media/uploads/ diretamente
-                    url = f"{sinapum_base}/media/uploads/{img_path_clean}"
-                    logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (fallback): {url}")
-                    return url
-                return None
+            # Usar função utilitária build_image_url importada de utils
             
-            # 1. Tentar campo imagens (array) - priorizar image_url completo quando disponível
+            # 1. Tentar campo imagens (array)
             imagens = produto_data.get('imagens', [])
             logger.info(f"[SHOPPER_PRODUCTS] Campo 'imagens' encontrado: {imagens} (tipo: {type(imagens)})")
             if imagens and isinstance(imagens, list):
@@ -520,12 +411,11 @@ def shopper_products(request):
                             if url:
                                 image_urls.append(url)
                     elif isinstance(img, dict):
-                        # Se for objeto, priorizar image_url, depois url, src, path
-                        # Formato esperado do SinapUm: { "image_url": "...", "image_path": "..." }
-                        url = img.get('image_url') or img.get('url') or img.get('src') or img.get('path')
+                        # Se for objeto, tentar extrair URL
+                        url = img.get('url') or img.get('src') or img.get('path') or img.get('image_url')
                         if url:
                             # Se já é URL completa, usar diretamente
-                            if url.startswith('http://') or url.startswith('https://'):
+                            if isinstance(url, str) and (url.startswith('http://') or url.startswith('https://')):
                                 image_urls.append(url)
                             else:
                                 final_url = build_image_url(url)
@@ -534,16 +424,17 @@ def shopper_products(request):
             
             # 2. Tentar campo imagem_original do modelo ProdutoJSON
             if not image_urls and produto_json.imagem_original:
+                logger.info(f"[SHOPPER_PRODUCTS] Tentando imagem_original: {produto_json.imagem_original}")
                 url = build_image_url(produto_json.imagem_original)
                 if url:
                     image_urls.append(url)
+                    logger.info(f"[SHOPPER_PRODUCTS] imagem_original construída: {url}")
             
             # 3. Tentar campo imagem (singular) no dados_json
             if not image_urls:
                 imagem = produto_data.get('imagem') or produto_data.get('image')
                 if imagem:
                     url = build_image_url(imagem)
->>>>>>> f71209ff5f876aecddf776ca585de45f6fde0272
                     if url:
                         image_urls.append(url)
             
