@@ -327,14 +327,16 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
     return resultado
 
 
-def build_image_url(img_path, openmind_url=None, media_url=None):
+def build_image_url(img_path, openmind_url=None, media_url=None, use_proxy=True):
     """
     Constrói URL completa para imagem - busca no SinapUm se necessário
+    Usa proxy interno em produção (HTTPS) para evitar problemas de mixed content
     
     Args:
         img_path: Caminho da imagem (relativo ou absoluto)
         openmind_url: URL base do servidor OpenMind AI (opcional, busca das settings se não fornecido)
         media_url: URL base de media local (opcional, busca das settings se não fornecido)
+        use_proxy: Se True, usa proxy interno quando em HTTPS (padrão: True)
     
     Returns:
         str: URL completa da imagem ou None se não houver path
@@ -343,8 +345,29 @@ def build_image_url(img_path, openmind_url=None, media_url=None):
         return None
     
     if isinstance(img_path, str):
-        # Se já é URL completa (HTTP/HTTPS), retornar como está
+        # Se já é URL completa (HTTP/HTTPS), verificar se precisa usar proxy
         if img_path.startswith('http://') or img_path.startswith('https://'):
+            # Se é HTTPS, retornar como está
+            if img_path.startswith('https://'):
+                return img_path
+            
+            # Se é HTTP e estamos em produção HTTPS, usar proxy
+            if use_proxy:
+                from django.conf import settings
+                is_railway = getattr(settings, 'IS_RAILWAY', False)
+                if is_railway:
+                    # Extrair path da URL HTTP e usar proxy
+                    try:
+                        from urllib.parse import urlparse
+                        parsed = urlparse(img_path)
+                        # Remover /media/ do início se houver
+                        path = parsed.path.lstrip('/')
+                        if path.startswith('media/'):
+                            path = path[6:]  # Remove 'media/'
+                        return f"/api/images/proxy/{path}"
+                    except:
+                        pass
+            
             return img_path
         
         # Obter URL base do SinapUm (se não fornecido)
@@ -370,17 +393,37 @@ def build_image_url(img_path, openmind_url=None, media_url=None):
                 
                 # Se o path já começa com "media/", não adicionar /media/ novamente
                 if clean_path.startswith('media/'):
-                    return f"{sinapum_base}/{clean_path}"
+                    url = f"{sinapum_base}/{clean_path}"
                 else:
                     # Caso contrário, adicionar /media/ antes do path
-                    return f"{sinapum_base}/media/{clean_path}"
+                    url = f"{sinapum_base}/media/{clean_path}"
+                
+                # Se use_proxy está ativado e estamos em Railway (HTTPS), usar proxy
+                if use_proxy:
+                    from django.conf import settings
+                    is_railway = getattr(settings, 'IS_RAILWAY', False)
+                    if is_railway:
+                        # Usar proxy interno (HTTPS)
+                        return f"/api/images/proxy/{clean_path}"
+                
+                return url
             else:
                 # Fallback: tentar construir com IP padrão
                 clean_path = img_path.lstrip('/')
                 if clean_path.startswith('media/'):
-                    return f"http://69.169.102.84:8000/{clean_path}"
+                    url = f"http://69.169.102.84:8000/{clean_path}"
                 else:
-                    return f"http://69.169.102.84:8000/media/{clean_path}"
+                    url = f"http://69.169.102.84:8000/media/{clean_path}"
+                
+                # Se use_proxy está ativado e estamos em Railway (HTTPS), usar proxy
+                if use_proxy:
+                    from django.conf import settings
+                    is_railway = getattr(settings, 'IS_RAILWAY', False)
+                    if is_railway:
+                        # Usar proxy interno (HTTPS)
+                        return f"/api/images/proxy/{clean_path}"
+                
+                return url
         
         # Se começa com /, pode ser:
         # - Path local (tentar MEDIA_URL local primeiro)

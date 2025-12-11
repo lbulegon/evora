@@ -10,6 +10,7 @@ from . import admin_dashboard_views
 from . import client_dashboard_views
 from . import user_settings_views
 from . import product_photo_views
+from . import image_proxy_views
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -80,6 +81,9 @@ urlpatterns = [
     path('api/produtos/detectar_por_foto/', product_photo_views.detect_product_by_photo, name='api_detect_product_by_photo'),  # Mantido para compatibilidade
     path('api/produtos/salvar_por_foto/', product_photo_views.save_product_from_photo, name='api_save_product_from_photo'),
     path('api/produtos/salvar_json/', product_photo_views.save_product_json, name='api_save_product_json'),
+    
+    # Proxy de imagens do SinapUm (resolve mixed content HTTP/HTTPS)
+    path('api/images/proxy/<path:image_path>', image_proxy_views.proxy_image, name='image_proxy'),
     
     # Dashboard Específico do Shopper
     path('shopper/dashboard/', shopper_dashboard_views.shopper_dashboard, name='shopper_dashboard'),
