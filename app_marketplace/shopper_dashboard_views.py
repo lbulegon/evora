@@ -372,7 +372,11 @@ def shopper_products(request):
     from django.conf import settings
     
     produtos_adaptados = []
+    import logging
+    logger = logging.getLogger(__name__)
+    
     for produto_json in page_obj:
+<<<<<<< HEAD
         dados = produto_json.get_produto_data()
         produto_data = dados.get('produto', {})
         
@@ -388,52 +392,187 @@ def shopper_products(request):
             for img in imagens:
                 if isinstance(img, str):
                     url = build_image_url(img)
+=======
+        try:
+            dados = produto_json.get_produto_data()
+            produto_data = dados.get('produto', {})
+            
+            # Extrair imagens - verificar múltiplos locais possíveis
+            image_urls = []
+            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+            
+            # DEBUG: Log para verificar dados do produto
+            logger.info(f"[SHOPPER_PRODUCTS] Processando produto ID: {produto_json.id}, Nome: {produto_json.nome_produto}")
+            logger.info(f"[SHOPPER_PRODUCTS] imagem_original: {produto_json.imagem_original}")
+            logger.info(f"[SHOPPER_PRODUCTS] dados completos (keys): {list(dados.keys()) if dados else 'None'}")
+            logger.info(f"[SHOPPER_PRODUCTS] produto_data (keys): {list(produto_data.keys()) if produto_data else 'None'}")
+            logger.info(f"[SHOPPER_PRODUCTS] produto_data.imagens: {produto_data.get('imagens', [])}")
+            
+            # Helper para construir URL correta
+            def build_image_url(img_path):
+                """
+                Constrói URL completa para imagem do SinapUm.
+                
+                Baseado na documentação do OpenMind:
+                - image_path: "media/uploads/{uuid}.jpg" (caminho relativo)
+                - image_url: "http://69.169.102.84:8000/media/uploads/{uuid}.jpg" (URL completa)
+                
+                O SinapUm serve imagens em: http://{HOST}:{PORT}/media/{path}
+                
+                IMPORTANTE: Tenta diferentes variações de caminho para resolver divergências.
+                """
+                if not img_path:
+                    return None
+                if isinstance(img_path, str):
+                    # 1. Se já é URL completa (HTTP/HTTPS), corrigir se necessário e retornar
+                    if img_path.startswith('http://') or img_path.startswith('https://'):
+                        # Corrigir URL malformada (ex: mediauploads -> media/uploads)
+                        if 'mediauploads' in img_path:
+                            logger.info(f"[SHOPPER_PRODUCTS] Corrigindo URL malformada: {img_path}")
+                            img_path = img_path.replace('mediauploads', 'media/uploads')
+                        return img_path
+                    
+                    # 2. Obter URL base do SinapUm
+                    openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:8000')
+                    
+                    # Remover /api/v1 se existir para obter base URL do servidor
+                    sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
+                    
+                    # 3. Normalizar o caminho - remover barras duplicadas e normalizar
+                    img_path_clean = img_path.strip().lstrip('/')
+                    
+                    # 4. Tentar diferentes variações de caminho
+                    # Variação 1: "media/uploads/{arquivo}" (formato padrão)
+                    if img_path_clean.startswith('media/uploads/'):
+                        url = f"{sinapum_base}/{img_path_clean}"
+                        logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 1): {url}")
+                        return url
+                    
+                    # Variação 2: "uploads/{arquivo}" (sem media/)
+                    if img_path_clean.startswith('uploads/'):
+                        url = f"{sinapum_base}/media/{img_path_clean}"
+                        logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 2): {url}")
+                        return url
+                    
+                    # Variação 3: Apenas nome do arquivo (ex: "uuid.jpg")
+                    if '/' not in img_path_clean and '.' in img_path_clean:
+                        # Verificar se parece ser um UUID ou nome de arquivo
+                        if any(img_path_clean.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
+                            url = f"{sinapum_base}/media/uploads/{img_path_clean}"
+                            logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 3): {url}")
+                            return url
+                    
+                    # Variação 4: "media/{arquivo}" (sem uploads/)
+                    if img_path_clean.startswith('media/'):
+                        url = f"{sinapum_base}/{img_path_clean}"
+                        logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 4): {url}")
+                        return url
+                    
+                    # Variação 5: Path completo com "/media/uploads/"
+                    if '/media/uploads/' in img_path or '/media/uploads/' in img_path_clean:
+                        # Extrair apenas a parte após /media/uploads/
+                        if '/media/uploads/' in img_path:
+                            filename = img_path.split('/media/uploads/')[-1]
+                        else:
+                            filename = img_path_clean.split('/media/uploads/')[-1]
+                        url = f"{sinapum_base}/media/uploads/{filename}"
+                        logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 5): {url}")
+                        return url
+                    
+                    # Variação 6: Se começa com "/media/" (com barra inicial)
+                    if img_path.startswith('/media/'):
+                        url = f"{sinapum_base}{img_path}"
+                        logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 6): {url}")
+                        return url
+                    
+                    # Variação 7: Path absoluto local (começa com / mas não é /media/)
+                    if img_path.startswith('/'):
+                        # Se parece ser uma imagem, tentar adicionar /media
+                        if '.' in img_path and any(img_path.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
+                            url = f"{sinapum_base}/media{img_path}"
+                            logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (variação 7): {url}")
+                            return url
+                        # Caso contrário, retornar como path local
+                        logger.warning(f"[SHOPPER_PRODUCTS] Path absoluto não reconhecido: {img_path}")
+                        return img_path
+                    
+                    # Fallback: adicionar media/uploads/ diretamente
+                    url = f"{sinapum_base}/media/uploads/{img_path_clean}"
+                    logger.info(f"[SHOPPER_PRODUCTS] Construindo URL (fallback): {url}")
+                    return url
+                return None
+            
+            # 1. Tentar campo imagens (array) - priorizar image_url completo quando disponível
+            imagens = produto_data.get('imagens', [])
+            logger.info(f"[SHOPPER_PRODUCTS] Campo 'imagens' encontrado: {imagens} (tipo: {type(imagens)})")
+            if imagens and isinstance(imagens, list):
+                for idx, img in enumerate(imagens):
+                    logger.info(f"[SHOPPER_PRODUCTS]   Processando imagem {idx + 1}: {img} (tipo: {type(img)})")
+                    if isinstance(img, str):
+                        # Se já é URL completa, usar diretamente; senão, construir
+                        if img.startswith('http://') or img.startswith('https://'):
+                            logger.info(f"[SHOPPER_PRODUCTS]     URL completa detectada, adicionando: {img}")
+                            image_urls.append(img)
+                        else:
+                            logger.info(f"[SHOPPER_PRODUCTS]     Construindo URL a partir de: {img}")
+                            url = build_image_url(img)
+                            logger.info(f"[SHOPPER_PRODUCTS]     URL construída: {url}")
+                            if url:
+                                image_urls.append(url)
+                    elif isinstance(img, dict):
+                        # Se for objeto, priorizar image_url, depois url, src, path
+                        # Formato esperado do SinapUm: { "image_url": "...", "image_path": "..." }
+                        url = img.get('image_url') or img.get('url') or img.get('src') or img.get('path')
+                        if url:
+                            # Se já é URL completa, usar diretamente
+                            if url.startswith('http://') or url.startswith('https://'):
+                                image_urls.append(url)
+                            else:
+                                final_url = build_image_url(url)
+                                if final_url:
+                                    image_urls.append(final_url)
+            
+            # 2. Tentar campo imagem_original do modelo ProdutoJSON
+            if not image_urls and produto_json.imagem_original:
+                url = build_image_url(produto_json.imagem_original)
+                if url:
+                    image_urls.append(url)
+            
+            # 3. Tentar campo imagem (singular) no dados_json
+            if not image_urls:
+                imagem = produto_data.get('imagem') or produto_data.get('image')
+                if imagem:
+                    url = build_image_url(imagem)
+>>>>>>> f71209ff5f876aecddf776ca585de45f6fde0272
                     if url:
                         image_urls.append(url)
-                elif isinstance(img, dict):
-                    # Se for objeto, tentar extrair URL
-                    url = img.get('url') or img.get('src') or img.get('path')
+            
+            # 4. Verificar também em produto_viagem
+            if not image_urls:
+                produto_viagem = dados.get('produto_viagem', {})
+                imagem_viagem = produto_viagem.get('imagem') or produto_viagem.get('image')
+                if imagem_viagem:
+                    url = build_image_url(imagem_viagem)
                     if url:
-                        final_url = build_image_url(url)
-                        if final_url:
-                            image_urls.append(final_url)
-        
-        # 2. Tentar campo imagem_original do modelo ProdutoJSON
-        if not image_urls and produto_json.imagem_original:
-            url = build_image_url(produto_json.imagem_original)
-            if url:
-                image_urls.append(url)
-        
-        # 3. Tentar campo imagem (singular) no dados_json
-        if not image_urls:
-            imagem = produto_data.get('imagem') or produto_data.get('image')
-            if imagem:
-                url = build_image_url(imagem)
-                if url:
-                    image_urls.append(url)
-        
-        # 4. Verificar também em produto_viagem
-        if not image_urls:
+                        image_urls.append(url)
+            
+            # DEBUG: Log das URLs extraídas
+            logger.info(f"[SHOPPER_PRODUCTS] image_urls extraídas: {image_urls}")
+            logger.info(f"[SHOPPER_PRODUCTS] Total de URLs: {len(image_urls)}")
+            
+            # Extrair preço do produto_viagem se disponível
             produto_viagem = dados.get('produto_viagem', {})
-            imagem_viagem = produto_viagem.get('imagem') or produto_viagem.get('image')
-            if imagem_viagem:
-                url = build_image_url(imagem_viagem)
-                if url:
-                    image_urls.append(url)
-        
-        # Extrair preço do produto_viagem se disponível
-        produto_viagem = dados.get('produto_viagem', {})
-        price = produto_viagem.get('preco_venda_brl') or produto_viagem.get('preco_venda_usd')
-        currency = 'BRL' if produto_viagem.get('preco_venda_brl') else 'USD'
-        
-        # Criar objeto adaptado
-        produto_adaptado = type('ProdutoAdaptado', (), {
+            price = produto_viagem.get('preco_venda_brl') or produto_viagem.get('preco_venda_usd')
+            currency = 'BRL' if produto_viagem.get('preco_venda_brl') else 'USD'
+            
+            # Criar objeto adaptado
+            produto_adaptado = type('ProdutoAdaptado', (), {
             'id': produto_json.id,
             'name': produto_json.nome_produto,
             'brand': produto_json.marca or produto_data.get('marca', ''),
             'description': produto_data.get('descricao', ''),
             'category': produto_json.categoria or produto_data.get('categoria', ''),
-            'image_urls': image_urls,
+            'image_urls': image_urls,  # Lista de URLs das imagens
             'price': price,
             'currency': currency,
             'is_available': True,  # ProdutoJSON sempre disponível por padrão
@@ -442,9 +581,17 @@ def shopper_products(request):
             'estabelecimento': None,  # ProdutoJSON não tem estabelecimento direto
             'localizacao_especifica': None,
             'created_at': produto_json.criado_em,
-            'dados_json': dados,  # Manter dados completos para acesso
-        })()
-        produtos_adaptados.append(produto_adaptado)
+                'dados_json': dados,  # Manter dados completos para acesso
+            })()
+            
+            # DEBUG: Verificar objeto criado
+            logger.info(f"[SHOPPER_PRODUCTS] Objeto criado - image_urls: {produto_adaptado.image_urls}, len: {len(produto_adaptado.image_urls) if produto_adaptado.image_urls else 0}")
+            
+            produtos_adaptados.append(produto_adaptado)
+        except Exception as e:
+            logger.error(f"[SHOPPER_PRODUCTS] Erro ao processar produto ID {produto_json.id}: {str(e)}", exc_info=True)
+            # Continuar com próximo produto mesmo se houver erro
+            continue
     
     # Substituir page_obj.object_list com produtos adaptados
     # Criar um objeto mock que simula o Page mas com produtos adaptados

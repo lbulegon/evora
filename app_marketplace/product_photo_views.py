@@ -329,6 +329,24 @@ def analise_completa_produto(request):
             produto_data = result.get('data', {})
             image_url_from_sinapum = result.get('image_url')
             image_path_from_sinapum = result.get('image_path')
+            
+            # Corrigir URL malformada (ex: mediauploads -> media/uploads)
+            if image_url_from_sinapum and 'mediauploads' in image_url_from_sinapum:
+                image_url_from_sinapum = image_url_from_sinapum.replace('mediauploads', 'media/uploads')
+            
+            # Se image_url estiver incorreto ou ausente, construir a partir do image_path
+            if image_path_from_sinapum and (not image_url_from_sinapum or 'mediauploads' in image_url_from_sinapum):
+                from django.conf import settings
+                openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:8000')
+                sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
+                # Garantir que image_path começa com media/
+                if image_path_from_sinapum.startswith('media/'):
+                    image_url_from_sinapum = f"{sinapum_base}/{image_path_from_sinapum}"
+                elif image_path_from_sinapum.startswith('/media/'):
+                    image_url_from_sinapum = f"{sinapum_base}{image_path_from_sinapum}"
+                else:
+                    # Adicionar media/ se não tiver
+                    image_url_from_sinapum = f"{sinapum_base}/media/{image_path_from_sinapum.lstrip('/')}"
             saved_filename = result.get('saved_filename')
             
             # Garantir que o array de imagens existe
@@ -360,12 +378,34 @@ def analise_completa_produto(request):
             saved_filenames = []
             
             if result.get('analises_individuais'):
+                from django.conf import settings
+                openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:8000')
+                sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
+                
                 for analise in result['analises_individuais']:
                     analise_result = analise.get('result', {})
-                    if analise_result.get('image_url'):
-                        image_urls.append(analise_result['image_url'])
-                    if analise_result.get('image_path'):
-                        image_paths.append(analise_result['image_path'])
+                    img_url = analise_result.get('image_url')
+                    img_path = analise_result.get('image_path')
+                    
+                    # Corrigir URL malformada (ex: mediauploads -> media/uploads)
+                    if img_url and 'mediauploads' in img_url:
+                        img_url = img_url.replace('mediauploads', 'media/uploads')
+                    
+                    # Se image_url estiver incorreto ou ausente, construir a partir do image_path
+                    if img_path and (not img_url or 'mediauploads' in img_url):
+                        # Garantir que image_path começa com media/
+                        if img_path.startswith('media/'):
+                            img_url = f"{sinapum_base}/{img_path}"
+                        elif img_path.startswith('/media/'):
+                            img_url = f"{sinapum_base}{img_path}"
+                        else:
+                            # Adicionar media/ se não tiver
+                            img_url = f"{sinapum_base}/media/{img_path.lstrip('/')}"
+                    
+                    if img_url:
+                        image_urls.append(img_url)
+                    if img_path:
+                        image_paths.append(img_path)
                     if analise_result.get('saved_filename'):
                         saved_filenames.append(analise_result['saved_filename'])
             
@@ -500,6 +540,24 @@ def detect_product_by_photo(request):
             image_url_from_sinapum = result.get('image_url')  # URL completa
             image_path_from_sinapum = result.get('image_path')  # Caminho relativo (preferido para JSON)
             saved_filename = result.get('saved_filename')  # Nome do arquivo salvo
+            
+            # Corrigir URL malformada (ex: mediauploads -> media/uploads)
+            if image_url_from_sinapum and 'mediauploads' in image_url_from_sinapum:
+                image_url_from_sinapum = image_url_from_sinapum.replace('mediauploads', 'media/uploads')
+            
+            # Se image_url estiver incorreto ou ausente, construir a partir do image_path
+            if image_path_from_sinapum and (not image_url_from_sinapum or 'mediauploads' in image_url_from_sinapum):
+                from django.conf import settings
+                openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:8000')
+                sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
+                # Garantir que image_path começa com media/
+                if image_path_from_sinapum.startswith('media/'):
+                    image_url_from_sinapum = f"{sinapum_base}/{image_path_from_sinapum}"
+                elif image_path_from_sinapum.startswith('/media/'):
+                    image_url_from_sinapum = f"{sinapum_base}{image_path_from_sinapum}"
+                else:
+                    # Adicionar media/ se não tiver
+                    image_url_from_sinapum = f"{sinapum_base}/media/{image_path_from_sinapum.lstrip('/')}"
             
             # Usar image_path (relativo) no JSON do produto, image_url para acesso/exibição
             image_path_for_json = image_path_from_sinapum or image_url_from_sinapum
