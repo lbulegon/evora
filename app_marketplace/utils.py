@@ -360,10 +360,8 @@ def build_image_url(img_path, openmind_url=None, media_url=None, use_proxy=True)
                     try:
                         from urllib.parse import urlparse
                         parsed = urlparse(img_path)
-                        # Remover /media/ do início se houver
+                        # Manter o path completo (incluindo /media/ se houver)
                         path = parsed.path.lstrip('/')
-                        if path.startswith('media/'):
-                            path = path[6:]  # Remove 'media/'
                         return f"/api/images/proxy/{path}"
                     except:
                         pass
