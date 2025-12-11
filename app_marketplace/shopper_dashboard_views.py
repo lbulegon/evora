@@ -363,9 +363,15 @@ def shopper_products(request):
     groups = WhatsappGroup.objects.filter(owner=request.user).order_by('name')
     
     # Paginação do QuerySet primeiro
+    logger.info(f"[SHOPPER_PRODUCTS] Total de produtos antes da paginação: {products.count()}")
+    logger.info(f"[SHOPPER_PRODUCTS] Query SQL: {str(products.query)}")
+    
     paginator = Paginator(products, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    
+    logger.info(f"[SHOPPER_PRODUCTS] Página atual: {page_obj.number}, Total de páginas: {paginator.num_pages}")
+    logger.info(f"[SHOPPER_PRODUCTS] Produtos na página atual: {len(page_obj)}")
     
     # Converter ProdutoJSON para formato compatível com o template
     # O template espera campos como name, brand, image_urls, etc.
