@@ -400,8 +400,7 @@ def build_image_url(img_path, openmind_url=None, media_url=None, use_proxy=True)
                 
                 # Se use_proxy está ativado e estamos em Railway (HTTPS), usar proxy
                 if use_proxy:
-                    from django.conf import settings
-                    is_railway = getattr(settings, 'IS_RAILWAY', False)
+                    is_railway = getattr(django_settings, 'IS_RAILWAY', False)
                     if is_railway:
                         # Usar proxy interno (HTTPS)
                         return f"/api/images/proxy/{clean_path}"
@@ -417,8 +416,7 @@ def build_image_url(img_path, openmind_url=None, media_url=None, use_proxy=True)
                 
                 # Se use_proxy está ativado e estamos em Railway (HTTPS), usar proxy
                 if use_proxy:
-                    from django.conf import settings
-                    is_railway = getattr(settings, 'IS_RAILWAY', False)
+                    is_railway = getattr(django_settings, 'IS_RAILWAY', False)
                     if is_railway:
                         # Usar proxy interno (HTTPS)
                         return f"/api/images/proxy/{clean_path}"
