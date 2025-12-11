@@ -7,8 +7,9 @@ from .models import (
     Agente, Cliente, ClienteRelacao, Produto, EstoqueItem,
     Oferta, TrustlineKeeper, RoleStats, Pedido, ItemPedido,
     Pagamento, TransacaoGateway, Evento,
-    PublicacaoAgora, EngajamentoAgora
+    PublicacaoAgora, EngajamentoAgora, ProdutoJSON
 )
+from .utils import build_image_url
 
 
 class UserBasicSerializer(serializers.ModelSerializer):
@@ -643,6 +644,66 @@ class CheckoutCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Campo 'gateway' é obrigatório em pagamento")
         return value
 
+
+# ============================================================================
+# PRODUTO JSON - SERIALIZERS PARA PRODUTOS CADASTRADOS POR FOTO
+# ============================================================================
+
+class ProdutoJSONSerializer(serializers.ModelSerializer):
+    """Serializer para ProdutoJSON (produtos cadastrados por foto)"""
+    imagens_urls = serializers.SerializerMethodField()
+    grupo_nome = serializers.CharField(source='grupo_whatsapp.name', read_only=True, allow_null=True)
+    criado_por_username = serializers.CharField(source='criado_por.username', read_only=True)
+    dados_json_completo = serializers.JSONField(source='dados_json', read_only=True)
+    
+    class Meta:
+        model = ProdutoJSON
+        fields = [
+            'id', 'nome_produto', 'marca', 'categoria', 'codigo_barras',
+            'imagem_original', 'imagens_urls', 'dados_json', 'dados_json_completo',
+            'grupo_whatsapp', 'grupo_nome', 'criado_por', 'criado_por_username',
+            'criado_em', 'atualizado_em'
+        ]
+        read_only_fields = ['id', 'criado_em', 'atualizado_em']
+    
+    def get_imagens_urls(self, obj):
+        """Retorna array de URLs completas das imagens"""
+        image_urls = []
+        
+        # 1. Tentar campo imagem_original
+        if obj.imagem_original:
+            url = build_image_url(obj.imagem_original)
+            if url:
+                image_urls.append(url)
+        
+        # 2. Tentar extrair do dados_json.produto.imagens
+        dados = obj.dados_json or {}
+        produto = dados.get('produto', {})
+        imagens = produto.get('imagens', [])
+        
+        if imagens and isinstance(imagens, list):
+            for img in imagens:
+                if isinstance(img, str):
+                    url = build_image_url(img)
+                    if url and url not in image_urls:
+                        image_urls.append(url)
+                elif isinstance(img, dict):
+                    # Se for objeto, tentar extrair URL
+                    img_url = img.get('url') or img.get('src') or img.get('path')
+                    if img_url:
+                        url = build_image_url(img_url)
+                        if url and url not in image_urls:
+                            image_urls.append(url)
+        
+        # 3. Fallback: tentar campo imagem (singular) no dados_json
+        if not image_urls:
+            imagem = produto.get('imagem') or produto.get('image')
+            if imagem:
+                url = build_image_url(imagem)
+                if url:
+                    image_urls.append(url)
+        
+        return image_urls
 
 
 

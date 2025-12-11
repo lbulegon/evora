@@ -5,6 +5,7 @@ Adaptado das melhorias do SinapUm para qualidade de informações geradas no JSO
 from datetime import datetime
 from typing import Dict, Any, Optional
 import re
+from django.conf import settings
 
 
 def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: str = None, image_path: str = None) -> Dict[str, Any]:
@@ -324,4 +325,84 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
     }
     
     return resultado
+
+
+def build_image_url(img_path, openmind_url=None, media_url=None):
+    """
+    Constrói URL completa para imagem - busca no SinapUm se necessário
+    
+    Args:
+        img_path: Caminho da imagem (relativo ou absoluto)
+        openmind_url: URL base do servidor OpenMind AI (opcional, busca das settings se não fornecido)
+        media_url: URL base de media local (opcional, busca das settings se não fornecido)
+    
+    Returns:
+        str: URL completa da imagem ou None se não houver path
+    """
+    if not img_path:
+        return None
+    
+    if isinstance(img_path, str):
+        # Se já é URL completa (HTTP/HTTPS), retornar como está
+        if img_path.startswith('http://') or img_path.startswith('https://'):
+            return img_path
+        
+        # Obter URL base do SinapUm (se não fornecido)
+        if openmind_url is None:
+            openmind_url = getattr(settings, 'OPENMIND_AI_URL', '')
+        
+        # Obter URL base de media local (se não fornecido)
+        if media_url is None:
+            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+        
+        # Se o path não começa com /, é provável que seja uma imagem do SinapUm
+        # Imagens salvas no SinapUm durante análise têm paths como:
+        # - "photo_0.jpg"
+        # - "media/uploads/7cc806f7-e22d-45ba-8aab-6513f1715c09.jpg"
+        # - "produtos/temp/15/20251202_043814_temp.jpg"
+        if not img_path.startswith('/'):
+            # É uma imagem do SinapUm - construir URL completa
+            if openmind_url:
+                # Remover /api/v1 se existir para obter base URL do servidor
+                sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
+                # Limpar o path (remover / no início se houver)
+                clean_path = img_path.lstrip('/')
+                
+                # Se o path já começa com "media/", não adicionar /media/ novamente
+                if clean_path.startswith('media/'):
+                    return f"{sinapum_base}/{clean_path}"
+                else:
+                    # Caso contrário, adicionar /media/ antes do path
+                    return f"{sinapum_base}/media/{clean_path}"
+            else:
+                # Fallback: tentar construir com IP padrão
+                clean_path = img_path.lstrip('/')
+                if clean_path.startswith('media/'):
+                    return f"http://69.169.102.84:8000/{clean_path}"
+                else:
+                    return f"http://69.169.102.84:8000/media/{clean_path}"
+        
+        # Se começa com /, pode ser:
+        # - Path local (tentar MEDIA_URL local primeiro)
+        # - Path do SinapUm que começa com /media/
+        if img_path.startswith('/media/'):
+            # Pode ser do SinapUm ou local
+            # Se não começar com http, assumir que é local
+            if openmind_url and ('produtos/temp' in img_path or 'photo_' in img_path):
+                # Parece ser do SinapUm (tem padrões típicos)
+                sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
+                return f"{sinapum_base}{img_path}"
+            # Caso contrário, retornar como path local
+            return img_path
+        
+        # Path absoluto local (sem /media)
+        if img_path.startswith('/'):
+            return img_path
+        
+        # Caso contrário, adicionar MEDIA_URL local
+        if img_path.startswith(media_url.lstrip('/')):
+            return f"/{img_path}"
+        return f"{media_url}{img_path}".replace('//', '/')
+    
+    return None
 

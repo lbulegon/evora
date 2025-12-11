@@ -11,14 +11,15 @@ from django.contrib.auth.models import User
 
 from .models import (
     Agente, Cliente, ClienteRelacao, Produto, EstoqueItem,
-    Oferta, TrustlineKeeper, RoleStats, Pedido, EnderecoEntrega
+    Oferta, TrustlineKeeper, RoleStats, Pedido, EnderecoEntrega,
+    ProdutoJSON
 )
 from .serializers import (
     AgenteSerializer, ClienteSerializer, ClienteRelacaoSerializer,
     ProdutoSerializer, EstoqueItemSerializer, OfertaSerializer,
     OfertaCreateSerializer, TrustlineKeeperSerializer, TrustlineCreateSerializer,
     RoleStatsSerializer, CatalogoSerializer, PedidoKMNCreateSerializer,
-    PedidoKMNSerializer, ScoreAgenteSerializer
+    PedidoKMNSerializer, ScoreAgenteSerializer, ProdutoJSONSerializer
 )
 from .services import KMNRoleEngine, KMNStatsService, CatalogoService
 
@@ -434,6 +435,34 @@ def resolver_operacao(request):
         
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
+
+class ProdutoJSONViewSet(viewsets.ModelViewSet):
+    """ViewSet para ProdutoJSON (produtos cadastrados por foto)"""
+    queryset = ProdutoJSON.objects.all()
+    serializer_class = ProdutoJSONSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filtrar por usuário se for shopper
+        if hasattr(self.request.user, 'personalshopper'):
+            queryset = queryset.filter(criado_por=self.request.user)
+        
+        # Filtros opcionais
+        grupo_id = self.request.query_params.get('grupo_id')
+        categoria = self.request.query_params.get('categoria')
+        marca = self.request.query_params.get('marca')
+        
+        if grupo_id:
+            queryset = queryset.filter(grupo_whatsapp_id=grupo_id)
+        if categoria:
+            queryset = queryset.filter(categoria=categoria)
+        if marca:
+            queryset = queryset.filter(marca=marca)
+        
+        return queryset.order_by('-criado_em')
 
 
 
