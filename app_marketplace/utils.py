@@ -341,6 +341,9 @@ def build_image_url(img_path, openmind_url=None, media_url=None, use_proxy=True)
     Returns:
         str: URL completa da imagem ou None se não houver path
     """
+    # Importar settings no início da função
+    from django.conf import settings as django_settings
+    
     if not img_path:
         return None
     
@@ -353,8 +356,7 @@ def build_image_url(img_path, openmind_url=None, media_url=None, use_proxy=True)
             
             # Se é HTTP e estamos em produção HTTPS, usar proxy
             if use_proxy:
-                from django.conf import settings
-                is_railway = getattr(settings, 'IS_RAILWAY', False)
+                is_railway = getattr(django_settings, 'IS_RAILWAY', False)
                 if is_railway:
                     # Extrair path da URL HTTP e usar proxy
                     try:
@@ -370,11 +372,11 @@ def build_image_url(img_path, openmind_url=None, media_url=None, use_proxy=True)
         
         # Obter URL base do SinapUm (se não fornecido)
         if openmind_url is None:
-            openmind_url = getattr(settings, 'OPENMIND_AI_URL', '')
+            openmind_url = getattr(django_settings, 'OPENMIND_AI_URL', '')
         
         # Obter URL base de media local (se não fornecido)
         if media_url is None:
-            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+            media_url = getattr(django_settings, 'MEDIA_URL', '/media/')
         
         # Se o path não começa com /, é provável que seja uma imagem do SinapUm
         # Imagens salvas no SinapUm durante análise têm paths como:
