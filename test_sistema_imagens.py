@@ -94,7 +94,7 @@ def test_build_image_url():
                 if result:
                     # Verificar se não tem duplicação de /media/
                     if "/media/media/" in result:
-                        print(f"  ⚠️  ERRO: URL tem duplicação de /media/")
+                        print(f"  [ERRO] URL tem duplicacao de /media/")
             
             print()
             
