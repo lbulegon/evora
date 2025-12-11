@@ -375,6 +375,9 @@ def shopper_products(request):
     import logging
     logger = logging.getLogger(__name__)
     
+    logger.info(f"[SHOPPER_PRODUCTS] Total de produtos na página: {len(page_obj)}")
+    logger.info(f"[SHOPPER_PRODUCTS] Produtos no page_obj.object_list: {list(page_obj.object_list.values_list('id', flat=True)) if hasattr(page_obj, 'object_list') else 'N/A'}")
+    
     for produto_json in page_obj:
         try:
             dados = produto_json.get_produto_data()
