@@ -367,29 +367,19 @@ def shopper_products(request):
     # Grupos do shopper para o modal de criação (OBRIGATÓRIO para o dropdown)
     groups = WhatsappGroup.objects.filter(owner=request.user).order_by('name')
     
-    # Paginação do QuerySet primeiro
-    logger.info(f"[SHOPPER_PRODUCTS] Total de produtos antes da paginação: {products.count()}")
-    logger.info(f"[SHOPPER_PRODUCTS] Query SQL: {str(products.query)}")
-    
-    paginator = Paginator(products, 20)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    
-    logger.info(f"[SHOPPER_PRODUCTS] Página atual: {page_obj.number}, Total de páginas: {paginator.num_pages}")
-    logger.info(f"[SHOPPER_PRODUCTS] Produtos na página atual: {len(page_obj)}")
-    
     # Converter ProdutoJSON para formato compatível com o template
     # O template espera campos como name, brand, image_urls, etc.
+    # IMPORTANTE: Filtrar apenas produtos disponíveis ANTES da paginação
     from django.conf import settings
     
     produtos_adaptados = []
     import logging
     logger = logging.getLogger(__name__)
     
-    logger.info(f"[SHOPPER_PRODUCTS] Total de produtos na página: {len(page_obj)}")
-    logger.info(f"[SHOPPER_PRODUCTS] Produtos no page_obj.object_list: {list(page_obj.object_list.values_list('id', flat=True)) if hasattr(page_obj, 'object_list') else 'N/A'}")
+    logger.info(f"[SHOPPER_PRODUCTS] Total de produtos antes do filtro de disponibilidade: {products.count()}")
     
-    for produto_json in page_obj:
+    # Processar TODOS os produtos filtrados para verificar disponibilidade
+    for produto_json in products:
         try:
             dados = produto_json.get_produto_data()
             produto_data = dados.get('produto', {})
@@ -470,6 +460,14 @@ def shopper_products(request):
             price = produto_viagem.get('preco_venda_brl') or produto_viagem.get('preco_venda_usd')
             currency = 'BRL' if produto_viagem.get('preco_venda_brl') else 'USD'
             
+            # Verificar se produto está disponível (filtrar apenas disponíveis)
+            is_available = produto_data.get('is_available', True)  # Padrão True se não existir
+            
+            # Pular produtos não disponíveis
+            if not is_available:
+                logger.info(f"[SHOPPER_PRODUCTS] Produto {produto_json.id} pulado (não disponível)")
+                continue
+            
             # Criar objeto adaptado
             produto_adaptado = type('ProdutoAdaptado', (), {
             'id': produto_json.id,
@@ -480,7 +478,7 @@ def shopper_products(request):
             'image_urls': image_urls,  # Lista de URLs das imagens
             'price': price,
             'currency': currency,
-            'is_available': produto_data.get('is_available', True),  # Ler do JSON ou padrão True
+            'is_available': is_available,
             'is_featured': produto_data.get('is_featured', False),  # Ler do JSON ou padrão False
             'group': produto_json.grupo_whatsapp,
             'estabelecimento': None,  # ProdutoJSON não tem estabelecimento direto
@@ -498,28 +496,15 @@ def shopper_products(request):
             # Continuar com próximo produto mesmo se houver erro
             continue
     
-    # Substituir page_obj.object_list com produtos adaptados
-    # Criar um objeto mock que simula o Page mas com produtos adaptados
-    class AdaptedPage:
-        def __init__(self, original_page, adapted_objects):
-            self.original_page = original_page
-            self.object_list = adapted_objects
-            self.number = original_page.number
-            self.paginator = original_page.paginator
-            self.has_previous = original_page.has_previous
-            self.has_next = original_page.has_next
-            self.previous_page_number = original_page.previous_page_number
-            self.next_page_number = original_page.next_page_number
-        
-        def __iter__(self):
-            """Tornar o objeto iterável para uso em templates Django"""
-            return iter(self.object_list)
-        
-        def __len__(self):
-            """Retornar o tamanho da lista de objetos"""
-            return len(self.object_list)
+    # Agora aplicar paginação nos produtos já filtrados (apenas disponíveis)
+    logger.info(f"[SHOPPER_PRODUCTS] Total de produtos disponíveis após filtro: {len(produtos_adaptados)}")
     
-    page_obj = AdaptedPage(page_obj, produtos_adaptados)
+    paginator = Paginator(produtos_adaptados, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    logger.info(f"[SHOPPER_PRODUCTS] Página atual: {page_obj.number}, Total de páginas: {paginator.num_pages}")
+    logger.info(f"[SHOPPER_PRODUCTS] Produtos na página atual: {len(page_obj)}")
     
     context = {
         'page_obj': page_obj,
