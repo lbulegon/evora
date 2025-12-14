@@ -540,7 +540,7 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                     logger.info(f"[SERVICES]   image_url final: {image_url}")
                     logger.info(f"[SERVICES]   image_path_for_json: {image_path_for_json}")
                     
-                    # Transformar dados ÉVORA para formato modelo.json
+                    # Verificar se dados já estão no formato modelo.json ou precisam transformação
                     if result.get('success') and result.get('data'):
                         try:
                             # DEBUG: Log dos dados recebidos do SinapUm ANTES da transformação
@@ -549,21 +549,87 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                             logger.info(f"[SERVICES] Dados recebidos do SinapUm (ANTES transformação):")
                             logger.info(f"[SERVICES]   Tipo: {type(dados_originais)}")
                             logger.info(f"[SERVICES]   Chaves principais: {list(dados_originais.keys()) if isinstance(dados_originais, dict) else 'não é dict'}")
-                            logger.info(f"[SERVICES]   Dados completos (primeiros 2000 chars): {json_module.dumps(dados_originais, indent=2, ensure_ascii=False)[:2000]}")
                             
-                            modelo_json = transform_evora_to_modelo_json(
-                                result['data'],
-                                image_file.name,
-                                image_path=image_path_for_json  # Usar image_path (relativo) ou image_url (completo)
+                            # Verificar se já está no formato modelo.json (tem 'produto', 'produto_generico_catalogo', etc.)
+                            ja_esta_modelo_json = (
+                                isinstance(dados_originais, dict) and
+                                'produto' in dados_originais and
+                                'produto_generico_catalogo' in dados_originais
                             )
                             
-                            # DEBUG: Log dos dados APÓS transformação
-                            logger.info(f"[SERVICES] Dados transformados (APÓS transformação):")
+                            if ja_esta_modelo_json:
+                                logger.info(f"[SERVICES] ✓ Dados já estão no formato modelo.json - preservando estrutura original")
+                                # Fazer deep copy para não modificar o original
+                                import copy
+                                modelo_json = copy.deepcopy(dados_originais)
+                                
+                                # Garantir que imagens estão no array produto.imagens
+                                if 'produto' in modelo_json and isinstance(modelo_json['produto'], dict):
+                                    if 'imagens' not in modelo_json['produto']:
+                                        modelo_json['produto']['imagens'] = []
+                                    if image_path_for_json and image_path_for_json not in modelo_json['produto']['imagens']:
+                                        modelo_json['produto']['imagens'].insert(0, image_path_for_json)
+                                
+                                # Criar ou atualizar campo analise_ia com TODOS os dados originais preservados
+                                if 'analise_ia' not in modelo_json:
+                                    modelo_json['analise_ia'] = {}
+                                
+                                # PRESERVAR TODA A ESTRUTURA ORIGINAL no analise_ia
+                                # Isso garante que nenhum dado seja perdido
+                                modelo_json['analise_ia']['dados_originais_completos'] = copy.deepcopy(dados_originais)
+                                
+                                # Preservar dados específicos do produto que podem ser úteis
+                                if isinstance(dados_originais.get('produto'), dict):
+                                    produto_original = dados_originais['produto']
+                                    
+                                    # Preservar características completas (mesmo que tenham nulls)
+                                    if 'caracteristicas' in produto_original:
+                                        modelo_json['analise_ia']['caracteristicas_completas'] = produto_original['caracteristicas']
+                                    
+                                    # Preservar dimensões completas (mesmo que tenham nulls)
+                                    if 'dimensoes_embalagem' in produto_original:
+                                        modelo_json['analise_ia']['dimensoes_embalagem_completas'] = produto_original['dimensoes_embalagem']
+                                    
+                                    # Preservar fabricação completa
+                                    if 'fabricacao' in produto_original:
+                                        modelo_json['analise_ia']['fabricacao_completa'] = produto_original['fabricacao']
+                                    
+                                    # Preservar TODOS os outros campos do produto que não estão mapeados diretamente
+                                    campos_produto_mapeados = {'nome', 'marca', 'descricao', 'categoria', 'subcategoria', 
+                                                              'codigo_barras', 'imagens', 'caracteristicas', 'dimensoes_embalagem',
+                                                              'peso_embalagem_gramas', 'preco_visivel', 'fabricacao'}
+                                    for campo, valor in produto_original.items():
+                                        if campo not in campos_produto_mapeados and valor is not None:
+                                            modelo_json['analise_ia'][f'produto_{campo}'] = valor
+                                
+                                # Preservar TODOS os outros campos do nível raiz que não estão mapeados
+                                campos_raiz_mapeados = {'produto', 'produto_generico_catalogo', 'produto_viagem', 
+                                                        'estabelecimento', 'campanha', 'shopper', 'cadastro_meta', 'analise_ia'}
+                                for campo, valor in dados_originais.items():
+                                    if campo not in campos_raiz_mapeados and valor is not None:
+                                        modelo_json['analise_ia'][f'raiz_{campo}'] = valor
+                                
+                                # Preservar metadados da análise original
+                                if 'cadastro_meta' in dados_originais:
+                                    modelo_json['analise_ia']['cadastro_meta_original'] = copy.deepcopy(dados_originais['cadastro_meta'])
+                                
+                                logger.info(f"[SERVICES] ✓ Estrutura original preservada. Campo analise_ia criado com dados completos.")
+                                
+                            else:
+                                logger.info(f"[SERVICES] Dados no formato ÉVORA - aplicando transformação")
+                                modelo_json = transform_evora_to_modelo_json(
+                                    result['data'],
+                                    image_file.name,
+                                    image_path=image_path_for_json  # Usar image_path (relativo) ou image_url (completo)
+                                )
+                            
+                            # DEBUG: Log dos dados APÓS processamento
+                            logger.info(f"[SERVICES] Dados processados (APÓS processamento):")
                             logger.info(f"[SERVICES]   Chaves principais: {list(modelo_json.keys()) if isinstance(modelo_json, dict) else 'não é dict'}")
                             logger.info(f"[SERVICES]   Tem campo 'analise_ia': {'analise_ia' in modelo_json if isinstance(modelo_json, dict) else False}")
                             if isinstance(modelo_json, dict) and 'analise_ia' in modelo_json:
                                 logger.info(f"[SERVICES]   analise_ia chaves: {list(modelo_json['analise_ia'].keys()) if isinstance(modelo_json['analise_ia'], dict) else 'não é dict'}")
-                            logger.info(f"[SERVICES]   Dados completos transformados (primeiros 2000 chars): {json_module.dumps(modelo_json, indent=2, ensure_ascii=False)[:2000]}")
+                                logger.info(f"[SERVICES]   analise_ia completo: {json_module.dumps(modelo_json['analise_ia'], indent=2, ensure_ascii=False)[:1500]}")
                             
                             # Substituir data pelo formato modelo.json
                             result['data'] = modelo_json
@@ -574,9 +640,9 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                                 result['image_path'] = image_path
                             if saved_filename:
                                 result['saved_filename'] = saved_filename
-                            logger.info(f"Dados transformados para formato modelo.json. Imagem salva: {image_url or 'não retornada'}")
+                            logger.info(f"Dados processados para formato modelo.json. Imagem salva: {image_url or 'não retornada'}")
                         except Exception as transform_error:
-                            logger.error(f"Erro ao transformar dados: {str(transform_error)}", exc_info=True)
+                            logger.error(f"Erro ao processar dados: {str(transform_error)}", exc_info=True)
                             # Continuar com dados originais se houver erro na transformação
                     
                     return result
