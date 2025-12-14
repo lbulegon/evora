@@ -904,6 +904,12 @@ def update_product_json(request, product_id):
         
         # Salvar dados JSON atualizados
         dados_json['produto'] = produto_data
+        
+        # PRESERVAR campo analise_ia se existir (não sobrescrever)
+        if 'analise_ia' in dados_json:
+            # Manter analise_ia intacto
+            pass
+        
         produto.dados_json = dados_json
         produto.save()
         

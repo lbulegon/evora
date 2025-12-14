@@ -324,6 +324,77 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
         "cadastro_meta": cadastro_meta
     }
     
+    # PRESERVAR TODOS OS DADOS ORIGINAIS DA ANÁLISE DE IA
+    # Adicionar campo analise_ia com todos os dados originais que não foram mapeados
+    analise_ia = {}
+    
+    # Preservar características completas se existirem
+    if evora_data.get('caracteristicas'):
+        if isinstance(evora_data['caracteristicas'], dict):
+            # Adicionar características completas que não foram mapeadas
+            analise_ia['caracteristicas_completas'] = evora_data['caracteristicas']
+        elif isinstance(evora_data['caracteristicas'], list):
+            analise_ia['caracteristicas_lista'] = evora_data['caracteristicas']
+    
+    # Preservar compatibilidade completa
+    if evora_data.get('compatibilidade'):
+        analise_ia['compatibilidade'] = evora_data['compatibilidade']
+    
+    # Preservar dimensões completas
+    if evora_data.get('dimensoes_embalagem'):
+        if isinstance(evora_data['dimensoes_embalagem'], dict):
+            # Adicionar dimensões completas (pode ter mais campos que altura/largura/profundidade)
+            analise_ia['dimensoes_embalagem_completas'] = evora_data['dimensoes_embalagem']
+    
+    # Preservar outros campos importantes da análise
+    campos_analise = [
+        'sku_interno', 'preco_compra', 'percentual_lucro', 'preco_venda_sugerido',
+        'pais_origem', 'fabricante', 'modelo', 'cor', 'material',
+        'plataformas', 'funcoes', 'observacoes', 'tags', 'palavras_chave',
+        'analise_texto', 'extracao_ocr', 'confianca_extracao'
+    ]
+    
+    for campo in campos_analise:
+        if evora_data.get(campo) is not None:
+            analise_ia[campo] = evora_data[campo]
+    
+    # Preservar dados completos do produto_viagem se existirem
+    if evora_data.get('produto_viagem') and isinstance(evora_data['produto_viagem'], dict):
+        produto_viagem_original = evora_data['produto_viagem']
+        # Adicionar campos que não foram mapeados
+        for key, value in produto_viagem_original.items():
+            if key not in produto_viagem and value is not None:
+                analise_ia[f'produto_viagem_{key}'] = value
+    
+    # Preservar metadados completos do cadastro_meta original
+    if evora_data.get('cadastro_meta') and isinstance(evora_data['cadastro_meta'], dict):
+        cadastro_meta_original = evora_data['cadastro_meta']
+        # Adicionar campos que não foram mapeados
+        for key, value in cadastro_meta_original.items():
+            if key not in cadastro_meta or (key == 'detalhes_rotulo' and isinstance(value, dict)):
+                if key == 'detalhes_rotulo' and isinstance(value, dict):
+                    # Mesclar detalhes_rotulo originais com os extraídos
+                    if 'detalhes_rotulo_completos' not in analise_ia:
+                        analise_ia['detalhes_rotulo_completos'] = value
+                else:
+                    analise_ia[f'cadastro_meta_{key}'] = value
+    
+    # Adicionar todos os outros campos que não foram mapeados
+    campos_mapeados = {
+        'nome_produto', 'marca', 'descricao', 'categoria', 'subcategoria',
+        'codigo_barras', 'caracteristicas', 'compatibilidade', 'dimensoes_embalagem',
+        'peso_embalagem_gramas', 'imagens', 'preco_visivel', 'produto_viagem',
+        'cadastro_meta', 'pais_origem', 'fabricante'
+    }
+    
+    for key, value in evora_data.items():
+        if key not in campos_mapeados and value is not None:
+            analise_ia[key] = value
+    
+    # Adicionar campo analise_ia ao resultado se houver dados preservados
+    if analise_ia:
+        resultado['analise_ia'] = analise_ia
+    
     return resultado
 
 
