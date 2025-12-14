@@ -480,8 +480,8 @@ def shopper_products(request):
             'image_urls': image_urls,  # Lista de URLs das imagens
             'price': price,
             'currency': currency,
-            'is_available': True,  # ProdutoJSON sempre disponível por padrão
-            'is_featured': False,  # ProdutoJSON não tem featured por padrão
+            'is_available': produto_data.get('is_available', True),  # Ler do JSON ou padrão True
+            'is_featured': produto_data.get('is_featured', False),  # Ler do JSON ou padrão False
             'group': produto_json.grupo_whatsapp,
             'estabelecimento': None,  # ProdutoJSON não tem estabelecimento direto
             'localizacao_especifica': None,
@@ -819,3 +819,139 @@ def create_product(request):
         return JsonResponse({'error': 'Dados inválidos'}, status=400)
     except Exception as e:
         return JsonResponse({'error': f'Erro ao criar produto: {str(e)}'}, status=500)
+
+
+@login_required
+@require_http_methods(["GET"])
+def get_product_json(request, product_id):
+    """Buscar produto ProdutoJSON específico (para edição)"""
+    if not request.user.is_shopper:
+        return JsonResponse({'error': 'Acesso restrito a Personal Shoppers'}, status=403)
+    
+    try:
+        produto = get_object_or_404(ProdutoJSON, id=product_id, criado_por=request.user)
+        dados = produto.get_produto_data()
+        produto_data = dados.get('produto', {})
+        
+        # Extrair imagens
+        image_urls = []
+        if produto.imagem_original:
+            image_urls.append(produto.imagem_original)
+        if produto_data.get('imagens'):
+            image_urls.extend(produto_data.get('imagens', []))
+        
+        return JsonResponse({
+            'success': True,
+            'product': {
+                'id': produto.id,
+                'name': produto.nome_produto,
+                'description': produto_data.get('descricao', ''),
+                'price': str(produto_data.get('preco', '')) if produto_data.get('preco') else None,
+                'currency': produto_data.get('moeda', 'BRL'),
+                'brand': produto.marca or '',
+                'category': produto.categoria or '',
+                'image_urls': image_urls,
+                'codigo_barras': produto.codigo_barras or '',
+                'estabelecimento_id': produto_data.get('estabelecimento_id'),
+                'localizacao_especifica': produto_data.get('localizacao_especifica', ''),
+                'group_id': produto.grupo_whatsapp_id if produto.grupo_whatsapp else None,
+                'is_available': produto_data.get('is_available', True),
+                'is_featured': produto_data.get('is_featured', False),
+                'created_at': produto.criado_em.isoformat(),
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["PUT", "PATCH"])
+def update_product_json(request, product_id):
+    """Atualizar produto ProdutoJSON"""
+    if not request.user.is_shopper:
+        return JsonResponse({'error': 'Acesso restrito a Personal Shoppers'}, status=403)
+    
+    try:
+        produto = get_object_or_404(ProdutoJSON, id=product_id, criado_por=request.user)
+        data = json.loads(request.body)
+        
+        # Atualizar campos do modelo
+        if 'name' in data:
+            produto.nome_produto = data['name']
+        if 'brand' in data:
+            produto.marca = data.get('brand', '')
+        if 'category' in data:
+            produto.categoria = data.get('category', '')
+        if 'codigo_barras' in data:
+            produto.codigo_barras = data.get('codigo_barras', '')
+        
+        # Atualizar dados JSON
+        dados_json = produto.get_produto_data()
+        produto_data = dados_json.get('produto', {})
+        
+        if 'description' in data:
+            produto_data['descricao'] = data.get('description', '')
+        if 'price' in data:
+            produto_data['preco'] = float(data['price']) if data['price'] else None
+        if 'currency' in data:
+            produto_data['moeda'] = data.get('currency', 'BRL')
+        if 'estabelecimento_id' in data:
+            produto_data['estabelecimento_id'] = data.get('estabelecimento_id')
+        if 'localizacao_especifica' in data:
+            produto_data['localizacao_especifica'] = data.get('localizacao_especifica', '')
+        if 'image_urls' in data:
+            produto_data['imagens'] = data['image_urls']
+            if data['image_urls'] and len(data['image_urls']) > 0:
+                produto.imagem_original = data['image_urls'][0]
+        if 'is_available' in data:
+            produto_data['is_available'] = data['is_available']
+        if 'is_featured' in data:
+            produto_data['is_featured'] = data['is_featured']
+        
+        # Atualizar grupo se fornecido
+        if 'group_id' in data:
+            group_id = data.get('group_id')
+            if group_id:
+                group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
+                produto.grupo_whatsapp = group
+            else:
+                produto.grupo_whatsapp = None
+        
+        # Salvar dados JSON atualizados
+        dados_json['produto'] = produto_data
+        produto.dados_json = dados_json
+        produto.save()
+        
+        return JsonResponse({
+            'success': True,
+            'product': {
+                'id': produto.id,
+                'name': produto.nome_produto,
+                'description': produto_data.get('descricao', ''),
+                'price': str(produto_data.get('preco', '')) if produto_data.get('preco') else None,
+                'currency': produto_data.get('moeda', 'BRL'),
+                'brand': produto.marca or '',
+                'category': produto.categoria or '',
+                'image_urls': produto_data.get('imagens', []),
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["DELETE"])
+def delete_product_json(request, product_id):
+    """Deletar produto ProdutoJSON"""
+    if not request.user.is_shopper:
+        return JsonResponse({'error': 'Acesso restrito a Personal Shoppers'}, status=403)
+    
+    try:
+        produto = get_object_or_404(ProdutoJSON, id=product_id, criado_por=request.user)
+        produto.delete()
+        
+        return JsonResponse({'success': True, 'message': 'Produto deletado com sucesso'})
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

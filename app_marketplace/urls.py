@@ -73,6 +73,9 @@ urlpatterns = [
            
       # API para criação de produtos (sem grupo específico)
       path('api/products/create/', shopper_dashboard_views.create_product, name='api_create_product_general'),
+      path('api/products/<int:product_id>/', shopper_dashboard_views.get_product_json, name='api_get_product_json'),
+      path('api/products/<int:product_id>/update/', shopper_dashboard_views.update_product_json, name='api_update_product_json'),
+      path('api/products/<int:product_id>/delete/', shopper_dashboard_views.delete_product_json, name='api_delete_product_json'),
       
       # Cadastrar produto por foto (inspirado no app de nutrição)
     path('products/cadastrar-por-foto/', product_photo_views.product_photo_create, name='product_photo_create'),

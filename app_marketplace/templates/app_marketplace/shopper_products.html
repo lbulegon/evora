@@ -284,6 +284,9 @@
                     <button class="btn btn-sm btn-outline-primary flex-fill" onclick="editProduct({{ product.id }})">
                         <i class="fas fa-edit"></i> Editar
                     </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteProduct({{ product.id }})">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
                     <button class="btn btn-sm btn-outline-success" onclick="toggleFeatured({{ product.id }})">
                         {% if product.is_featured %}
                         <i class="fas fa-star"></i>
@@ -349,6 +352,110 @@
         </div>
     </div>
     {% endif %}
+</div>
+
+<!-- Modal Editar Produto -->
+<div class="modal fade" id="editProductModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Produto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editProductForm">
+                    <input type="hidden" id="editProductId">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProductName" class="form-label">Nome do Produto</label>
+                                <input type="text" class="form-control" id="editProductName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProductBrand" class="form-label">Marca</label>
+                                <input type="text" class="form-control" id="editProductBrand">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProductPrice" class="form-label">Preço</label>
+                                <input type="number" class="form-control" id="editProductPrice" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProductCurrency" class="form-label">Moeda</label>
+                                <select class="form-select" id="editProductCurrency">
+                                    <option value="USD">USD</option>
+                                    <option value="BRL">BRL</option>
+                                    <option value="EUR">EUR</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editProductDescription" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="editProductDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProductCategory" class="form-label">Categoria</label>
+                                <input type="text" class="form-control" id="editProductCategory" placeholder="Ex: Eletrônicos, Roupas, Acessórios">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProductGroup" class="form-label">Grupo</label>
+                                <select class="form-select" id="editProductGroup">
+                                    <option value="">Nenhum grupo</option>
+                                    {% for group in groups %}
+                                    <option value="{{ group.id }}">{{ group.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProductStore" class="form-label">Estabelecimento</label>
+                                <select class="form-select" id="editProductStore">
+                                    <option value="">Selecione onde encontrar</option>
+                                    {% for estabelecimento in estabelecimentos %}
+                                    <option value="{{ estabelecimento.id }}">{{ estabelecimento.nome }} - {{ estabelecimento.cidade }}/{{ estabelecimento.estado }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editProductLocation" class="form-label">Localização Específica</label>
+                                <input type="text" class="form-control" id="editProductLocation" placeholder="Ex: Corredor 3, Prateleira A">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editProductBarcode" class="form-label">Código de Barras</label>
+                        <input type="text" class="form-control" id="editProductBarcode" placeholder="Código de barras do produto">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveProductEdit()">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal Criar Produto -->
@@ -528,18 +635,176 @@ function createProduct() {
 }
 
 function editProduct(productId) {
-    // Implementar edição de produto
-    console.log('Editando produto:', productId);
+    // Buscar dados do produto
+    fetch(`{% url 'api_get_product_json' 0 %}`.replace('0', productId))
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const p = data.product;
+                document.getElementById('editProductId').value = p.id;
+                document.getElementById('editProductName').value = p.name || '';
+                document.getElementById('editProductBrand').value = p.brand || '';
+                document.getElementById('editProductPrice').value = p.price || '';
+                document.getElementById('editProductCurrency').value = p.currency || 'BRL';
+                document.getElementById('editProductDescription').value = p.description || '';
+                document.getElementById('editProductCategory').value = p.category || '';
+                document.getElementById('editProductGroup').value = p.group_id || '';
+                document.getElementById('editProductStore').value = p.estabelecimento_id || '';
+                document.getElementById('editProductLocation').value = p.localizacao_especifica || '';
+                document.getElementById('editProductBarcode').value = p.codigo_barras || '';
+                
+                new bootstrap.Modal(document.getElementById('editProductModal')).show();
+            } else {
+                alert('Erro ao carregar produto: ' + (data.error || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar produto: ' + error.message);
+        });
+}
+
+function saveProductEdit() {
+    const productId = document.getElementById('editProductId').value;
+    if (!productId) {
+        alert('ID do produto não encontrado');
+        return;
+    }
+    
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`{% url 'api_update_product_json' 0 %}`.replace('0', productId), {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify({
+            name: document.getElementById('editProductName').value,
+            brand: document.getElementById('editProductBrand').value,
+            price: document.getElementById('editProductPrice').value,
+            currency: document.getElementById('editProductCurrency').value,
+            description: document.getElementById('editProductDescription').value,
+            category: document.getElementById('editProductCategory').value,
+            group_id: document.getElementById('editProductGroup').value || null,
+            estabelecimento_id: document.getElementById('editProductStore').value || null,
+            localizacao_especifica: document.getElementById('editProductLocation').value,
+            codigo_barras: document.getElementById('editProductBarcode').value
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
+            location.reload();
+        } else {
+            alert('Erro ao atualizar produto: ' + (data.error || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao atualizar produto: ' + error.message);
+    });
+}
+
+function deleteProduct(productId) {
+    if (!confirm('Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.')) {
+        return;
+    }
+    
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`{% url 'api_delete_product_json' 0 %}`.replace('0', productId), {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': csrftoken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Produto excluído com sucesso!');
+            location.reload();
+        } else {
+            alert('Erro ao excluir produto: ' + (data.error || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao excluir produto: ' + error.message);
+    });
 }
 
 function toggleFeatured(productId) {
-    // Implementar toggle de destaque
-    console.log('Toggle destaque produto:', productId);
+    // Buscar produto atual
+    fetch(`{% url 'api_get_product_json' 0 %}`.replace('0', productId))
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const p = data.product;
+                const newFeatured = !p.is_featured;
+                
+                const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                fetch(`{% url 'api_update_product_json' 0 %}`.replace('0', productId), {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify({
+                        is_featured: newFeatured
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Erro ao atualizar destaque: ' + (data.error || 'Erro desconhecido'));
+                    }
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao atualizar destaque: ' + error.message);
+        });
 }
 
 function toggleAvailability(productId) {
-    // Implementar toggle de disponibilidade
-    console.log('Toggle disponibilidade produto:', productId);
+    // Buscar produto atual
+    fetch(`{% url 'api_get_product_json' 0 %}`.replace('0', productId))
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const p = data.product;
+                const newAvailable = !p.is_available;
+                
+                const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                fetch(`{% url 'api_update_product_json' 0 %}`.replace('0', productId), {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify({
+                        is_available: newAvailable
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Erro ao atualizar disponibilidade: ' + (data.error || 'Erro desconhecido'));
+                    }
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao atualizar disponibilidade: ' + error.message);
+        });
 }
 </script>
 {% endblock %}
