@@ -1,6 +1,6 @@
 # 📱 Módulo de Integração WhatsApp - Évora/VitrineZap
 
-Módulo completo de integração com WhatsApp utilizando **apenas Python**, sem Node.js, com foco nos conceitos de **DropKeeping** e **KMN (Keeper Mesh Network)**.
+Módulo completo de integração com WhatsApp utilizando **apenas Python**, sem Node.js, com foco nos conceitos de **DropKeeper** e **KMN (Keeper Mesh Network)**.
 
 ## 🎯 Visão Geral
 
@@ -35,7 +35,7 @@ Este módulo adiciona capacidades de WhatsApp ao projeto Évora/VitrineZap de fo
 │              Porta: 8000                                     │
 │  - Recebe mensagens do gateway                               │
 │  - Identifica contatos (Keeper/Shopper/Cliente)              │
-│  - Processa comandos DropKeeping/KMN                        │
+│  - Processa comandos DropKeeper/KMN                        │
 │  - Gera respostas automáticas                               │
 └───────────────────────┬─────────────────────────────────────┘
                         │ JSON com campo "reply"
@@ -270,7 +270,7 @@ Acesse `http://localhost:8000/admin/` e verifique:
 - `message_timestamp` - Quando a mensagem foi enviada/recebida
 - `metadata` - JSON para dados adicionais
 
-## 🔮 Próximos Passos (Integração DropKeeping/KMN)
+## 🔮 Próximos Passos (Integração DropKeeper/KMN)
 
 O módulo está preparado para integração futura com:
 
@@ -285,7 +285,7 @@ O módulo está preparado para integração futura com:
 - `/keeper` - Escolher keeper para entrega
 - `/pagar` - Processar pagamento
 
-### 3. Lógica DropKeeping
+### 3. Lógica DropKeeper
 - Verificar ofertas disponíveis
 - Calcular preços com base em trustlines
 - Gerenciar estoque via KMN
@@ -346,5 +346,5 @@ Ao adicionar novas funcionalidades:
 
 ---
 
-**Évora/VitrineZap** - *Integração WhatsApp com DropKeeping e KMN* ✨
+**Évora/VitrineZap** - *Integração WhatsApp com DropKeeper e KMN* ✨
 

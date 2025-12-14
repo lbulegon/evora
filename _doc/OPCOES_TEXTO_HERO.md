@@ -12,8 +12,8 @@
 
 ## 🚀 **OPÇÕES ALTERNATIVAS**
 
-### **OPÇÃO 1 - Foco no Dropkeeping**
-**Título:** "Dropkeeping: Comércio Real, Distribuído"
+### **OPÇÃO 1 - Foco no DropKeeper**
+**Título:** "DropKeeper: Comércio Real, Distribuído"
 **Subtítulo:** "Produtos físicos, guardados por pessoas reais, vendidos através de uma rede de confiança inteligente."
 
 ### **OPÇÃO 2 - Foco na Rede KMN**
@@ -26,7 +26,7 @@
 
 ### **OPÇÃO 4 - Foco na Inovação**
 **Título:** "Revolucionando o Comércio Digital"
-**Subtítulo:** "Não é dropshipping. É Dropkeeping - onde produtos existem antes das promessas."
+**Subtítulo:** "Não é dropshipping. É DropKeeper - onde produtos existem antes das promessas."
 
 ### **OPÇÃO 5 - Foco na Simplicidade**
 **Título:** "Compre. Guarde. Venda. Colabore."
@@ -73,11 +73,11 @@
 ## 🎯 **RECOMENDAÇÃO**
 
 ### **MELHOR OPÇÃO (Equilibrada)**
-**Título:** "Dropkeeping: Comércio Real, Distribuído"
+**Título:** "DropKeeper: Comércio Real, Distribuído"
 **Subtítulo:** "Rede inteligente onde produtos físicos encontram clientes através de Keepers e Shoppers conectados por confiança."
 
 ### **POR QUE ESTA OPÇÃO?**
-- ✅ **Menciona Dropkeeping** (conceito único)
+- ✅ **Menciona DropKeeper** (conceito único)
 - ✅ **"Comércio Real"** (diferencia do dropshipping)
 - ✅ **"Distribuído"** (essência da rede)
 - ✅ **Explica os papéis** (Keepers e Shoppers)

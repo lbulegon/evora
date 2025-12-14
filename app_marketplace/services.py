@@ -1,6 +1,6 @@
 """
 KMN (Keeper Mesh Network) Services
-Sistema de resolução de papéis, ofertas e comissionamento para Dropkeeping
+Sistema de resolução de papéis, ofertas e comissionamento para DropKeeper
 
 + OpenMind AI Services
 Serviços para integração com OpenMind AI (melhorias do SinapUm)

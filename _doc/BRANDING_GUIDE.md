@@ -41,7 +41,7 @@
 ### **Documentação Técnica**
 ```markdown
 # VitrineZap API Documentation
-Sistema de Dropkeeping desenvolvido pela ÉVORA
+Sistema de DropKeeper desenvolvido pela ÉVORA
 ```
 
 ### **Marketing**
@@ -101,7 +101,7 @@ Powered by ÉVORA
 ### **Dashboard**
 ```
 VitrineZap - Dashboard KMN
-Sistema de Dropkeeping ÉVORA
+Sistema de DropKeeper ÉVORA
 ```
 
 ### **Rodapé**

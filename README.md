@@ -1,10 +1,10 @@
 # VitrineZap by ÉVORA - Minimalist, Sophisticated Style
 
-**Dropkeeping + KMN + Personal Shopping + Address Keeper + Integração WhatsApp**
+**DropKeeper + KMN + Personal Shopping + Address Keeper + Integração WhatsApp**
 
 ## 🎯 O que é o VitrineZap?
 
-VitrineZap é o aplicativo da **ÉVORA** - uma **rede de comércio distribuído** baseada no modelo Dropkeeping, onde:
+VitrineZap é o aplicativo da **ÉVORA** - uma **rede de comércio distribuído** baseada no modelo DropKeeper, onde:
 
 - **Clientes** compram produtos pelo WhatsApp
 - **Personal Shoppers** fazem compras em lojas físicas

@@ -1779,7 +1779,7 @@ class WhatsappOrder(models.Model):
 
 
 # ============================================================================
-# SISTEMA KMN - DROPKEEPING + KEEPER MESH NETWORK
+# SISTEMA KMN - DROPKEEPER + KEEPER MESH NETWORK
 # ============================================================================
 
 class Agente(models.Model):

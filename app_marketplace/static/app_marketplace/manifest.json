@@ -1,7 +1,7 @@
 {
   "name": "ÉVORA Connect",
   "short_name": "ÉVORA",
-  "description": "Plataforma de Dropkeeping com Keeper Mesh Network (KMN) - VitrineZap",
+  "description": "Plataforma de DropKeeper com Keeper Mesh Network (KMN) - VitrineZap",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#212529",

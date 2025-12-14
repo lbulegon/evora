@@ -276,7 +276,7 @@ app_marketplace/
 - **Testado** e validado
 
 ### **🚀 Sistema Pronto para Produção**
-O VitrineZap (ÉVORA) agora possui um **ecossistema completo de Dropkeeping** com interface web moderna e intuitiva, mantendo a identidade visual e a experiência do usuário do sistema original.
+O VitrineZap (ÉVORA) agora possui um **ecossistema completo de DropKeeper** com interface web moderna e intuitiva, mantendo a identidade visual e a experiência do usuário do sistema original.
 
 ---
 

@@ -170,7 +170,7 @@ curl -X POST http://localhost:8001/webhook/whatsapp \
 
 ## 📝 Próximos Passos
 
-- [ ] Implementar lógica de DropKeeping/KMN nas respostas
+- [ ] Implementar lógica de DropKeeper/KMN nas respostas
 - [ ] Adicionar comandos específicos por tipo de usuário
 - [ ] Implementar envio de imagens/documentos
 - [ ] Adicionar painel de controle no dashboard

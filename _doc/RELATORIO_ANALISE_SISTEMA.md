@@ -9,7 +9,7 @@
 ## 🎯 RESUMO EXECUTIVO
 
 O sistema **ÉVORA/VitrineZap** está **funcional e coerente**, com uma arquitetura bem estruturada que suporta:
-- ✅ Dropkeeping (comércio distribuído)
+- ✅ DropKeeper (comércio distribuído)
 - ✅ KMN (Keeper Mesh Network)
 - ✅ Personal Shopping
 - ✅ Integração WhatsApp
@@ -248,7 +248,7 @@ def validar_webhook(self, payload: dict, signature: str) -> bool:
 
 ### 8.1 Objetivo do Sistema
 ✅ **Claro e Bem Definido**
-- Dropkeeping (comércio distribuído)
+- DropKeeper (comércio distribuído)
 - Rede KMN (confiança entre agentes)
 - Integração WhatsApp
 - Personal Shopping

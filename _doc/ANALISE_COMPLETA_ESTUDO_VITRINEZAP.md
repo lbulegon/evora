@@ -8,9 +8,9 @@
 
 ### **Identidade**
 - **Marca**: ÉVORA (empresa/identidade corporativa)
-- **Produto**: VitrineZap (aplicativo de Dropkeeping)
+- **Produto**: VitrineZap (aplicativo de DropKeeper)
 - **Conceito Central**: Keeper Mesh Network (KMN)
-- **Modelo de Negócio**: Dropkeeping (comércio distribuído)
+- **Modelo de Negócio**: DropKeeper (comércio distribuído)
 
 ### **Missão**
 Criar uma rede inteligente onde produtos físicos encontram clientes através de agentes conectados por confiança, eliminando os problemas do dropshipping tradicional.
@@ -19,7 +19,7 @@ Criar uma rede inteligente onde produtos físicos encontram clientes através de
 
 ## 🏗️ **CONCEITOS FUNDAMENTAIS**
 
-### **1. DROPKEEPING vs DROPSHIPPING**
+### **1. DROPKEEPER vs DROPSHIPPING**
 
 #### **Dropshipping Tradicional**
 - ❌ Vendedor não possui o produto
@@ -28,7 +28,7 @@ Criar uma rede inteligente onde produtos físicos encontram clientes através de
 - ❌ Dependência de terceiros
 - ❌ Tempo de entrega incerto
 
-#### **Dropkeeping (Nosso Modelo)**
+#### **DropKeeper (Nosso Modelo)**
 - ✅ Keeper possui o produto fisicamente
 - ✅ Curadoria e verificação real
 - ✅ Controle total de qualidade
@@ -441,7 +441,7 @@ dual_score = 2 / ((1/K_norm) + (1/S_norm)) * 100
 - **Owner Cliente**: Dono primário do cliente
 
 ### **Termos de Negócio**
-- **Dropkeeping**: Modelo de comércio distribuído
+- **DropKeeper**: Modelo de comércio distribuído
 - **Mesh**: Rede distribuída
 - **Cluster**: Grupo de agentes conectados
 - **Curadoria**: Verificação de qualidade
@@ -465,7 +465,7 @@ O **VitrineZap by ÉVORA** representa uma evolução natural do comércio digita
 - **Inovação** com **praticidade**
 
 ### **Diferenciais Únicos**
-1. **Primeiro sistema de Dropkeeping** do mercado
+1. **Primeiro sistema de DropKeeper** do mercado
 2. **Rede mesh de confiança** aplicada ao comércio
 3. **Papéis dinâmicos** que se adaptam à operação
 4. **Pricing local** com markup distribuído

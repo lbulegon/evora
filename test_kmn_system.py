@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Script de teste para o sistema KMN (Keeper Mesh Network)
-Demonstra o funcionamento completo do Dropkeeping
+Demonstra o funcionamento completo do DropKeeper
 """
 import os
 import sys
@@ -332,7 +332,7 @@ def testar_processamento_pedido(dados):
 
 def main():
     """Função principal"""
-    print("TESTE COMPLETO DO SISTEMA KMN - DROPKEEPING")
+    print("TESTE COMPLETO DO SISTEMA KMN - DROPKEEPER")
     print("=" * 60)
     
     try:
