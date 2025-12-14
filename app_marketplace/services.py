@@ -480,6 +480,23 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                     result = response.json()
                     logger.info(f"Análise concluída com sucesso: {result.get('success', False)}")
                     
+                    # DEBUG: Log completo da resposta do SinapUm
+                    import json as json_module
+                    logger.info(f"[SERVICES] Resposta completa do SinapUm (primeiros 3000 chars):")
+                    logger.info(f"{json_module.dumps(result, indent=2, ensure_ascii=False)[:3000]}")
+                    
+                    # Verificar se há dados detalhados na resposta
+                    if result.get('data'):
+                        dados_ia = result['data']
+                        logger.info(f"[SERVICES] Dados da análise (result['data']):")
+                        logger.info(f"[SERVICES]   Tipo: {type(dados_ia)}")
+                        logger.info(f"[SERVICES]   Chaves: {list(dados_ia.keys()) if isinstance(dados_ia, dict) else 'não é dict'}")
+                        if isinstance(dados_ia, dict):
+                            logger.info(f"[SERVICES]   Tem 'caracteristicas': {'caracteristicas' in dados_ia}")
+                            logger.info(f"[SERVICES]   Tem 'compatibilidade': {'compatibilidade' in dados_ia}")
+                            logger.info(f"[SERVICES]   Tem 'dimensoes_embalagem': {'dimensoes_embalagem' in dados_ia}")
+                            logger.info(f"[SERVICES]   Dados completos (primeiros 2000 chars): {json_module.dumps(dados_ia, indent=2, ensure_ascii=False)[:2000]}")
+                    
                     # Extrair informações da imagem salva no SinapUm (se retornada)
                     image_url = result.get('image_url') or result.get('saved_image_url')
                     image_path = result.get('image_path')  # Caminho relativo (ex: media/uploads/uuid.jpg)
@@ -526,11 +543,28 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                     # Transformar dados ÉVORA para formato modelo.json
                     if result.get('success') and result.get('data'):
                         try:
+                            # DEBUG: Log dos dados recebidos do SinapUm ANTES da transformação
+                            import json as json_module
+                            dados_originais = result['data']
+                            logger.info(f"[SERVICES] Dados recebidos do SinapUm (ANTES transformação):")
+                            logger.info(f"[SERVICES]   Tipo: {type(dados_originais)}")
+                            logger.info(f"[SERVICES]   Chaves principais: {list(dados_originais.keys()) if isinstance(dados_originais, dict) else 'não é dict'}")
+                            logger.info(f"[SERVICES]   Dados completos (primeiros 2000 chars): {json_module.dumps(dados_originais, indent=2, ensure_ascii=False)[:2000]}")
+                            
                             modelo_json = transform_evora_to_modelo_json(
                                 result['data'],
                                 image_file.name,
                                 image_path=image_path_for_json  # Usar image_path (relativo) ou image_url (completo)
                             )
+                            
+                            # DEBUG: Log dos dados APÓS transformação
+                            logger.info(f"[SERVICES] Dados transformados (APÓS transformação):")
+                            logger.info(f"[SERVICES]   Chaves principais: {list(modelo_json.keys()) if isinstance(modelo_json, dict) else 'não é dict'}")
+                            logger.info(f"[SERVICES]   Tem campo 'analise_ia': {'analise_ia' in modelo_json if isinstance(modelo_json, dict) else False}")
+                            if isinstance(modelo_json, dict) and 'analise_ia' in modelo_json:
+                                logger.info(f"[SERVICES]   analise_ia chaves: {list(modelo_json['analise_ia'].keys()) if isinstance(modelo_json['analise_ia'], dict) else 'não é dict'}")
+                            logger.info(f"[SERVICES]   Dados completos transformados (primeiros 2000 chars): {json_module.dumps(modelo_json, indent=2, ensure_ascii=False)[:2000]}")
+                            
                             # Substituir data pelo formato modelo.json
                             result['data'] = modelo_json
                             # Adicionar informações da imagem salva no SinapUm

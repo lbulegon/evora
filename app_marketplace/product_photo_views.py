@@ -898,7 +898,11 @@ def save_product_json(request):
         
         # Log completo do produto_json para debug
         import json as json_module
-        logger.info(f"[SAVE_PRODUCT] produto_json completo (primeiros 1000 chars): {json_module.dumps(produto_json, indent=2, ensure_ascii=False)[:1000]}")
+        logger.info(f"[SAVE_PRODUCT] produto_json completo (primeiros 2000 chars): {json_module.dumps(produto_json, indent=2, ensure_ascii=False)[:2000]}")
+        logger.info(f"[SAVE_PRODUCT] produto_json tem campo 'analise_ia': {'analise_ia' in produto_json if isinstance(produto_json, dict) else False}")
+        if isinstance(produto_json, dict) and 'analise_ia' in produto_json:
+            logger.info(f"[SAVE_PRODUCT] analise_ia chaves: {list(produto_json['analise_ia'].keys()) if isinstance(produto_json['analise_ia'], dict) else 'não é dict'}")
+            logger.info(f"[SAVE_PRODUCT] analise_ia completo: {json_module.dumps(produto_json['analise_ia'], indent=2, ensure_ascii=False)[:1500]}")
         
         # Extrair informações básicas para indexação
         produto = produto_json.get('produto', {})
