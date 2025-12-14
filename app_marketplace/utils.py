@@ -481,9 +481,9 @@ def build_image_url(img_path, openmind_url=None, media_url=None, use_proxy=True)
                 # Fallback: tentar construir com IP padrão
                 clean_path = img_path.lstrip('/')
                 if clean_path.startswith('media/'):
-                    url = f"http://69.169.102.84:8000/{clean_path}"
+                    url = f"http://127.0.0.1:8001/{clean_path}"
                 else:
-                    url = f"http://69.169.102.84:8000/media/{clean_path}"
+                    url = f"http://127.0.0.1:8001/media/{clean_path}"
                 
                 # Se use_proxy está ativado e estamos em Railway (HTTPS), usar proxy
                 if use_proxy:

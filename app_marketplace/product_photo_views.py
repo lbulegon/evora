@@ -221,7 +221,7 @@ def analise_completa_produto(request):
                     urls_completas.append(url)
                 else:
                     # Se for path relativo, construir URL completa
-                    base_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:5000')
+                    base_url = getattr(settings, 'OPENMIND_AI_URL', 'http://127.0.0.1:8001')
                     if '/api/v1' in base_url:
                         base_url = base_url.replace('/api/v1', '')
                     urls_completas.append(f"{base_url}/{url.lstrip('/')}")
@@ -337,7 +337,7 @@ def analise_completa_produto(request):
             # Se image_url estiver incorreto ou ausente, construir a partir do image_path
             if image_path_from_sinapum and (not image_url_from_sinapum or 'mediauploads' in image_url_from_sinapum):
                 from django.conf import settings
-                openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:8000')
+                openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://127.0.0.1:8001')
                 sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
                 # Garantir que image_path começa com media/
                 if image_path_from_sinapum.startswith('media/'):
@@ -379,7 +379,7 @@ def analise_completa_produto(request):
             
             if result.get('analises_individuais'):
                 from django.conf import settings
-                openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:8000')
+                openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://127.0.0.1:8001')
                 sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
                 
                 for analise in result['analises_individuais']:
@@ -548,7 +548,7 @@ def detect_product_by_photo(request):
             # Se image_url estiver incorreto ou ausente, construir a partir do image_path
             if image_path_from_sinapum and (not image_url_from_sinapum or 'mediauploads' in image_url_from_sinapum):
                 from django.conf import settings
-                openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:8000')
+                openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://127.0.0.1:8001')
                 sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
                 # Garantir que image_path começa com media/
                 if image_path_from_sinapum.startswith('media/'):

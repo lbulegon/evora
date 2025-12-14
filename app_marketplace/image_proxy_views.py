@@ -24,7 +24,7 @@ def proxy_image(request, image_path):
         openmind_url = getattr(settings, 'OPENMIND_AI_URL', '')
         if not openmind_url:
             # Fallback para IP padrão
-            sinapum_base = 'http://69.169.102.84:8000'
+            sinapum_base = 'http://127.0.0.1:8001'
         else:
             # Remover /api/v1 se existir
             sinapum_base = openmind_url.replace('/api/v1', '').rstrip('/')
