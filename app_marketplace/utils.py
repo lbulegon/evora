@@ -406,6 +406,7 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
         'analise_texto', 'extracao_ocr', 'confianca_extracao'
     ]
     
+
     for campo in campos_analise:
         if evora_data.get(campo) is not None:
             analise_ia[campo] = evora_data[campo]
