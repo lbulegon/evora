@@ -563,19 +563,42 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                                 import copy
                                 modelo_json = copy.deepcopy(dados_originais)
                                 
-                                # Garantir que imagens estão no array produto.imagens
+                                # IMPORTANTE: Garantir que TODOS os campos do produto original sejam preservados DIRETAMENTE no produto
+                                # Não apenas no analise_ia, mas diretamente acessíveis
                                 if 'produto' in modelo_json and isinstance(modelo_json['produto'], dict):
-                                    if 'imagens' not in modelo_json['produto']:
-                                        modelo_json['produto']['imagens'] = []
-                                    if image_path_for_json and image_path_for_json not in modelo_json['produto']['imagens']:
-                                        modelo_json['produto']['imagens'].insert(0, image_path_for_json)
+                                    produto_original = dados_originais.get('produto', {})
+                                    produto_atualizado = modelo_json['produto']
+                                    
+                                    # PRESERVAR TODOS os campos do produto original diretamente no produto
+                                    # Mesmo que já existam, garantir que não sejam sobrescritos
+                                    for campo, valor in produto_original.items():
+                                        # Se o campo não existe ou está None/vazio, usar o valor original
+                                        if campo not in produto_atualizado or not produto_atualizado.get(campo):
+                                            produto_atualizado[campo] = valor
+                                        # Se ambos existem, preservar o original se o atual está vazio/null
+                                        elif produto_atualizado.get(campo) is None or produto_atualizado.get(campo) == '':
+                                            produto_atualizado[campo] = valor
+                                        # Se ambos têm valores, preservar o original como backup
+                                        elif campo in ['caracteristicas', 'dimensoes_embalagem', 'fabricacao']:
+                                            # Para campos complexos, garantir que todos os subcampos sejam preservados
+                                            if isinstance(valor, dict) and isinstance(produto_atualizado.get(campo), dict):
+                                                # Mesclar dicionários para preservar todas as chaves
+                                                for subcampo, subvalor in valor.items():
+                                                    if subcampo not in produto_atualizado[campo] or produto_atualizado[campo][subcampo] is None:
+                                                        produto_atualizado[campo][subcampo] = subvalor
+                                    
+                                    # Garantir que imagens estão no array produto.imagens
+                                    if 'imagens' not in produto_atualizado:
+                                        produto_atualizado['imagens'] = []
+                                    if image_path_for_json and image_path_for_json not in produto_atualizado['imagens']:
+                                        produto_atualizado['imagens'].insert(0, image_path_for_json)
                                 
                                 # Criar ou atualizar campo analise_ia com TODOS os dados originais preservados
                                 if 'analise_ia' not in modelo_json:
                                     modelo_json['analise_ia'] = {}
                                 
-                                # PRESERVAR TODA A ESTRUTURA ORIGINAL no analise_ia
-                                # Isso garante que nenhum dado seja perdido
+                                # PRESERVAR TODA A ESTRUTURA ORIGINAL no analise_ia como backup completo
+                                # Isso garante que nenhum dado seja perdido, mesmo que não esteja no produto principal
                                 modelo_json['analise_ia']['dados_originais_completos'] = copy.deepcopy(dados_originais)
                                 
                                 # Preservar dados específicos do produto que podem ser úteis
@@ -584,36 +607,38 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                                     
                                     # Preservar características completas (mesmo que tenham nulls)
                                     if 'caracteristicas' in produto_original:
-                                        modelo_json['analise_ia']['caracteristicas_completas'] = produto_original['caracteristicas']
+                                        modelo_json['analise_ia']['caracteristicas_completas'] = copy.deepcopy(produto_original['caracteristicas'])
                                     
                                     # Preservar dimensões completas (mesmo que tenham nulls)
                                     if 'dimensoes_embalagem' in produto_original:
-                                        modelo_json['analise_ia']['dimensoes_embalagem_completas'] = produto_original['dimensoes_embalagem']
+                                        modelo_json['analise_ia']['dimensoes_embalagem_completas'] = copy.deepcopy(produto_original['dimensoes_embalagem'])
                                     
                                     # Preservar fabricação completa
                                     if 'fabricacao' in produto_original:
-                                        modelo_json['analise_ia']['fabricacao_completa'] = produto_original['fabricacao']
+                                        modelo_json['analise_ia']['fabricacao_completa'] = copy.deepcopy(produto_original['fabricacao'])
                                     
-                                    # Preservar TODOS os outros campos do produto que não estão mapeados diretamente
-                                    campos_produto_mapeados = {'nome', 'marca', 'descricao', 'categoria', 'subcategoria', 
+                                    # Preservar TODOS os outros campos do produto (mesmo que None) como backup
+                                    campos_produto_principais = {'nome', 'marca', 'descricao', 'categoria', 'subcategoria', 
                                                               'codigo_barras', 'imagens', 'caracteristicas', 'dimensoes_embalagem',
                                                               'peso_embalagem_gramas', 'preco_visivel', 'fabricacao'}
                                     for campo, valor in produto_original.items():
-                                        if campo not in campos_produto_mapeados and valor is not None:
+                                        if campo not in campos_produto_principais:
+                                            # Preservar mesmo se None, como documentação do que foi retornado
                                             modelo_json['analise_ia'][f'produto_{campo}'] = valor
                                 
                                 # Preservar TODOS os outros campos do nível raiz que não estão mapeados
                                 campos_raiz_mapeados = {'produto', 'produto_generico_catalogo', 'produto_viagem', 
                                                         'estabelecimento', 'campanha', 'shopper', 'cadastro_meta', 'analise_ia'}
                                 for campo, valor in dados_originais.items():
-                                    if campo not in campos_raiz_mapeados and valor is not None:
+                                    if campo not in campos_raiz_mapeados:
+                                        # Preservar mesmo se None
                                         modelo_json['analise_ia'][f'raiz_{campo}'] = valor
                                 
                                 # Preservar metadados da análise original
                                 if 'cadastro_meta' in dados_originais:
                                     modelo_json['analise_ia']['cadastro_meta_original'] = copy.deepcopy(dados_originais['cadastro_meta'])
                                 
-                                logger.info(f"[SERVICES] ✓ Estrutura original preservada. Campo analise_ia criado com dados completos.")
+                                logger.info(f"[SERVICES] ✓ Estrutura original preservada com TODOS os campos. Campo analise_ia criado com backup completo.")
                                 
                             else:
                                 logger.info(f"[SERVICES] Dados no formato ÉVORA - aplicando transformação")

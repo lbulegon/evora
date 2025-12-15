@@ -91,56 +91,79 @@ def _analyze_with_openmind_org(img: Image.Image, base64_image: str, api_key: str
     # Usar modelo de visão do OpenMind.org (mais barato!)
     model = settings.OPENMIND_ORG_MODEL or "qwen2.5-vl-72b-instruct"
     
-    # Prompt específico para formato ÉVORA (mesmo do código original)
-    prompt = """Analise esta imagem de um produto e extraia TODAS as informações visíveis no rótulo, etiqueta ou embalagem.
+    # Prompt melhorado para extrair MÁXIMO de informações
+    prompt = """Analise esta imagem de um produto e extraia TODAS as informações possíveis visíveis no rótulo, etiqueta ou embalagem.
 
-IMPORTANTE: Extraia dados REAIS que estão visíveis na imagem. NÃO invente informações.
+🔍 MISSÃO: Identificar e extrair CADA TEXTO, NÚMERO, CÓDIGO, LOGO e INFORMAÇÃO visível na imagem.
 
-Retorne APENAS um JSON válido no formato ÉVORA com esta estrutura EXATA:
+IMPORTANTE: 
+- Leia TODOS os textos da imagem, incluindo textos pequenos, números de série, códigos, ingredientes, instruções
+- Extraia dados REAIS que estão visíveis na imagem. NÃO invente informações.
+- Se uma informação estiver parcialmente visível, extraia o que conseguir
+- Seja EXTREMAMENTE DETALHADO na descrição - inclua todos os textos que conseguir ler
+
+Retorne APENAS um JSON válido no formato ÉVORA com esta estrutura EXATA (preencha TODOS os campos possíveis):
 {
-    "nome_produto": "Nome completo do produto extraído do rótulo",
-    "categoria": "Categoria principal (ex: Eletrônicos, Roupas, Cosméticos, etc.)",
-    "subcategoria": "Subcategoria específica (ex: Fones de Ouvido, Lingerie, Perfumes, etc.)",
-    "descricao": "Descrição comercial detalhada do produto baseada no que está visível",
+    "nome_produto": "Nome COMPLETO exatamente como aparece no rótulo/embalagem",
+    "categoria": "Categoria principal (ex: Eletrônicos, Roupas, Cosméticos, Alimentos, Bebidas, Produtos de Limpeza, etc.)",
+    "subcategoria": "Subcategoria específica e detalhada",
+    "descricao": "Descrição COMPLETA incluindo TODOS os textos visíveis: características, benefícios, ingredientes, modo de uso, advertências, etc.",
     "caracteristicas": {
         "marca": "Marca do produto (se visível)",
-        "modelo": "Modelo específico (se visível)",
-        "funcoes": ["função 1", "função 2", "função 3"],
-        "conectividade": "Tipo de conexão (Bluetooth, USB-C, etc.)",
-        "aplicativo_compativel": "Nome do app (se mencionado)",
+        "modelo": "Modelo/versão específica (se visível)",
+        "tipo": "Tipo específico do produto (ex: Eau de Parfum, Shampoo Anticaspa, etc.)",
+        "funcoes": ["lista de todas as funções mencionadas"],
+        "conectividade": "Tipo de conexão se aplicável",
+        "aplicativo_compativel": "Nome do app se mencionado",
         "plataformas": ["iOS", "Android", "PC"],
-        "bateria": "Tipo de bateria (se visível)",
-        "material": "Material do produto (se visível)",
-        "cor": "Cor do produto (se visível)",
-        "alcance_estimado": "Alcance ou distância (se visível)"
+        "bateria": "Informações de bateria se visível",
+        "material": "Material(s) do produto (se visível)",
+        "cor": "Cor(s) do produto (se visível)",
+        "alcance_estimado": "Alcance ou distância (se visível)",
+        "volume_ml": "Volume em ml se visível",
+        "peso_kg": "Peso em kg se visível",
+        "tamanho": "Tamanho/porte se visível (ex: Grande, Médio, P, M, G, GG)",
+        "fragrancia": "Fragrância se for produto perfumado",
+        "ingredientes": "Lista de ingredientes se visível (pode ser resumida)",
+        "certificacoes": "Certificações se visível (ex: Orgânico, Vegano, Cruelty Free)",
+        "beneficios": "Benefícios mencionados no produto",
+        "uso": "Modo de uso se visível",
+        "validade": "Validade ou prazo de validade se visível",
+        "lote": "Número de lote se visível"
     },
     "compatibilidade": {
-        "ios": "Modelos iOS compatíveis (se visível)",
-        "android": "Versão Android mínima (se visível)",
-        "sistemas": ["iOS", "Android", "PC"]
+        "ios": "Modelos iOS compatíveis se visível",
+        "android": "Versão Android mínima se visível",
+        "sistemas": ["iOS", "Android", "PC", "Windows", "Mac"]
     },
     "dimensoes_embalagem": {
-        "altura_cm": null,
-        "largura_cm": null,
-        "profundidade_cm": null
+        "altura_cm": "altura se visível (número)",
+        "largura_cm": "largura se visível (número)",
+        "profundidade_cm": "profundidade se visível (número)",
+        "diametro_cm": "diâmetro se for produto cilíndrico",
+        "formato": "Formato da embalagem se relevante"
     },
-    "peso_embalagem_gramas": null,
-    "codigo_barras": "Código de barras completo se visível (EAN, UPC, etc.)",
-    "fabricante": "Nome do fabricante (se visível)",
-    "pais_origem": "País de origem (se visível)",
-    "data_fabricacao": "Data de fabricação (se visível no formato YYYY-MM-DD)",
-    "preco_visivel": "Preço se estiver visível na etiqueta (apenas números, ex: '15.90') - NÃO inclua se for preço de loja/etiqueta de venda"
+    "peso_embalagem_gramas": "peso em gramas se visível (número)",
+    "codigo_barras": "Código de barras COMPLETO se visível (EAN, UPC, etc.)",
+    "codigo_interno": "Código interno/ref do fabricante se visível",
+    "fabricante": "Nome completo do fabricante se visível",
+    "pais_origem": "País de origem/fabricação se visível",
+    "data_fabricacao": "Data de fabricação se visível (formato YYYY-MM-DD)",
+    "preco_visivel": "Preço se estiver IMPRESSO na embalagem original (não etiqueta de loja)",
+    "informacoes_adicionais": "Qualquer outro texto ou informação visível que não se encaixe nos campos acima"
 }
 
 REGRAS CRÍTICAS:
-- Se alguma informação NÃO estiver visível, use null (não invente)
-- Preço visível: apenas se estiver na EMBALAGEM do produto, NÃO na etiqueta de loja
-- Seja ESPECÍFICO e detalhado na descrição
-- Identifique TODOS os textos visíveis
-- Para categoria, use termos comerciais padrão
-- Para subcategoria, seja mais específico
-- Retorne APENAS o JSON, sem markdown, sem explicações
-- NÃO inclua preço de venda de loja, apenas preço se estiver na embalagem original do produto"""
+1. LEIA CADA TEXTO da imagem - não pule informações
+2. Se alguma informação NÃO estiver visível, use null (não invente)
+3. Preço: apenas se estiver IMPRESSO na EMBALAGEM do produto, NÃO em etiquetas de loja
+4. Descrição: seja EXTREMAMENTE DETALHADO - inclua textos de ingredientes, benefícios, advertências, modo de uso
+5. Características: extraia TODOS os detalhes visíveis (tamanho, cor, material, tipo, etc.)
+6. Código de barras: se visível, copie COMPLETO
+7. Ingredientes: se houver lista longa, mencione os principais e indique quantidade
+8. Certificações: identifique todas as certificações/logos visíveis
+9. Para categoria/subcategoria, use termos comerciais padrão e seja específico
+10. Retorne APENAS o JSON válido, sem markdown, sem explicações adicionais"""
     
     # Chamar OpenMind.org API (compatível com OpenAI)
     response = client.chat.completions.create(
@@ -162,8 +185,8 @@ REGRAS CRÍTICAS:
                 ]
             }
         ],
-        max_tokens=2000,
-        temperature=0.2
+        max_tokens=4000,
+        temperature=0.1
     )
     
     # Extrair resposta (mesmo formato OpenAI)
@@ -199,56 +222,79 @@ def _analyze_with_openai(img: Image.Image, base64_image: str) -> Dict[str, Any]:
     
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
     
-    # Prompt específico para formato ÉVORA (mesmo do código original)
-    prompt = """Analise esta imagem de um produto e extraia TODAS as informações visíveis no rótulo, etiqueta ou embalagem.
+    # Prompt melhorado para extrair MÁXIMO de informações
+    prompt = """Analise esta imagem de um produto e extraia TODAS as informações possíveis visíveis no rótulo, etiqueta ou embalagem.
 
-IMPORTANTE: Extraia dados REAIS que estão visíveis na imagem. NÃO invente informações.
+🔍 MISSÃO: Identificar e extrair CADA TEXTO, NÚMERO, CÓDIGO, LOGO e INFORMAÇÃO visível na imagem.
 
-Retorne APENAS um JSON válido no formato ÉVORA com esta estrutura EXATA:
+IMPORTANTE: 
+- Leia TODOS os textos da imagem, incluindo textos pequenos, números de série, códigos, ingredientes, instruções
+- Extraia dados REAIS que estão visíveis na imagem. NÃO invente informações.
+- Se uma informação estiver parcialmente visível, extraia o que conseguir
+- Seja EXTREMAMENTE DETALHADO na descrição - inclua todos os textos que conseguir ler
+
+Retorne APENAS um JSON válido no formato ÉVORA com esta estrutura EXATA (preencha TODOS os campos possíveis):
 {
-    "nome_produto": "Nome completo do produto extraído do rótulo",
-    "categoria": "Categoria principal (ex: Eletrônicos, Roupas, Cosméticos, etc.)",
-    "subcategoria": "Subcategoria específica (ex: Fones de Ouvido, Lingerie, Perfumes, etc.)",
-    "descricao": "Descrição comercial detalhada do produto baseada no que está visível",
+    "nome_produto": "Nome COMPLETO exatamente como aparece no rótulo/embalagem",
+    "categoria": "Categoria principal (ex: Eletrônicos, Roupas, Cosméticos, Alimentos, Bebidas, Produtos de Limpeza, etc.)",
+    "subcategoria": "Subcategoria específica e detalhada",
+    "descricao": "Descrição COMPLETA incluindo TODOS os textos visíveis: características, benefícios, ingredientes, modo de uso, advertências, etc.",
     "caracteristicas": {
         "marca": "Marca do produto (se visível)",
-        "modelo": "Modelo específico (se visível)",
-        "funcoes": ["função 1", "função 2", "função 3"],
-        "conectividade": "Tipo de conexão (Bluetooth, USB-C, etc.)",
-        "aplicativo_compativel": "Nome do app (se mencionado)",
+        "modelo": "Modelo/versão específica (se visível)",
+        "tipo": "Tipo específico do produto (ex: Eau de Parfum, Shampoo Anticaspa, etc.)",
+        "funcoes": ["lista de todas as funções mencionadas"],
+        "conectividade": "Tipo de conexão se aplicável",
+        "aplicativo_compativel": "Nome do app se mencionado",
         "plataformas": ["iOS", "Android", "PC"],
-        "bateria": "Tipo de bateria (se visível)",
-        "material": "Material do produto (se visível)",
-        "cor": "Cor do produto (se visível)",
-        "alcance_estimado": "Alcance ou distância (se visível)"
+        "bateria": "Informações de bateria se visível",
+        "material": "Material(s) do produto (se visível)",
+        "cor": "Cor(s) do produto (se visível)",
+        "alcance_estimado": "Alcance ou distância (se visível)",
+        "volume_ml": "Volume em ml se visível",
+        "peso_kg": "Peso em kg se visível",
+        "tamanho": "Tamanho/porte se visível (ex: Grande, Médio, P, M, G, GG)",
+        "fragrancia": "Fragrância se for produto perfumado",
+        "ingredientes": "Lista de ingredientes se visível (pode ser resumida)",
+        "certificacoes": "Certificações se visível (ex: Orgânico, Vegano, Cruelty Free)",
+        "beneficios": "Benefícios mencionados no produto",
+        "uso": "Modo de uso se visível",
+        "validade": "Validade ou prazo de validade se visível",
+        "lote": "Número de lote se visível"
     },
     "compatibilidade": {
-        "ios": "Modelos iOS compatíveis (se visível)",
-        "android": "Versão Android mínima (se visível)",
-        "sistemas": ["iOS", "Android", "PC"]
+        "ios": "Modelos iOS compatíveis se visível",
+        "android": "Versão Android mínima se visível",
+        "sistemas": ["iOS", "Android", "PC", "Windows", "Mac"]
     },
     "dimensoes_embalagem": {
-        "altura_cm": null,
-        "largura_cm": null,
-        "profundidade_cm": null
+        "altura_cm": "altura se visível (número)",
+        "largura_cm": "largura se visível (número)",
+        "profundidade_cm": "profundidade se visível (número)",
+        "diametro_cm": "diâmetro se for produto cilíndrico",
+        "formato": "Formato da embalagem se relevante"
     },
-    "peso_embalagem_gramas": null,
-    "codigo_barras": "Código de barras completo se visível (EAN, UPC, etc.)",
-    "fabricante": "Nome do fabricante (se visível)",
-    "pais_origem": "País de origem (se visível)",
-    "data_fabricacao": "Data de fabricação (se visível no formato YYYY-MM-DD)",
-    "preco_visivel": "Preço se estiver visível na etiqueta (apenas números, ex: '15.90') - NÃO inclua se for preço de loja/etiqueta de venda"
+    "peso_embalagem_gramas": "peso em gramas se visível (número)",
+    "codigo_barras": "Código de barras COMPLETO se visível (EAN, UPC, etc.)",
+    "codigo_interno": "Código interno/ref do fabricante se visível",
+    "fabricante": "Nome completo do fabricante se visível",
+    "pais_origem": "País de origem/fabricação se visível",
+    "data_fabricacao": "Data de fabricação se visível (formato YYYY-MM-DD)",
+    "preco_visivel": "Preço se estiver IMPRESSO na embalagem original (não etiqueta de loja)",
+    "informacoes_adicionais": "Qualquer outro texto ou informação visível que não se encaixe nos campos acima"
 }
 
 REGRAS CRÍTICAS:
-- Se alguma informação NÃO estiver visível, use null (não invente)
-- Preço visível: apenas se estiver na EMBALAGEM do produto, NÃO na etiqueta de loja
-- Seja ESPECÍFICO e detalhado na descrição
-- Identifique TODOS os textos visíveis
-- Para categoria, use termos comerciais padrão
-- Para subcategoria, seja mais específico
-- Retorne APENAS o JSON, sem markdown, sem explicações
-- NÃO inclua preço de venda de loja, apenas preço se estiver na embalagem original do produto"""
+1. LEIA CADA TEXTO da imagem - não pule informações
+2. Se alguma informação NÃO estiver visível, use null (não invente)
+3. Preço: apenas se estiver IMPRESSO na EMBALAGEM do produto, NÃO em etiquetas de loja
+4. Descrição: seja EXTREMAMENTE DETALHADO - inclua textos de ingredientes, benefícios, advertências, modo de uso
+5. Características: extraia TODOS os detalhes visíveis (tamanho, cor, material, tipo, etc.)
+6. Código de barras: se visível, copie COMPLETO
+7. Ingredientes: se houver lista longa, mencione os principais e indique quantidade
+8. Certificações: identifique todas as certificações/logos visíveis
+9. Para categoria/subcategoria, use termos comerciais padrão e seja específico
+10. Retorne APENAS o JSON válido, sem markdown, sem explicações adicionais"""
     
     # Chamar OpenAI Vision API
     response = client.chat.completions.create(
@@ -270,8 +316,8 @@ REGRAS CRÍTICAS:
                 ]
             }
         ],
-        max_tokens=2000,
-        temperature=0.2
+        max_tokens=4000,
+        temperature=0.1
     )
     
     # Extrair resposta

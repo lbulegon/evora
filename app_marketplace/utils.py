@@ -149,7 +149,7 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
         else:
             tipo = None
     
-    # Construir estrutura produto
+    # Construir estrutura produto - PRESERVAR TODOS os campos originais
     produto = {
         "nome": nome_completo,
         "marca": marca,
@@ -162,6 +162,44 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
         "codigo_barras": codigo_barras if codigo_barras else None,
         "imagens": imagens if imagens else []
     }
+    
+    # PRESERVAR campos adicionais do produto original que podem estar no formato ÉVORA
+    # Extrair e preservar características completas se existirem
+    if isinstance(caracteristicas, dict):
+        # Preservar características completas diretamente no produto
+        produto['caracteristicas'] = caracteristicas.copy()  # Copia todas as chaves e valores
+        
+        # Extrair campos específicos de características se não foram mapeados
+        if 'material' in caracteristicas and 'material' not in produto:
+            produto['material'] = caracteristicas['material']
+        if 'cor' in caracteristicas and 'cor' not in produto:
+            produto['cor'] = caracteristicas['cor']
+        if 'tamanho' in caracteristicas and 'tamanho' not in produto:
+            produto['tamanho'] = caracteristicas['tamanho']
+        if 'modelo' in caracteristicas and 'modelo' not in produto:
+            produto['modelo'] = caracteristicas['modelo']
+    
+    # Extrair e preservar dimensões completas se existirem
+    dimensoes_embalagem = evora_data.get('dimensoes_embalagem')
+    if dimensoes_embalagem:
+        if isinstance(dimensoes_embalagem, dict):
+            produto['dimensoes_embalagem'] = dimensoes_embalagem.copy()
+        else:
+            produto['dimensoes_embalagem'] = dimensoes_embalagem
+    
+    # Extrair e preservar fabricação se existir
+    fabricacao = evora_data.get('fabricacao')
+    if not fabricacao and isinstance(caracteristicas, dict):
+        fabricacao = caracteristicas.get('fabricacao')
+    if fabricacao:
+        if isinstance(fabricacao, dict):
+            produto['fabricacao'] = fabricacao.copy()
+        else:
+            produto['fabricacao'] = fabricacao
+    
+    # Preservar peso se disponível
+    if peso_embalagem_gramas:
+        produto['peso_embalagem_gramas'] = peso_embalagem_gramas
     
     # Adicionar peso se disponível
     if peso_embalagem_gramas:
@@ -379,7 +417,8 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
                 else:
                     analise_ia[f'cadastro_meta_{key}'] = value
     
-    # Adicionar todos os outros campos que não foram mapeados
+    # Adicionar TODOS os outros campos que não foram mapeados (mesmo se None)
+    # Isso garante que nenhuma informação seja perdida
     campos_mapeados = {
         'nome_produto', 'marca', 'descricao', 'categoria', 'subcategoria',
         'codigo_barras', 'caracteristicas', 'compatibilidade', 'dimensoes_embalagem',
@@ -387,8 +426,10 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
         'cadastro_meta', 'pais_origem', 'fabricante'
     }
     
+    # Preservar TODOS os campos originais que não foram mapeados
     for key, value in evora_data.items():
-        if key not in campos_mapeados and value is not None:
+        if key not in campos_mapeados:
+            # Preservar mesmo se None, para documentar o que foi retornado
             analise_ia[key] = value
     
     # Adicionar campo analise_ia ao resultado se houver dados preservados
