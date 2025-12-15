@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 
 # Configuração
 SINAPUM_IP = "69.169.102.84"
-SINAPUM_PORT = "8000"
+SINAPUM_PORT = "5000"
 SINAPUM_BASE = f"http://{SINAPUM_IP}:{SINAPUM_PORT}"
 
 # URL da imagem que está sendo salva

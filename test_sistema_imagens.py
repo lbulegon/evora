@@ -21,29 +21,29 @@ def test_build_image_url():
     print("TESTE: build_image_url")
     print("=" * 80)
     
-    # Configurar URL do SinapUm
-    openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:8000/api/v1')
+    # Configurar URL do MCP_SinapUm
+    openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:5000/api/v1')
     
     test_cases = [
         # (input, expected_pattern, description)
         (
             "media/uploads/7cc806f7-e22d-45ba-8aab-6513f1715c09.jpg",
-            "69.169.102.84:8000/media/uploads/",
+            "69.169.102.84:5000/media/uploads/",
             "Path com media/ (mais comum)"
         ),
         (
             "photo_0.jpg",
-            "69.169.102.84:8000/media/photo_0.jpg",
+            "69.169.102.84:5000/media/photo_0.jpg",
             "Path simples sem media/"
         ),
         (
             "produtos/temp/15/20251202_043814_temp.jpg",
-            "69.169.102.84:8000/media/produtos/temp/",
+            "69.169.102.84:5000/media/produtos/temp/",
             "Path produtos/temp"
         ),
         (
-            "http://69.169.102.84:8000/media/uploads/test.jpg",
-            "http://69.169.102.84:8000/media/uploads/test.jpg",
+            "http://69.169.102.84:5000/media/uploads/test.jpg",
+            "http://69.169.102.84:5000/media/uploads/test.jpg",
             "URL completa (deve retornar como está)"
         ),
         (
@@ -115,7 +115,7 @@ def test_acesso_servidor():
     print("TESTE: Acesso ao Servidor SinapUm")
     print("=" * 80)
     
-    base_url = "http://69.169.102.84:8000"
+    base_url = "http://69.169.102.84:5000"
     test_image = "media/uploads/7cc806f7-e22d-45ba-8aab-6513f1715c09.jpg"
     
     tests = [

@@ -393,8 +393,8 @@ def _get_openmind_config():
     global OPENMIND_AI_URL, OPENMIND_AI_KEY
     if OPENMIND_AI_URL is None:
         from django.conf import settings
-        # URL padrão do servidor SinapUm (OpenMind AI)
-        default_url = 'http://127.0.0.1:8001'
+        # URL padrão do servidor (OpenMind AI)
+        default_url = 'http://127.0.0.1:5000'
         OPENMIND_AI_URL = getattr(settings, 'OPENMIND_AI_URL', default_url)
         OPENMIND_AI_KEY = getattr(settings, 'OPENMIND_AI_KEY', None)
     return OPENMIND_AI_URL, OPENMIND_AI_KEY

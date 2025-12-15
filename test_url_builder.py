@@ -1,7 +1,7 @@
 """
 Teste da função build_image_url
 """
-def build_image_url(img_path, openmind_url="http://69.169.102.84:8000/api/v1"):
+def build_image_url(img_path, openmind_url="http://69.169.102.84:5000/api/v1"):
     """Teste da função build_image_url"""
     media_url = "/media/"
     
@@ -31,9 +31,9 @@ def build_image_url(img_path, openmind_url="http://69.169.102.84:8000/api/v1"):
                 # Fallback: tentar construir com IP padrão
                 clean_path = img_path.lstrip('/')
                 if clean_path.startswith('media/'):
-                    return f"http://69.169.102.84:8000/{clean_path}"
+                    return f"http://69.169.102.84:5000/{clean_path}"
                 else:
-                    return f"http://69.169.102.84:8000/media/{clean_path}"
+                    return f"http://69.169.102.84:5000/media/{clean_path}"
         
         # Se começa com /, pode ser:
         # - Path local (tentar MEDIA_URL local primeiro)
@@ -64,7 +64,7 @@ test_cases = [
     ("photo_0.jpg", "Path simples"),
     ("produtos/temp/15/20251202_043814_temp.jpg", "Path produtos/temp"),
     ("/media/uploads/test.jpg", "Path absoluto com /media/"),
-    ("http://69.169.102.84:8000/media/uploads/test.jpg", "URL completa"),
+    ("http://69.169.102.84:5000/media/uploads/test.jpg", "URL completa"),
 ]
 
 print("Testando build_image_url:")
@@ -75,7 +75,7 @@ for path, desc in test_cases:
     print(f"  Input:  {path}")
     print(f"  Output: {result}")
     if result:
-        expected = "http://69.169.102.84:8000/media/uploads/7cc806f7-e22d-45ba-8aab-6513f1715c09.jpg"
+        expected = "http://69.169.102.84:5000/media/uploads/7cc806f7-e22d-45ba-8aab-6513f1715c09.jpg"
         if "media/media" in result:
             print(f"  [ERRO] URL tem 'media/media' duplicado!")
         else:

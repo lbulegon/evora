@@ -10,7 +10,7 @@ from PIL import Image
 import os
 
 # Configurações
-SERVER_URL = "http://69.169.102.84:8000"
+SERVER_URL = "http://69.169.102.84:5000"
 API_KEY = "om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1"
 
 def print_section(title):
