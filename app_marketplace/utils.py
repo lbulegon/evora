@@ -21,7 +21,8 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
         dict: Dados no formato modelo.json
     """
     # Extrair dados do formato ÉVORA
-    nome_produto = evora_data.get('nome_produto', 'Produto não identificado')
+    # Aceitar tanto 'nome' quanto 'nome_produto' (o servidor pode retornar qualquer um)
+    nome_produto = evora_data.get('nome_produto') or evora_data.get('nome') or 'Produto não identificado'
     
     # Características pode ser dict ou list
     caracteristicas = evora_data.get('caracteristicas', {})
@@ -321,7 +322,20 @@ def transform_evora_to_modelo_json(evora_data: Dict[str, Any], image_filename: s
     detalhes_rotulo = {}
     
     # Procurar por informações de origem
-    pais_origem = evora_data.get('pais_origem') or evora_data.get('caracteristicas', {}).get('fabricacao', {}).get('pais')
+    pais_origem = evora_data.get('pais_origem')
+    if not pais_origem:
+        # Verificar se caracteristicas é um dicionário antes de acessar
+        if isinstance(caracteristicas, dict):
+            fabricacao = caracteristicas.get('fabricacao', {})
+            if isinstance(fabricacao, dict):
+                pais_origem = fabricacao.get('pais')
+        # Se ainda não encontrou, tentar em evora_data diretamente
+        if not pais_origem:
+            caracteristicas_raw = evora_data.get('caracteristicas')
+            if isinstance(caracteristicas_raw, dict):
+                fabricacao = caracteristicas_raw.get('fabricacao', {})
+                if isinstance(fabricacao, dict):
+                    pais_origem = fabricacao.get('pais')
     if pais_origem:
         detalhes_rotulo['origem'] = pais_origem
     
