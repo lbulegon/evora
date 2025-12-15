@@ -746,14 +746,35 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
         else:
             # Status code diferente de 200
             response_text = response.text.strip()
-            error_msg = f"Erro na API OpenMind AI (status {response.status_code}): {response_text}"
+            
+            # Tentar extrair mensagem de erro mais clara do JSON de resposta
+            error_detail = response_text
+            error_code_detected = 'API_ERROR'
+            
+            try:
+                error_json = response.json()
+                if isinstance(error_json, dict):
+                    error_detail = error_json.get('error', response_text)
+                    error_code_detected = error_json.get('error_code', error_code_detected)
+                    
+                    # Melhorar mensagens de erro comuns
+                    if 'Root not found' in error_detail or '404' in error_detail:
+                        error_detail = f"Erro de configuração no servidor Openmind AI: API OpenMind.org não encontrada. Verifique a configuração OPENMIND_ORG_BASE_URL no servidor. Detalhes: {error_detail}"
+                        error_code_detected = 'OPENMIND_CONFIG_ERROR'
+                    elif 'ANALYSIS_ERROR' in str(error_code_detected):
+                        error_detail = f"Erro na análise de IA: {error_detail}. Verifique as configurações do servidor Openmind AI."
+            except:
+                pass  # Usar response_text original se não for JSON
+            
+            error_msg = f"Erro na API OpenMind AI (status {response.status_code}): {error_detail}"
             logger.error(error_msg)
+            
             return {
                 'success': False,
-                'error': error_msg,
-                'error_code': 'API_ERROR',
+                'error': error_detail if len(error_detail) < 500 else error_detail[:500] + '...',
+                'error_code': error_code_detected,
                 'status_code': response.status_code,
-                'raw_response': response_text
+                'raw_response': response_text[:1000] if len(response_text) > 1000 else response_text
             }
     
     except requests.exceptions.RequestException as e:
