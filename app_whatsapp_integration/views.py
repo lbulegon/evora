@@ -328,28 +328,102 @@ def process_message(contact: WhatsAppContact, message: str, message_log: WhatsAp
         return "Olá! Bem-vindo ao Évora Connect. Como posso ajudar?"
     
     if message_lower in ['ajuda', 'help', 'comandos']:
-        return "Comandos disponíveis:\n- /produtos: Ver produtos disponíveis\n- /pedidos: Ver meus pedidos\n- /status: Ver status do sistema"
+        return """📱 *Comandos disponíveis:*
+        
+🛍️ */produtos* - Ver produtos disponíveis
+📦 */pedidos* - Ver meus pedidos
+📊 */status* - Ver status do sistema
+🔍 */buscar [nome]* - Buscar produto
+📞 */contato* - Informações de contato
+ℹ️ */sobre* - Sobre o Évora Connect"""
     
     if message_lower.startswith('/produtos'):
-        return "Acesse seus produtos em: https://evora-product.up.railway.app/client/products/"
+        return "🛍️ Acesse seus produtos em: https://evora-product.up.railway.app/client/products/"
     
     if message_lower.startswith('/pedidos'):
-        return "Acesse seus pedidos em: https://evora-product.up.railway.app/client/orders/"
+        return "📦 Acesse seus pedidos em: https://evora-product.up.railway.app/client/orders/"
+    
+    if message_lower.startswith('/buscar'):
+        # Extrair termo de busca
+        search_term = message_lower.replace('/buscar', '').strip()
+        if search_term:
+            # Buscar produtos
+            from app_marketplace.models import Produto
+            produtos = Produto.objects.filter(
+                nome__icontains=search_term
+            )[:5]  # Limitar a 5 resultados
+            
+            if produtos.exists():
+                response = f"🔍 *Encontrei {produtos.count()} produto(s):*\n\n"
+                for produto in produtos:
+                    response += f"• *{produto.nome}*\n"
+                    if produto.marca:
+                        response += f"  Marca: {produto.marca}\n"
+                    response += f"  Ver: https://evora-product.up.railway.app/client/products/\n\n"
+                return response
+            else:
+                return f"❌ Nenhum produto encontrado para '{search_term}'"
+        else:
+            return "🔍 Digite: /buscar [nome do produto]"
+    
+    if message_lower.startswith('/contato'):
+        return """📞 *Contato Évora Connect:*
+        
+🌐 Site: https://evora-product.up.railway.app
+📧 Email: contato@evora.com
+💬 WhatsApp: Este número"""
+    
+    if message_lower.startswith('/sobre'):
+        return """ℹ️ *Sobre o Évora Connect:*
+        
+Plataforma de marketplace e personal shopping.
+Conectamos clientes, shoppers e keepers em uma experiência única de compras."""
+    
+    if message_lower.startswith('/status'):
+        # Verificar status da instância
+        try:
+            result = evolution_service.get_instance_status()
+            if result.get('success'):
+                instance = result.get('instance', {})
+                status_icon = "✅" if instance.get('status') == 'open' else "❌"
+                return f"""{status_icon} *Status do Sistema:*
+                
+Status: {instance.get('status', 'unknown')}
+Instância: {instance.get('name', 'N/A')}
+Telefone: {instance.get('phone_number', 'N/A')}"""
+            else:
+                return f"❌ Erro ao verificar status: {result.get('error', 'Desconhecido')}"
+        except Exception as e:
+            return f"❌ Erro ao verificar status: {str(e)}"
     
     # Identificar tipo de usuário e responder adequadamente
     user_type = contact.user_type
     
     if user_type == 'cliente':
-        return f"Olá! Você é um cliente. Digite /produtos para ver produtos ou /pedidos para ver seus pedidos."
+        return """👋 Olá! Você é um cliente.
+        
+Digite:
+• /produtos - Ver produtos
+• /pedidos - Ver seus pedidos
+• /ajuda - Ver todos os comandos"""
     
     elif user_type == 'shopper':
-        return f"Olá Shopper! Acesse seu dashboard: https://evora-product.up.railway.app/shopper/dashboard/"
+        return """👋 Olá Shopper!
+        
+Acesse seu dashboard:
+https://evora-product.up.railway.app/shopper/dashboard/"""
     
     elif user_type == 'keeper':
-        return f"Olá Keeper! Acesse seu dashboard: https://evora-product.up.railway.app/"
+        return """👋 Olá Keeper!
+        
+Acesse seu dashboard:
+https://evora-product.up.railway.app/"""
     
     # Resposta padrão para contatos não identificados
-    return "Olá! Bem-vindo ao Évora Connect. Para começar, acesse: https://evora-product.up.railway.app/"
+    return """👋 Olá! Bem-vindo ao Évora Connect.
+    
+Para começar, digite /ajuda para ver os comandos disponíveis.
+Ou acesse: https://evora-product.up.railway.app/"""
 
 
 @csrf_exempt
@@ -402,4 +476,131 @@ def instance_status(request):
         return JsonResponse(result)
     except Exception as e:
         logger.error(f"Erro ao verificar status: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def send_product(request):
+    """
+    Endpoint para enviar produto via WhatsApp
+    
+    Payload:
+    {
+        "phone": "+5511999999999",
+        "product_id": 123,  // ID do produto no banco
+        "product_data": {   // Ou dados do produto diretamente
+            "produto": {
+                "nome": "Produto",
+                "marca": "Marca",
+                "categoria": "Categoria",
+                "preco": "R$ 100,00",
+                "descricao": "Descrição"
+            }
+        },
+        "image_url": "https://..."  // Opcional
+    }
+    """
+    try:
+        data = json.loads(request.body)
+        phone = data.get('phone')
+        product_id = data.get('product_id')
+        product_data = data.get('product_data')
+        image_url = data.get('image_url')
+        
+        if not phone:
+            return JsonResponse({'error': 'phone é obrigatório'}, status=400)
+        
+        # Se forneceu product_id, buscar do banco
+        if product_id and not product_data:
+            from app_marketplace.models import ProdutoJSON, Produto
+            produto = None
+            
+            # Tentar buscar primeiro no ProdutoJSON (formato completo)
+            try:
+                produto_json = ProdutoJSON.objects.get(id=product_id)
+                dados_json = produto_json.dados_json
+                produto_data_json = dados_json.get('produto', {})
+                
+                # Construir product_data no formato esperado
+                product_data = {
+                    'produto': {
+                        'nome': produto_data_json.get('nome') or produto_json.nome_produto or 'Produto',
+                        'marca': produto_data_json.get('marca') or produto_json.marca or '',
+                        'categoria': produto_data_json.get('categoria') or produto_json.categoria or '',
+                        'subcategoria': produto_data_json.get('subcategoria', ''),
+                        'preco': produto_data_json.get('preco', ''),
+                        'descricao': produto_data_json.get('descricao', '')
+                    }
+                }
+                
+                # Buscar primeira imagem se houver
+                imagens = produto_data_json.get('imagens', [])
+                if imagens and isinstance(imagens, list) and len(imagens) > 0:
+                    image_path = imagens[0]
+                    # Construir URL completa
+                    from django.conf import settings
+                    if not image_url:
+                        if hasattr(settings, 'RAILWAY_URL'):
+                            image_url = f"{settings.RAILWAY_URL}/api/images/proxy/{image_path}"
+                        else:
+                            image_url = f"http://localhost:8000/api/images/proxy/{image_path}"
+                elif produto_json.imagem_original:
+                    image_path = produto_json.imagem_original
+                    from django.conf import settings
+                    if not image_url:
+                        if hasattr(settings, 'RAILWAY_URL'):
+                            image_url = f"{settings.RAILWAY_URL}/api/images/proxy/{image_path}"
+                        else:
+                            image_url = f"http://localhost:8000/api/images/proxy/{image_path}"
+                
+                produto = produto_json
+                
+            except ProdutoJSON.DoesNotExist:
+                # Tentar buscar no modelo Produto tradicional
+                try:
+                    produto_tradicional = Produto.objects.get(id=product_id)
+                    # Construir product_data no formato esperado
+                    product_data = {
+                        'produto': {
+                            'nome': produto_tradicional.nome or 'Produto',
+                            'marca': '',  # Produto tradicional não tem marca
+                            'categoria': produto_tradicional.categoria.nome if produto_tradicional.categoria else '',
+                            'subcategoria': '',
+                            'preco': str(produto_tradicional.preco) if produto_tradicional.preco else '',
+                            'descricao': produto_tradicional.descricao or ''
+                        }
+                    }
+                    # Buscar imagem se houver
+                    if produto_tradicional.imagem:
+                        from django.conf import settings
+                        if not image_url:
+                            if hasattr(settings, 'RAILWAY_URL'):
+                                image_url = f"{settings.RAILWAY_URL}{produto_tradicional.imagem.url}"
+                            else:
+                                image_url = f"http://localhost:8000{produto_tradicional.imagem.url}"
+                    produto = produto_tradicional
+                except Produto.DoesNotExist:
+                    return JsonResponse({'error': f'Produto {product_id} não encontrado'}, status=404)
+        
+        if not product_data:
+            return JsonResponse({'error': 'product_id ou product_data é obrigatório'}, status=400)
+        
+        result = evolution_service.send_product_message(phone, product_data, image_url)
+        
+        if result.get('success'):
+            return JsonResponse({
+                'success': True,
+                'message': 'Produto enviado com sucesso'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': result.get('error', 'Erro desconhecido')
+            }, status=500)
+            
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        logger.error(f"Erro ao enviar produto: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)

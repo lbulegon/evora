@@ -28,6 +28,11 @@ urlpatterns = [
         views.send_message,
         name='send_message'
     ),
+    path(
+        'api/whatsapp/send-product/',
+        views.send_product,
+        name='send_product'
+    ),
     # Status
     path(
         'api/whatsapp/status/',
