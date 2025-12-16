@@ -909,7 +909,7 @@ def save_product_json(request):
         nome_produto = produto.get('nome', 'Produto sem nome')
         marca = produto.get('marca')
         categoria = produto.get('categoria')
-        codigo_barras = produto.get('codigo_barras')
+        codigo_barras = (produto.get('codigo_barras') or '').strip() or None
         
         logger.info(f"[SAVE_PRODUCT] Dados extraídos - Nome: {nome_produto}, Marca: {marca}, Categoria: {categoria}, Código: {codigo_barras}")
         

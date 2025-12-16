@@ -868,7 +868,19 @@ def update_product_json(request, product_id):
         if 'category' in data:
             produto.categoria = data.get('category', '')
         if 'codigo_barras' in data:
-            produto.codigo_barras = data.get('codigo_barras', '')
+            raw_codigo = data.get('codigo_barras') or ''
+            codigo_barras = raw_codigo.strip() or None
+            
+            # Impedir conflito com outros produtos do mesmo shopper
+            if codigo_barras:
+                exists = ProdutoJSON.objects.filter(~Q(id=produto.id), codigo_barras=codigo_barras).exists()
+                if exists:
+                    return JsonResponse(
+                        {'error': 'Código de barras já está em uso por outro produto.'},
+                        status=400
+                    )
+            
+            produto.codigo_barras = codigo_barras
         
         # Atualizar dados JSON
         dados_json = produto.get_produto_data()
@@ -882,6 +894,8 @@ def update_product_json(request, product_id):
             produto_data['moeda'] = data.get('currency', 'BRL')
         if 'estabelecimento_id' in data:
             produto_data['estabelecimento_id'] = data.get('estabelecimento_id')
+        if 'codigo_barras' in data:
+            produto_data['codigo_barras'] = produto.codigo_barras or None
         if 'localizacao_especifica' in data:
             produto_data['localizacao_especifica'] = data.get('localizacao_especifica', '')
         if 'image_urls' in data:
