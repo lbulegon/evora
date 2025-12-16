@@ -280,7 +280,7 @@
                 </div>
 
                 <!-- Ações -->
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
                     <button class="btn btn-sm btn-outline-primary flex-fill" onclick="editProduct({{ product.id }})">
                         <i class="fas fa-edit"></i> Editar
                     </button>
@@ -300,6 +300,9 @@
                         {% else %}
                         <i class="fas fa-eye"></i>
                         {% endif %}
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" onclick="sendProductToWhatsApp({{ product.id }}, '{{ product.name }}')" title="Enviar produto via WhatsApp">
+                        <i class="fab fa-whatsapp"></i>
                     </button>
                 </div>
             </div>
@@ -805,6 +808,61 @@ function toggleAvailability(productId) {
             console.error('Erro:', error);
             alert('Erro ao atualizar disponibilidade: ' + error.message);
         });
+}
+
+function sendProductToWhatsApp(productId, productName) {
+    // Pedir número do WhatsApp
+    const phone = prompt(`Enviar "${productName}" via WhatsApp\n\nDigite o número do WhatsApp (formato: +5511999999999):`);
+    
+    if (!phone) {
+        return; // Usuário cancelou
+    }
+    
+    // Validar formato básico
+    let phoneNumber = phone.trim();
+    if (!phoneNumber.startsWith('+')) {
+        if (phoneNumber.startsWith('55')) {
+            phoneNumber = '+' + phoneNumber;
+        } else {
+            phoneNumber = '+55' + phoneNumber;
+        }
+    }
+    
+    // Mostrar loading
+    const btn = event.target.closest('button');
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
+    // Enviar produto via API
+    fetch('/api/whatsapp/send-product/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            phone: phoneNumber,
+            product_id: productId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+        
+        if (data.success) {
+            alert('✅ Produto enviado com sucesso via WhatsApp!');
+        } else {
+            alert('❌ Erro ao enviar produto: ' + (data.error || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+        console.error('Erro:', error);
+        alert('❌ Erro ao enviar produto: ' + error.message);
+    });
 }
 </script>
 {% endblock %}
