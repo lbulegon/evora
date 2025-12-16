@@ -14,13 +14,14 @@ from decimal import Decimal
 from .models import (
     Cliente, Pedido, Pacote, PedidoPacote, EnderecoEntrega,
     WhatsappOrder, PagamentoIntent, MovimentoPacote, FotoPacote,
-    WhatsappGroup, WhatsappProduct, WhatsappParticipant,
+    WhatsappGroup, WhatsappParticipant, ProdutoJSON,
     RelacionamentoClienteShopper, PersonalShopper, LigacaoMesh, TrustlineKeeper
 )
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 import json
 from decimal import Decimal
+from .utils import build_image_url
 
 
 # ============================================================================
@@ -441,40 +442,83 @@ def client_products(request):
     
     group_ids_validos = grupos_validos.values_list('id', flat=True)
     
-    # 5. Buscar produtos dos grupos válidos
-    products = WhatsappProduct.objects.filter(
-        group_id__in=group_ids_validos,
-        is_available=True
-    ).order_by('-is_featured', '-created_at')
-    
-    # Filtros
+    # 5. Buscar produtos dos grupos válidos (somente ProdutoJSON - fluxo novo)
     search = request.GET.get('search', '')
     category = request.GET.get('category', '')
     group_id = request.GET.get('group', '')
+
+    produtos_json_qs = ProdutoJSON.objects.filter(
+        grupo_whatsapp_id__in=group_ids_validos
+    ).select_related('grupo_whatsapp')
     
     if search:
-        products = products.filter(
-            Q(name__icontains=search) | 
-            Q(description__icontains=search) |
-            Q(brand__icontains=search)
+        produtos_json_qs = produtos_json_qs.filter(
+            Q(nome_produto__icontains=search) |
+            Q(marca__icontains=search) |
+            Q(categoria__icontains=search)
         )
     
     if category:
-        products = products.filter(category=category)
+        produtos_json_qs = produtos_json_qs.filter(categoria=category)
     
     if group_id:
-        products = products.filter(group_id=group_id)
+        produtos_json_qs = produtos_json_qs.filter(grupo_whatsapp_id=group_id)
+    
+    # Adaptar ProdutoJSON para formato exibível
+    produtos_json = []
+    for pj in produtos_json_qs.order_by('-criado_em'):
+        dados = pj.get_produto_data() if hasattr(pj, 'get_produto_data') else {}
+        produto_data = dados.get('produto', {}) if isinstance(dados, dict) else {}
+        
+        imagens = produto_data.get('imagens') or []
+        image_urls = []
+        if isinstance(imagens, list):
+            for img in imagens:
+                url = None
+                if isinstance(img, str):
+                    url = img
+                elif isinstance(img, dict):
+                    url = img.get('url') or img.get('src') or img.get('path') or img.get('image_url')
+                if url:
+                    built = build_image_url(url) or url
+                    image_urls.append(built)
+        if not image_urls and pj.imagem_original:
+            image_urls.append(build_image_url(pj.imagem_original) or pj.imagem_original)
+        
+        preco_valor = produto_data.get('preco')
+        try:
+            preco_convertido = float(preco_valor) if preco_valor not in [None, ''] else None
+        except (ValueError, TypeError):
+            preco_convertido = None
+        
+        produtos_json.append({
+            'id': pj.id,
+            'name': pj.nome_produto or produto_data.get('nome', ''),
+            'brand': pj.marca or produto_data.get('marca', ''),
+            'description': produto_data.get('descricao', ''),
+            'price': preco_convertido,
+            'currency': produto_data.get('moeda', 'BRL'),
+            'category': pj.categoria or produto_data.get('categoria', ''),
+            'image_urls': image_urls,
+            'is_featured': produto_data.get('is_featured', False),
+            'is_available': produto_data.get('is_available', True),
+            'group_id': pj.grupo_whatsapp_id,
+            'created_at': pj.criado_em,
+        })
+    
+    # Ordenar (destaque primeiro, depois data)
+    produtos_json.sort(key=lambda p: (not p.get('is_featured', False), p.get('created_at')), reverse=True)
     
     # Grupos disponíveis (apenas os válidos pela regra de negócio)
     groups = grupos_validos.order_by('name')
     
     # Paginação
-    paginator = Paginator(products, 12)
+    paginator = Paginator(produtos_json, 12)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # Categorias disponíveis
-    categories = products.values_list('category', flat=True).distinct().exclude(category='')
+    # Categorias disponíveis (apenas ProdutoJSON)
+    categories = produtos_json_qs.exclude(categoria='').values_list('categoria', flat=True).distinct()
     
     context = {
         'page_obj': page_obj,
@@ -505,34 +549,52 @@ def create_whatsapp_order(request):
         if not product_id:
             return JsonResponse({'error': 'Produto é obrigatório'}, status=400)
         
-        product = get_object_or_404(WhatsappProduct, id=product_id, is_available=True)
+        produto = get_object_or_404(ProdutoJSON, id=product_id)
+        
+        # Recuperar grupo do ProdutoJSON
+        if not produto.grupo_whatsapp:
+            return JsonResponse({'error': 'Produto sem grupo associado'}, status=400)
+        group = produto.grupo_whatsapp
         
         # Buscar participante do cliente no grupo
         participant = WhatsappParticipant.objects.filter(
-            group=product.group,
+            group=group,
             cliente=cliente
         ).first()
         
         if not participant:
             return JsonResponse({'error': 'Cliente não é participante deste grupo'}, status=403)
         
+        # Recuperar dados de preço/moeda
+        dados = produto.get_produto_data() if hasattr(produto, 'get_produto_data') else {}
+        produto_data = dados.get('produto', {}) if isinstance(dados, dict) else {}
+        
+        preco_valor = produto_data.get('preco')
+        try:
+            preco_decimal = Decimal(str(preco_valor).replace(',', '.')) if preco_valor not in [None, ''] else Decimal('0')
+        except Exception:
+            preco_decimal = Decimal('0')
+        currency = produto_data.get('moeda', 'BRL')
+        
         # Calcular total
-        total = (product.price or Decimal('0')) * quantity
+        total = preco_decimal * quantity
         
         # Criar pedido
         order = WhatsappOrder.objects.create(
-            group=product.group,
+            group=group,
             customer=participant,
             cliente=cliente,
             order_number=f"WH{timezone.now().strftime('%Y%m%d%H%M%S')}",
             status='pending',
             total_amount=total,
-            currency=product.currency,
+            currency=currency,
             products=[{
-                'product_id': product.id,
-                'name': product.name,
-                'price': str(product.price) if product.price else '0',
-                'quantity': quantity
+                'product_id': produto.id,
+                'name': produto.nome_produto or produto_data.get('nome', ''),
+                'price': str(preco_decimal),
+                'currency': currency,
+                'quantity': quantity,
+                'image_url': produto.imagem_original,
             }],
             payment_status='pending'
         )

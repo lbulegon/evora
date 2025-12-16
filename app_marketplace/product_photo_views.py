@@ -20,7 +20,7 @@ from PIL import Image
 from io import BytesIO
 
 from .models import (
-    WhatsappGroup, WhatsappParticipant, WhatsappProduct,
+    WhatsappGroup, WhatsappParticipant,
     Categoria, Empresa, ProdutoJSON
 )
 from .services import analyze_image_with_openmind, analyze_multiple_images
@@ -776,20 +776,6 @@ def save_product_from_photo(request):
         else:
             final_image_url = image_url
         
-        # Buscar ou criar participante
-        phone = request.user.username
-        if hasattr(request.user, 'cliente') and request.user.cliente.telefone:
-            phone = request.user.cliente.telefone
-        
-        participant, _ = WhatsappParticipant.objects.get_or_create(
-            group=group,
-            phone=phone,
-            defaults={
-                'name': request.user.get_full_name() or request.user.username,
-                'is_admin': True
-            }
-        )
-        
         # Processar preço
         price = data.get('price', '')
         try:
@@ -807,50 +793,53 @@ def save_product_from_photo(request):
             categoria_final = evora_json.get('categoria', data.get('category', ''))
             caracteristicas = evora_json.get('caracteristicas', {})
             marca_final = caracteristicas.get('marca', data.get('brand', ''))
-            codigo_barras_final = evora_json.get('codigo_barras', data.get('codigo_barras', ''))
+            codigo_barras_final = (evora_json.get('codigo_barras', data.get('codigo_barras', '')) or '').strip() or None
             sku_final = evora_json.get('sku_interno', data.get('sku', ''))
         else:
             nome_final = name
             descricao_final = data.get('description', '')
             categoria_final = data.get('category', '')
             marca_final = data.get('brand', '')
-            codigo_barras_final = data.get('codigo_barras', '')
+            codigo_barras_final = (data.get('codigo_barras', '') or '').strip() or None
             sku_final = data.get('sku', '')
         
-        # Criar produto
-        product = WhatsappProduct.objects.create(
-            group=group,
-            name=nome_final,
-            description=descricao_final,
-            price=price_decimal,
-            currency=data.get('currency', 'BRL'),
-            brand=marca_final,
-            category=categoria_final,
-            image_urls=[final_image_url],  # Imagem salva e recuperável
-            posted_by=participant,
-            message=None,
-            is_available=True,
-            is_featured=data.get('is_featured', False),
-            codigo_barras=codigo_barras_final,
-            sku_loja=sku_final,
-        )
-        
-        # Se empresa_id foi fornecido, vincular
+        # Criar ProdutoJSON
         empresa_id = data.get('empresa_id')
-        if empresa_id:
-            try:
-                empresa = Empresa.objects.get(id=empresa_id)
-                product.estabelecimento = empresa
-                product.save()
-            except Empresa.DoesNotExist:
-                pass
+        produto_payload = {
+            'nome': nome_final,
+            'descricao': descricao_final,
+            'preco': float(price_decimal) if price_decimal is not None else None,
+            'moeda': data.get('currency', 'BRL'),
+            'categoria': categoria_final,
+            'marca': marca_final,
+            'imagens': [final_image_url] if final_image_url else [],
+            'codigo_barras': codigo_barras_final,
+            'sku': sku_final,
+            'estabelecimento_id': empresa_id,
+            'is_featured': data.get('is_featured', False),
+            'is_available': True,
+            'localizacao_especifica': data.get('localizacao_especifica', ''),
+        }
+        
+        dados_json = {'produto': produto_payload}
+        
+        produto = ProdutoJSON.objects.create(
+            dados_json=dados_json,
+            nome_produto=nome_final,
+            marca=marca_final,
+            categoria=categoria_final,
+            codigo_barras=codigo_barras_final,
+            imagem_original=final_image_url,
+            criado_por=request.user,
+            grupo_whatsapp=group
+        )
         
         return JsonResponse({
             'success': True,
             'product': {
-                'id': product.id,
-                'name': product.name,
-                'price': str(product.price) if product.price else None,
+                'id': produto.id,
+                'name': produto.nome_produto,
+                'price': str(price_decimal) if price_decimal else None,
                 'image_url': final_image_url,
                 'group_id': group.id,
                 'group_name': group.name

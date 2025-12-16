@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from .models import (
     Cliente, PersonalShopper, AddressKeeper, Pedido, Pacote,
-    WhatsappGroup, WhatsappOrder, WhatsappProduct, WhatsappParticipant,
+    WhatsappGroup, WhatsappOrder, WhatsappParticipant, ProdutoJSON,
     PagamentoIntent, Evento, Produto, Categoria, Empresa
 )
 
@@ -94,7 +94,7 @@ def admin_dashboard(request):
     total_grupos = grupos.count()
     grupos_ativos = grupos.filter(active=True).count()
     total_participantes = WhatsappParticipant.objects.count()
-    total_produtos_whatsapp = WhatsappProduct.objects.count()
+    total_produtos_whatsapp = ProdutoJSON.objects.count()
     
     # ========== ESTATÍSTICAS DE PRODUTOS ==========
     produtos = Produto.objects.all()

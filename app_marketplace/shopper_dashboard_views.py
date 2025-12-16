@@ -18,7 +18,7 @@ from decimal import Decimal
 
 from .models import (
     PersonalShopper, WhatsappGroup, WhatsappParticipant, 
-    WhatsappMessage, WhatsappProduct, WhatsappOrder,
+    WhatsappMessage, WhatsappOrder,
     Cliente, Produto, Categoria, Empresa, ProdutoJSON
 )
 from .whatsapp_views import send_message, send_reaction
@@ -54,16 +54,10 @@ def shopper_dashboard(request):
         joined_at__gte=start_date
     ).count()
     
-    # Produtos
-    total_products = WhatsappProduct.objects.filter(group__owner=request.user).count()
-    available_products = WhatsappProduct.objects.filter(
-        group__owner=request.user,
-        is_available=True
-    ).count()
-    featured_products = WhatsappProduct.objects.filter(
-        group__owner=request.user,
-        is_featured=True
-    ).count()
+    # Produtos (fluxo novo via ProdutoJSON)
+    total_products = ProdutoJSON.objects.filter(criado_por=request.user).count()
+    available_products = total_products  # ProdutoJSON não tem flag de disponibilidade
+    featured_products = 0  # ProdutoJSON não tem flag de destaque
     
     # Pedidos e vendas
     orders = WhatsappOrder.objects.filter(group__owner=request.user)
@@ -90,12 +84,10 @@ def shopper_dashboard(request):
         order_count=Count('orders')
     ).order_by('-message_count')[:5]
     
-    # Produtos mais vendidos
-    popular_products = WhatsappProduct.objects.filter(
-        group__owner=request.user
-    ).annotate(
-        order_count=Count('group__orders')
-    ).order_by('-order_count')[:5]
+    # Produtos mais recentes (ProdutoJSON)
+    popular_products = ProdutoJSON.objects.filter(
+        criado_por=request.user
+    ).order_by('-criado_em')[:5]
     
     # Pedidos recentes
     recent_orders = orders.order_by('-created_at')[:10]
@@ -640,10 +632,10 @@ def shopper_analytics(request):
         joined_at__gte=start_date
     ).count()
     
-    # Produtos
-    total_products = WhatsappProduct.objects.filter(
-        group__owner=request.user,
-        created_at__gte=start_date
+    # Produtos (ProdutoJSON)
+    total_products = ProdutoJSON.objects.filter(
+        criado_por=request.user,
+        criado_em__gte=start_date
     ).count()
     
     # Vendas por status
@@ -671,11 +663,9 @@ def shopper_analytics(request):
     ).order_by('-revenue')
     
     # Produtos mais vendidos
-    popular_products = WhatsappProduct.objects.filter(
-        group__owner=request.user
-    ).annotate(
-        order_count=Count('group__orders', filter=Q(group__orders__created_at__gte=start_date))
-    ).order_by('-order_count')[:10]
+    popular_products = ProdutoJSON.objects.filter(
+        criado_por=request.user
+    ).order_by('-criado_em')[:10]
     
     # Crescimento diário
     daily_sales = []
@@ -730,7 +720,7 @@ def shopper_analytics(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def create_product(request):
-    """Criar novo produto para o shopper"""
+    """Criar novo produto para o shopper (ProdutoJSON)"""
     if not request.user.is_shopper:
         return JsonResponse({'error': 'Acesso restrito a Personal Shoppers'}, status=403)
     
@@ -748,55 +738,69 @@ def create_product(request):
             return JsonResponse({'error': 'Grupo é obrigatório para criar produto'}, status=400)
         group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
         
-        # Buscar estabelecimento
+        # Buscar estabelecimento (opcional)
         estabelecimento_id = data.get('estabelecimento_id')
         estabelecimento = None
         if estabelecimento_id:
             estabelecimento = get_object_or_404(Empresa, id=estabelecimento_id)
         
-        # Buscar ou criar participante para o owner (obrigatório)
-        # Usar telefone do usuário ou username como fallback
-        phone = request.user.username
-        if hasattr(request.user, 'cliente') and request.user.cliente.telefone:
-            phone = request.user.cliente.telefone
+        # Sanitizar código de barras e evitar duplicidade
+        raw_codigo = data.get('codigo_barras') or ''
+        codigo_barras = raw_codigo.strip() or None
+        if codigo_barras and ProdutoJSON.objects.filter(codigo_barras=codigo_barras).exists():
+            return JsonResponse({'error': 'Código de barras já está em uso por outro produto.'}, status=400)
         
-        participant, _ = WhatsappParticipant.objects.get_or_create(
-            group=group,
-            phone=phone,
-            defaults={
-                'name': request.user.get_full_name() or request.user.username,
-                'is_admin': True
-            }
+        # Montar dados do produto
+        preco_valor = data.get('price')
+        try:
+            preco_decimal = Decimal(str(preco_valor).replace(',', '.')) if preco_valor not in [None, ''] else None
+        except Exception:
+            preco_decimal = None
+        
+        produto_data = {
+            'nome': name,
+            'descricao': data.get('description', ''),
+            'preco': float(preco_decimal) if preco_decimal is not None else None,
+            'moeda': data.get('currency', 'BRL'),
+            'marca': data.get('brand', ''),
+            'categoria': data.get('category', ''),
+            'localizacao_especifica': data.get('localizacao_especifica', ''),
+            'codigo_barras': codigo_barras,
+            'sku_loja': data.get('sku_loja', ''),
+            'estabelecimento_id': estabelecimento_id,
+            'is_featured': data.get('is_featured', False),
+            'is_available': True,
+            'imagens': data.get('image_urls', [])
+        }
+        
+        dados_json = {'produto': produto_data}
+        
+        produto = ProdutoJSON.objects.create(
+            dados_json=dados_json,
+            nome_produto=name,
+            marca=data.get('brand', ''),
+            categoria=data.get('category', ''),
+            codigo_barras=codigo_barras,
+            imagem_original=None,
+            criado_por=request.user,
+            grupo_whatsapp=group
         )
         
-        # Criar produto (message é opcional - None para produtos criados diretamente)
-        product = WhatsappProduct.objects.create(
-            name=name,
-            description=data.get('description', ''),
-            price=Decimal(data.get('price', 0)) if data.get('price') else None,
-            currency=data.get('currency', 'USD'),
-            brand=data.get('brand', ''),
-            category=data.get('category', ''),
-            group=group,
-            posted_by=participant,  # OBRIGATÓRIO
-            message=None,  # Opcional - None para produtos criados diretamente
-            estabelecimento=estabelecimento,
-            localizacao_especifica=data.get('localizacao_especifica', ''),
-            codigo_barras=data.get('codigo_barras', ''),
-            sku_loja=data.get('sku_loja', ''),
-            is_featured=data.get('is_featured', False),
-            is_available=True
-        )
+        # Vincular estabelecimento se fornecido
+        if estabelecimento:
+            # armazenar no JSON já foi feito; campo relacional é opcional (não existe em ProdutoJSON)
+            pass
         
         return JsonResponse({
             'success': True,
             'product': {
-                'id': product.id,
-                'name': product.name,
-                'price': str(product.price) if product.price else None,
-                'brand': product.brand,
-                'estabelecimento': product.estabelecimento.nome if product.estabelecimento else None,
-                'localizacao': product.localizacao_especifica
+                'id': produto.id,
+                'name': produto.nome_produto,
+                'price': str(preco_decimal) if preco_decimal is not None else None,
+                'brand': produto.marca,
+                'estabelecimento': estabelecimento.nome if estabelecimento else None,
+                'localizacao': produto_data.get('localizacao_especifica', ''),
+                'image_urls': produto_data.get('imagens', [])
             }
         })
         

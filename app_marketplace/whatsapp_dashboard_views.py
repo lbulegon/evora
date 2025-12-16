@@ -64,13 +64,8 @@ def whatsapp_dashboard(request):
         group__owner=request.user
     ).order_by('-created_at')[:10]
     
-    # Produtos mais vendidos
-    popular_products = WhatsappProduct.objects.filter(
-        group__owner=request.user,
-        is_available=True
-    ).annotate(
-        order_count=Count('group__orders')
-    ).order_by('-order_count')[:5]
+    # Produtos (legacy desativado) - retornando vazio
+    popular_products = []
     
     context = {
         'user_profile': user_profile,
@@ -682,200 +677,28 @@ def products_list(request, group_id):
 @login_required
 @require_http_methods(["POST"])
 def create_product(request, group_id):
-    """Criar post/produto no grupo (MVP)"""
-    if not (request.user.is_shopper or request.user.is_address_keeper):
-        return JsonResponse({'error': 'Acesso restrito'}, status=403)
-    
-    try:
-        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
-        
-        # Se for FormData (upload de imagem)
-        if request.content_type and 'multipart/form-data' in request.content_type:
-            name = request.POST.get('name')
-            description = request.POST.get('description', '')
-            price = request.POST.get('price')
-            currency = request.POST.get('currency', 'USD')
-            brand = request.POST.get('brand', '')
-            category = request.POST.get('category', '')
-            is_available = request.POST.get('is_available', 'true') == 'true'
-            is_featured = request.POST.get('is_featured', 'false') == 'true'
-            
-            # Processar imagens
-            image_urls = []
-            if 'images' in request.FILES:
-                from django.core.files.storage import default_storage
-                from django.core.files.base import ContentFile
-                import os
-                from datetime import datetime
-                
-                for image_file in request.FILES.getlist('images'):
-                    # Salvar imagem
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    filename = f"posts/{group.id}/{timestamp}_{image_file.name}"
-                    path = default_storage.save(filename, ContentFile(image_file.read()))
-                    image_urls.append(default_storage.url(path))
-        else:
-            # JSON
-            data = json.loads(request.body)
-            name = data.get('name')
-            description = data.get('description', '')
-            price = data.get('price')
-            currency = data.get('currency', 'USD')
-            brand = data.get('brand', '')
-            category = data.get('category', '')
-            image_urls = data.get('image_urls', [])
-            is_available = data.get('is_available', True)
-            is_featured = data.get('is_featured', False)
-        
-        if not name:
-            return JsonResponse({'error': 'Nome do post é obrigatório'}, status=400)
-        
-        # Buscar ou criar participante para o owner
-        participant, _ = WhatsappParticipant.objects.get_or_create(
-            group=group,
-            phone=request.user.username if not hasattr(request.user, 'cliente') else (request.user.cliente.telefone or request.user.username),
-            defaults={
-                'name': request.user.get_full_name() or request.user.username,
-                'is_admin': True
-            }
-        )
-        
-        # Criar produto/post
-        product = WhatsappProduct.objects.create(
-            group=group,
-            name=name,
-            description=description,
-            price=Decimal(price) if price else None,
-            currency=currency,
-            brand=brand,
-            category=category,
-            image_urls=image_urls,
-            is_available=is_available,
-            is_featured=is_featured,
-            posted_by=participant
-        )
-        
-        return JsonResponse({
-            'success': True,
-            'product': {
-                'id': product.id,
-                'name': product.name,
-                'description': product.description,
-                'price': str(product.price) if product.price else None,
-                'currency': product.currency,
-                'brand': product.brand,
-                'category': product.category,
-                'image_urls': product.image_urls,
-                'is_available': product.is_available,
-                'is_featured': product.is_featured,
-                'created_at': product.created_at.isoformat(),
-            }
-        })
-        
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    """Criar post/produto no grupo (MVP) - LEGADO DESATIVADO"""
+    return JsonResponse({'error': 'Endpoint legacy desativado. Use ProdutoJSON.'}, status=410)
 
 
 @login_required
 def get_product(request, group_id, product_id):
-    """Buscar produto específico (para edição)"""
-    if not (request.user.is_shopper or request.user.is_address_keeper):
-        return JsonResponse({'error': 'Acesso restrito'}, status=403)
-    
-    try:
-        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
-        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
-        
-        return JsonResponse({
-            'success': True,
-            'product': {
-                'id': product.id,
-                'name': product.name,
-                'description': product.description,
-                'price': str(product.price) if product.price else None,
-                'currency': product.currency,
-                'brand': product.brand,
-                'category': product.category,
-                'image_urls': product.image_urls,
-                'is_available': product.is_available,
-                'is_featured': product.is_featured,
-                'created_at': product.created_at.isoformat(),
-            }
-        })
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    """Buscar produto específico (LEGADO DESATIVADO)"""
+    return JsonResponse({'error': 'Endpoint legacy desativado. Use ProdutoJSON.'}, status=410)
 
 
 @login_required
 @require_http_methods(["PUT", "PATCH"])
 def update_product(request, group_id, product_id):
-    """Atualizar post/produto (MVP)"""
-    if not (request.user.is_shopper or request.user.is_address_keeper):
-        return JsonResponse({'error': 'Acesso restrito'}, status=403)
-    
-    try:
-        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
-        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
-        
-        data = json.loads(request.body)
-        
-        # Atualizar campos
-        if 'name' in data:
-            product.name = data['name']
-        if 'description' in data:
-            product.description = data.get('description', '')
-        if 'price' in data:
-            product.price = Decimal(data['price']) if data['price'] else None
-        if 'currency' in data:
-            product.currency = data['currency']
-        if 'brand' in data:
-            product.brand = data.get('brand', '')
-        if 'category' in data:
-            product.category = data.get('category', '')
-        if 'image_urls' in data:
-            product.image_urls = data['image_urls']
-        if 'is_available' in data:
-            product.is_available = data['is_available']
-        if 'is_featured' in data:
-            product.is_featured = data['is_featured']
-        
-        product.save()
-        
-        return JsonResponse({
-            'success': True,
-            'product': {
-                'id': product.id,
-                'name': product.name,
-                'description': product.description,
-                'price': str(product.price) if product.price else None,
-                'currency': product.currency,
-                'image_urls': product.image_urls,
-                'is_available': product.is_available,
-                'is_featured': product.is_featured,
-            }
-        })
-        
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    """Atualizar post/produto (LEGADO DESATIVADO)"""
+    return JsonResponse({'error': 'Endpoint legacy desativado. Use ProdutoJSON.'}, status=410)
 
 
 @login_required
 @require_http_methods(["DELETE"])
 def delete_product(request, group_id, product_id):
-    """Deletar post/produto (MVP)"""
-    if not (request.user.is_shopper or request.user.is_address_keeper):
-        return JsonResponse({'error': 'Acesso restrito'}, status=403)
-    
-    try:
-        group = get_object_or_404(WhatsappGroup, id=group_id, owner=request.user)
-        product = get_object_or_404(WhatsappProduct, id=product_id, group=group)
-        
-        product.delete()
-        
-        return JsonResponse({'success': True, 'message': 'Post deletado com sucesso'})
-        
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    """Deletar post/produto (LEGADO DESATIVADO)"""
+    return JsonResponse({'error': 'Endpoint legacy desativado. Use ProdutoJSON.'}, status=410)
 
 
 # ============================================================================
@@ -885,7 +708,8 @@ def delete_product(request, group_id, product_id):
 @login_required
 @require_http_methods(["POST"])
 def capture_post_screenshot(request, group_id, product_id):
-    """Capturar screenshot de um post (MVP)"""
+    """Capturar screenshot de um post (LEGADO DESATIVADO)"""
+    return JsonResponse({'error': 'Endpoint legacy desativado. Use ProdutoJSON.'}, status=410)
     if not (request.user.is_shopper or request.user.is_address_keeper):
         return JsonResponse({'error': 'Acesso restrito'}, status=403)
     
@@ -1155,12 +979,8 @@ def whatsapp_analytics(request):
         created_at__gte=start_date
     ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
     
-    # Produtos mais vendidos
-    popular_products = WhatsappProduct.objects.filter(
-        group__shopper=shopper
-    ).annotate(
-        order_count=Count('group__orders')
-    ).order_by('-order_count')[:10]
+    # Produtos mais vendidos (legacy desativado)
+    popular_products = []
     
     # Grupos com mais atividade
     active_groups = groups.annotate(
