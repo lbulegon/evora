@@ -216,3 +216,246 @@ class WhatsAppMessageLog(models.Model):
     
     def __str__(self):
         return f"{self.phone} - {self.message_type} - {self.timestamp}"
+
+
+class EvolutionInstance(models.Model):
+    """
+    Instância da Evolution API
+    
+    Armazena informações sobre instâncias do WhatsApp conectadas.
+    """
+    
+    class InstanceStatus(models.TextChoices):
+        CREATING = 'creating', 'Criando'
+        OPENING = 'opening', 'Abrindo'
+        OPEN = 'open', 'Conectada'
+        CLOSE = 'close', 'Desconectada'
+        CONNECTING = 'connecting', 'Conectando'
+        UNPAIRED = 'unpaired', 'Não pareado'
+        UNPAIRED_IDLE = 'unpaired_idle', 'Não pareado (ocioso)'
+        UNKNOWN = 'unknown', 'Desconhecido'
+    
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Nome da instância (ex: 'default')"
+    )
+    
+    status = models.CharField(
+        max_length=20,
+        choices=InstanceStatus.choices,
+        default=InstanceStatus.UNKNOWN,
+        help_text="Status atual da instância"
+    )
+    
+    qrcode = models.TextField(
+        blank=True,
+        null=True,
+        help_text="QR Code para conectar (base64)"
+    )
+    
+    qrcode_url = models.URLField(
+        blank=True,
+        null=True,
+        help_text="URL do QR Code"
+    )
+    
+    phone_number = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Número de telefone conectado"
+    )
+    
+    phone_name = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        help_text="Nome do WhatsApp conectado"
+    )
+    
+    # Configurações
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Instância está ativa e sendo usada"
+    )
+    
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Instância padrão do sistema"
+    )
+    
+    # Metadados
+    last_sync = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Última sincronização com Evolution API"
+    )
+    
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Metadados adicionais da instância"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Instância Evolution API'
+        verbose_name_plural = 'Instâncias Evolution API'
+        ordering = ['-is_default', '-is_active', 'name']
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['status', 'is_active']),
+        ]
+    
+    def __str__(self):
+        status_icon = "✅" if self.status == self.InstanceStatus.OPEN else "❌"
+        return f"{status_icon} {self.name} - {self.get_status_display()}"
+    
+    def save(self, *args, **kwargs):
+        """Override do save para garantir apenas uma instância padrão"""
+        if self.is_default:
+            EvolutionInstance.objects.filter(is_default=True).exclude(pk=self.pk if self.pk else None).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
+class EvolutionMessage(models.Model):
+    """
+    Mensagem armazenada no banco Django
+    
+    Todas as mensagens são armazenadas no PostgreSQL do Django,
+    mesmo que venham da Evolution API.
+    """
+    
+    class MessageType(models.TextChoices):
+        TEXT = 'text', 'Texto'
+        IMAGE = 'image', 'Imagem'
+        VIDEO = 'video', 'Vídeo'
+        AUDIO = 'audio', 'Áudio'
+        DOCUMENT = 'document', 'Documento'
+        LOCATION = 'location', 'Localização'
+        CONTACT = 'contact', 'Contato'
+        STICKER = 'sticker', 'Sticker'
+        UNKNOWN = 'unknown', 'Desconhecido'
+    
+    class MessageDirection(models.TextChoices):
+        INBOUND = 'inbound', 'Recebida'
+        OUTBOUND = 'outbound', 'Enviada'
+    
+    class MessageStatus(models.TextChoices):
+        PENDING = 'pending', 'Pendente'
+        SENT = 'sent', 'Enviada'
+        DELIVERED = 'delivered', 'Entregue'
+        READ = 'read', 'Lida'
+        ERROR = 'error', 'Erro'
+    
+    # Relacionamentos
+    instance = models.ForeignKey(
+        EvolutionInstance,
+        on_delete=models.CASCADE,
+        related_name='messages',
+        help_text="Instância que enviou/recebeu a mensagem"
+    )
+    
+    contact = models.ForeignKey(
+        WhatsAppContact,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='evolution_messages',
+        help_text="Contato relacionado"
+    )
+    
+    # Dados da mensagem
+    evolution_message_id = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="ID da mensagem na Evolution API"
+    )
+    
+    phone = models.CharField(
+        max_length=20,
+        help_text="Número de telefone (formato: +5511999999999)"
+    )
+    
+    direction = models.CharField(
+        max_length=10,
+        choices=MessageDirection.choices,
+        help_text="Direção da mensagem"
+    )
+    
+    message_type = models.CharField(
+        max_length=20,
+        choices=MessageType.choices,
+        default=MessageType.TEXT,
+        help_text="Tipo de mensagem"
+    )
+    
+    content = models.TextField(
+        help_text="Conteúdo da mensagem"
+    )
+    
+    # Status e processamento
+    status = models.CharField(
+        max_length=20,
+        choices=MessageStatus.choices,
+        default=MessageStatus.PENDING,
+        help_text="Status da mensagem"
+    )
+    
+    processed = models.BooleanField(
+        default=False,
+        help_text="Mensagem foi processada pelo sistema"
+    )
+    
+    # Mídia
+    media_url = models.URLField(
+        blank=True,
+        null=True,
+        help_text="URL da mídia (se houver)"
+    )
+    
+    media_type = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Tipo de mídia (MIME type)"
+    )
+    
+    # Metadados
+    raw_payload = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Payload completo da Evolution API"
+    )
+    
+    error_message = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Mensagem de erro (se houver)"
+    )
+    
+    timestamp = models.DateTimeField(
+        help_text="Timestamp da mensagem"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Mensagem Evolution API'
+        verbose_name_plural = 'Mensagens Evolution API'
+        ordering = ['-timestamp', '-created_at']
+        indexes = [
+            models.Index(fields=['instance', '-timestamp']),
+            models.Index(fields=['phone', '-timestamp']),
+            models.Index(fields=['contact', '-timestamp']),
+            models.Index(fields=['status', '-timestamp']),
+            models.Index(fields=['processed', '-timestamp']),
+        ]
+    
+    def __str__(self):
+        direction_icon = "📥" if self.direction == self.MessageDirection.INBOUND else "📤"
+        return f"{direction_icon} {self.phone} - {self.message_type} - {self.timestamp}"

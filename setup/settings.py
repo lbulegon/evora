@@ -24,6 +24,11 @@ OPENMIND_AI_KEY = config("OPENMIND_AI_KEY", default="")
 OPENMIND_AI_TIMEOUT = config("OPENMIND_AI_TIMEOUT", default=30, cast=int)
 OPENMIND_ORG_MODEL = config("OPENMIND_ORG_MODEL", default="qwen2.5-vl-72b-instruct")
 
+# Evolution API - WhatsApp Integration
+EVOLUTION_API_URL = config("EVOLUTION_API_URL", default="http://69.169.102.84:8004")
+EVOLUTION_API_KEY = config("EVOLUTION_API_KEY", default="GKvy6psn-8HHpBQ4HAHKFOXnwjHR-oSzeGZzCaws0xg")
+EVOLUTION_INSTANCE_NAME = config("EVOLUTION_INSTANCE_NAME", default="default")
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
