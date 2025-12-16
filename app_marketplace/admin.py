@@ -206,10 +206,10 @@ class ProdutoEventoInlineProduto(admin.TabularInline):
 
 @admin.register(Produto)
 class ProdutoAdmin(admin.ModelAdmin):
-    list_display  = ['nome', 'empresa', 'preco', 'categoria', 'criado_por', 'total_eventos', 'ativo', 'criado_em']
-    list_filter   = ['empresa', 'categoria', 'ativo', 'criado_por', 'criado_em']
-    search_fields = ['nome', 'descricao', 'empresa__nome', 'categoria__nome', 'criado_por__username']
-    autocomplete_fields = ['categoria', 'empresa', 'criado_por']
+    list_display  = ['nome', 'preco', 'categoria', 'criado_por', 'total_eventos', 'ativo', 'criado_em']
+    list_filter   = ['categoria', 'ativo', 'criado_por', 'criado_em']
+    search_fields = ['nome', 'descricao', 'categoria__nome', 'criado_por__username']
+    autocomplete_fields = ['categoria', 'criado_por']
     readonly_fields = ['criado_em', 'total_eventos']
     inlines = [ProdutoEventoInlineProduto]
     
@@ -221,7 +221,7 @@ class ProdutoAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Informações Básicas', {
-            'fields': ('nome', 'descricao', 'preco', 'categoria', 'empresa'),
+            'fields': ('nome', 'descricao', 'preco', 'categoria'),
             'description': 'Dados gerais do produto (cadastro geral)'
         }),
         ('Shopper', {

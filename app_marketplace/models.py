@@ -4,6 +4,8 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
+from django.utils.text import slugify
+from decimal import Decimal
 
 
 # ============================================================================
@@ -68,10 +70,9 @@ class Categoria(models.Model):
 
 class Produto(models.Model):
     """
-    Produto do sistema.
-    Adaptado para incluir criado_por (Shopper que criou o produto).
+    Produto do sistema (repositório geral).
+    Sem vínculo obrigatório a empresa.
     """
-    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name='produtos')
     nome = models.CharField(max_length=100)
     descricao = models.TextField()
     preco = models.DecimalField(max_digits=10, decimal_places=2)
@@ -2512,3 +2513,80 @@ class ProdutoJSON(models.Model):
             import json
             return json.loads(self.dados_json)
         return self.dados_json or {}
+
+
+# ============================================================================
+# SINCRONIZAÇÃO ProdutoJSON -> Produto (repositório geral)
+# ============================================================================
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+@receiver(post_save, sender=ProdutoJSON)
+def sync_produto_repository(sender, instance: ProdutoJSON, created, **kwargs):
+    """
+    Mantém o repositório geral Produto em sincronia com ProdutoJSON.
+    Regra:
+    - Se não existe Produto com mesmo nome, cria.
+    - Se existe, preenche campos vazios/zerados com dados do JSON (IA).
+    """
+    try:
+        dados = instance.get_produto_data() if hasattr(instance, "get_produto_data") else {}
+        produto_data = dados.get("produto", {}) if isinstance(dados, dict) else {}
+
+        nome = (instance.nome_produto or produto_data.get("nome") or "").strip()
+        if not nome:
+            return
+
+        # Categoria (opcional)
+        categoria_nome = instance.categoria or produto_data.get("categoria") or ""
+        categoria_obj = None
+        if categoria_nome:
+            slug = slugify(categoria_nome) or categoria_nome.lower().replace(" ", "-")
+            categoria_obj, _ = Categoria.objects.get_or_create(
+                slug=slug,
+                defaults={"nome": categoria_nome}
+            )
+
+        descricao = produto_data.get("descricao") or ""
+
+        preco_valor = produto_data.get("preco")
+        try:
+            preco_decimal = (
+                Decimal(str(preco_valor).replace(",", "."))
+                if preco_valor not in [None, ""]
+                else None
+            )
+        except Exception:
+            preco_decimal = None
+
+        # Localizar produto existente por nome
+        produto_repo = Produto.objects.filter(nome__iexact=nome).first()
+
+        if not produto_repo:
+            Produto.objects.create(
+                empresa=None,
+                nome=nome,
+                descricao=descricao,
+                preco=preco_decimal or Decimal("0"),
+                categoria=categoria_obj,
+                criado_por=instance.criado_por if hasattr(instance, "criado_por") else None,
+            )
+            return
+
+        # Atualizar campos faltantes
+        updated = False
+        if not produto_repo.descricao and descricao:
+            produto_repo.descricao = descricao
+            updated = True
+        if (not produto_repo.preco or produto_repo.preco == Decimal("0")) and preco_decimal:
+            produto_repo.preco = preco_decimal
+            updated = True
+        if not produto_repo.categoria and categoria_obj:
+            produto_repo.categoria = categoria_obj
+            updated = True
+        if updated:
+            produto_repo.save()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning("Falha ao sincronizar ProdutoJSON -> Produto", exc_info=True)
