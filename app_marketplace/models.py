@@ -1725,6 +1725,14 @@ class PostScreenshot(models.Model):
 
 class WhatsappOrder(models.Model):
     """Pedido criado via WhatsApp"""
+    CHANNEL_CHOICES = [
+        ('whatsapp', 'WhatsApp'),
+        ('site', 'Site'),
+        ('instagram', 'Instagram'),
+        ('store', 'Loja Física'),
+        ('other', 'Outro'),
+    ]
+
     STATUS_CHOICES = [
         ('pending', 'Pendente'),
         ('confirmed', 'Confirmado'),
@@ -1738,6 +1746,9 @@ class WhatsappOrder(models.Model):
     group = models.ForeignKey(WhatsappGroup, on_delete=models.CASCADE, related_name='orders')
     customer = models.ForeignKey(WhatsappParticipant, on_delete=models.CASCADE, related_name='orders')
     cliente = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True, blank=True, related_name='whatsapp_orders')
+    
+    # Canal de origem
+    channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default='whatsapp', db_index=True)
     
     # Dados do pedido
     order_number = models.CharField(max_length=20, unique=True)

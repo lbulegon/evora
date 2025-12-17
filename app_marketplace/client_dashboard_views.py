@@ -316,54 +316,25 @@ def client_orders(request):
         return redirect('home')
     
     cliente = request.user.cliente
-    pedidos = Pedido.objects.filter(cliente=cliente).order_by('-criado_em')
-    
     # Filtros
     search = request.GET.get('search', '')
     status = request.GET.get('status', '')
     
-    if search:
-        pedidos = pedidos.filter(
-            Q(id__icontains=search) |
-            Q(codigo_rastreamento__icontains=search)
-        )
+    # Usar apenas WhatsappOrder como tabela unificada de pedidos, com canal
+    orders_qs = WhatsappOrder.objects.filter(cliente=cliente).order_by('-created_at')
     
-    if status:
-        pedidos = pedidos.filter(status=status)
-    
-    # Paginação
-    paginator = Paginator(pedidos, 15)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
-    # Pedidos WhatsApp (criados pelo carrinho atual)
-    whatsapp_orders = WhatsappOrder.objects.filter(cliente=cliente).order_by('-created_at')
     if search:
-        whatsapp_orders = whatsapp_orders.filter(
+        orders_qs = orders_qs.filter(
             Q(order_number__icontains=search)
         )
+    
     if status:
-        whatsapp_orders = whatsapp_orders.filter(status=status)
-
-    # Lista combinada (site + WhatsApp)
+        orders_qs = orders_qs.filter(status=status)
+    
     all_orders = []
-
-    for p in page_obj:
+    for w in orders_qs:
         all_orders.append({
-            'tipo': 'site',
-            'id': p.id,
-            'numero': f"PED{p.id}",
-            'created_at': p.criado_em,
-            'status': p.status,
-            'status_label': p.get_status_display(),
-            'total': p.valor_total,
-            'moeda': 'BRL',
-            'itens': None,
-        })
-
-    for w in whatsapp_orders:
-        all_orders.append({
-            'tipo': 'whatsapp',
+            'tipo': w.channel or 'whatsapp',
             'id': w.id,
             'numero': w.order_number,
             'created_at': w.created_at,
@@ -374,18 +345,22 @@ def client_orders(request):
             'itens': w.products,
             'payment_status': w.payment_status,
         })
-
+    
     # ordenar por data desc
     all_orders.sort(key=lambda x: x['created_at'], reverse=True)
+    
+    # Paginação
+    paginator = Paginator(all_orders, 15)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     
     context = {
         'page_obj': page_obj,
         'search': search,
         'status': status,
-        'status_choices': Pedido.Status.choices,
-        'whatsapp_orders': whatsapp_orders,
+        'status_choices': WhatsappOrder.STATUS_CHOICES,
         'whatsapp_status_choices': WhatsappOrder.STATUS_CHOICES,
-        'all_orders': all_orders,
+        'all_orders': page_obj,
     }
     
     return render(request, 'app_marketplace/client_orders.html', context)
@@ -647,6 +622,7 @@ def create_whatsapp_order(request):
             group=group,
             customer=participant,
             cliente=cliente,
+            channel='whatsapp',
             order_number=f"WH{timezone.now().strftime('%Y%m%d%H%M%S')}",
             status='pending',
             total_amount=total,

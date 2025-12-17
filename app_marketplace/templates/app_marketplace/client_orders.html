@@ -55,7 +55,7 @@
                             <div class="col-md-3">
                                 <h5>{{ pedido.numero }}</h5>
                                 <small class="text-muted">{{ pedido.created_at|date:"d/m/Y H:i" }}</small><br>
-                                <span class="badge {% if pedido.tipo == 'whatsapp' %}bg-success{% else %}bg-primary{% endif %}">
+                                <span class="badge {% if pedido.tipo == 'whatsapp' %}bg-success{% elif pedido.tipo == 'site' %}bg-primary{% elif pedido.tipo == 'instagram' %}bg-info text-dark{% elif pedido.tipo == 'store' %}bg-secondary{% else %}bg-dark{% endif %}">
                                     {{ pedido.tipo|title }}
                                 </span>
                                 {% if pedido.payment_status == 'quote' %}
