@@ -562,14 +562,20 @@ def create_whatsapp_order(request):
             return JsonResponse({'error': 'Produto sem grupo associado'}, status=400)
         group = produto.grupo_whatsapp
         
-        # Buscar participante do cliente no grupo
+        # Buscar participante do cliente no grupo; se não existir, criar (MVP para permitir pedido)
         participant = WhatsappParticipant.objects.filter(
             group=group,
             cliente=cliente
         ).first()
         
         if not participant:
-            return JsonResponse({'error': 'Cliente não é participante deste grupo'}, status=403)
+            phone = (cliente.telefone or request.user.username)
+            participant = WhatsappParticipant.objects.create(
+                group=group,
+                cliente=cliente,
+                phone=phone,
+                name=request.user.get_full_name() or request.user.username
+            )
         
         # Recuperar dados de preço/moeda
         dados = produto.get_produto_data() if hasattr(produto, 'get_produto_data') else {}
