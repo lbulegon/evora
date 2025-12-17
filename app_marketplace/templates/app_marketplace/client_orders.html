@@ -43,6 +43,54 @@
         </div>
     </div>
 
+    <!-- Lista combinada (Site + WhatsApp) -->
+    <div class="row">
+        <div class="col-12">
+            <h4><i class="fas fa-list"></i> Todos os pedidos (site + WhatsApp)</h4>
+            {% if all_orders %}
+                {% for pedido in all_orders %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <h5>{{ pedido.numero }}</h5>
+                                <small class="text-muted">{{ pedido.created_at|date:"d/m/Y H:i" }}</small><br>
+                                <span class="badge {% if pedido.tipo == 'whatsapp' %}bg-success{% else %}bg-primary{% endif %}">
+                                    {{ pedido.tipo|title }}
+                                </span>
+                                {% if pedido.payment_status == 'quote' %}
+                                <span class="badge bg-warning text-dark ms-1">Orçamento</span>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-0"><strong>Status:</strong></p>
+                                <span class="badge bg-secondary">{{ pedido.status_label }}</span>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-0"><strong>Valor Total:</strong></p>
+                                <p class="mb-0">{{ pedido.moeda }} {{ pedido.total|floatformat:2 }}</p>
+                            </div>
+                            <div class="col-md-3 text-end">
+                                {% if pedido.itens %}
+                                <span class="text-muted small">Itens: {{ pedido.itens|length }}</span>
+                                {% else %}
+                                <span class="text-muted small">Itens: n/d</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Nenhum pedido encontrado.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <hr class="my-4">
+
     <!-- Lista de Pedidos (Checkout geral) -->
     <div class="row">
         <div class="col-12">

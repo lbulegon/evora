@@ -344,6 +344,39 @@ def client_orders(request):
         )
     if status:
         whatsapp_orders = whatsapp_orders.filter(status=status)
+
+    # Lista combinada (site + WhatsApp)
+    all_orders = []
+
+    for p in page_obj:
+        all_orders.append({
+            'tipo': 'site',
+            'id': p.id,
+            'numero': f"PED{p.id}",
+            'created_at': p.criado_em,
+            'status': p.status,
+            'status_label': p.get_status_display(),
+            'total': p.valor_total,
+            'moeda': 'BRL',
+            'itens': None,
+        })
+
+    for w in whatsapp_orders:
+        all_orders.append({
+            'tipo': 'whatsapp',
+            'id': w.id,
+            'numero': w.order_number,
+            'created_at': w.created_at,
+            'status': w.status,
+            'status_label': dict(WhatsappOrder.STATUS_CHOICES).get(w.status, w.status),
+            'total': w.total_amount,
+            'moeda': w.currency,
+            'itens': w.products,
+            'payment_status': w.payment_status,
+        })
+
+    # ordenar por data desc
+    all_orders.sort(key=lambda x: x['created_at'], reverse=True)
     
     context = {
         'page_obj': page_obj,
@@ -352,6 +385,7 @@ def client_orders(request):
         'status_choices': Pedido.Status.choices,
         'whatsapp_orders': whatsapp_orders,
         'whatsapp_status_choices': WhatsappOrder.STATUS_CHOICES,
+        'all_orders': all_orders,
     }
     
     return render(request, 'app_marketplace/client_orders.html', context)
