@@ -335,12 +335,23 @@ def client_orders(request):
     paginator = Paginator(pedidos, 15)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+
+    # Pedidos WhatsApp (criados pelo carrinho atual)
+    whatsapp_orders = WhatsappOrder.objects.filter(cliente=cliente).order_by('-created_at')
+    if search:
+        whatsapp_orders = whatsapp_orders.filter(
+            Q(order_number__icontains=search)
+        )
+    if status:
+        whatsapp_orders = whatsapp_orders.filter(status=status)
     
     context = {
         'page_obj': page_obj,
         'search': search,
         'status': status,
         'status_choices': Pedido.Status.choices,
+        'whatsapp_orders': whatsapp_orders,
+        'whatsapp_status_choices': WhatsappOrder.STATUS_CHOICES,
     }
     
     return render(request, 'app_marketplace/client_orders.html', context)

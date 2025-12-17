@@ -43,7 +43,7 @@
         </div>
     </div>
 
-    <!-- Lista de Pedidos -->
+    <!-- Lista de Pedidos (Checkout geral) -->
     <div class="row">
         <div class="col-12">
             {% if page_obj %}
@@ -105,6 +105,45 @@
             <div class="alert alert-info">
                 <i class="fas fa-info-circle"></i> Nenhum pedido encontrado.
             </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Lista de Pedidos WhatsApp (Carrinho atual) -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <h4><i class="fab fa-whatsapp text-success"></i> Pedidos via WhatsApp</h4>
+            {% if whatsapp_orders %}
+                {% for pedido in whatsapp_orders %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <h5>{{ pedido.order_number }}</h5>
+                                <small class="text-muted">{{ pedido.created_at|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-0"><strong>Status:</strong></p>
+                                <span class="badge bg-secondary">{{ pedido.get_status_display }}</span>
+                                {% if pedido.payment_status == 'quote' %}
+                                <span class="badge bg-warning text-dark ms-1">Orçamento</span>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-3">
+                                <p class="mb-0"><strong>Valor Total:</strong></p>
+                                <p class="mb-0">{{ pedido.currency }} {{ pedido.total_amount|floatformat:2 }}</p>
+                            </div>
+                            <div class="col-md-3 text-end">
+                                <span class="text-muted small">Produtos: {{ pedido.products|length }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Nenhum pedido via WhatsApp encontrado.
+                </div>
             {% endif %}
         </div>
     </div>
