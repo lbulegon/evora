@@ -1,0 +1,17 @@
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('app_marketplace', '0033_remove_produto_empresa'),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name='whatsapporder',
+            name='channel',
+            field=models.CharField(choices=[('whatsapp', 'WhatsApp'), ('site', 'Site'), ('instagram', 'Instagram'), ('store', 'Loja Física'), ('other', 'Outro')], db_index=True, default='whatsapp', max_length=20),
+        ),
+    ]
+

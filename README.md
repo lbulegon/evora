@@ -31,6 +31,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Configure banco de dados
+python manage.py makemigrations
 python manage.py migrate
 
 # Crie superusuário
