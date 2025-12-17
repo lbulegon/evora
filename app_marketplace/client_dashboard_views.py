@@ -544,7 +544,13 @@ def create_whatsapp_order(request):
         data = json.loads(request.body)
         
         product_id = data.get('product_id')
-        quantity = int(data.get('quantity', 1))
+        try:
+            quantity = int(data.get('quantity', 1))
+        except Exception:
+            return JsonResponse({'error': 'Quantidade inválida'}, status=400)
+        
+        if quantity <= 0:
+            return JsonResponse({'error': 'Quantidade deve ser maior que zero'}, status=400)
         
         if not product_id:
             return JsonResponse({'error': 'Produto é obrigatório'}, status=400)
@@ -575,9 +581,15 @@ def create_whatsapp_order(request):
         except Exception:
             preco_decimal = Decimal('0')
         currency = produto_data.get('moeda', 'BRL')
+
+        # Se não há preço, tratar como pedido de orçamento (sem total)
+        is_quote = False
+        if preco_decimal is None or preco_decimal == Decimal('0'):
+            is_quote = True
+            preco_decimal = Decimal('0')
         
-        # Calcular total
-        total = preco_decimal * quantity
+        # Calcular total (ou zero se orçamento)
+        total = preco_decimal * quantity if not is_quote else Decimal('0')
         
         # Criar pedido
         order = WhatsappOrder.objects.create(
@@ -596,12 +608,15 @@ def create_whatsapp_order(request):
                 'quantity': quantity,
                 'image_url': produto.imagem_original,
             }],
-            payment_status='pending'
+            payment_status='pending' if not is_quote else 'quote'
         )
         
         # Criar conversa individual automaticamente após pedido (Umbler Talk Style)
         from .conversations_views import create_conversation_after_order
         conversation = create_conversation_after_order(order)
+        
+        # Notificar status orçamento
+        order_meta_message = "Orçamento criado" if is_quote else "Pedido criado"
         
         return JsonResponse({
             'success': True,
@@ -611,6 +626,8 @@ def create_whatsapp_order(request):
                 'total_amount': str(order.total_amount),
                 'currency': order.currency,
                 'status': order.status,
+                'payment_status': order.payment_status,
+                'message': order_meta_message,
             }
         })
         

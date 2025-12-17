@@ -126,7 +126,7 @@
                         <p class="text-muted mb-3">Preço sob consulta</p>
                         {% endif %}
                         <div class="d-flex gap-2">
-                            <button class="btn btn-primary flex-fill" onclick="addToCart({{ product.id }}, '{{ product.name }}', {{ product.price|default:0 }}, '{{ product.currency }}')">
+                            <button class="btn btn-primary flex-fill" onclick="addToCart({{ product.id }}, '{{ product.name }}', {{ product.price|default:'null' }}, '{{ product.currency }}')" {% if not product.price %}disabled data-bs-toggle="tooltip" title="Preço sob consulta: abra um pedido de orçamento"{% endif %}>
                                 <i class="fas fa-cart-plus"></i> Adicionar ao Carrinho
                             </button>
                             <button class="btn btn-outline-info" onclick="viewProduct({{ product.id }})">
@@ -217,6 +217,14 @@
         // Implementar visualização detalhada se necessário
         alert('Visualização detalhada em desenvolvimento');
     }
+
+    // Habilitar tooltips Bootstrap para os botões desabilitados
+    document.addEventListener('DOMContentLoaded', () => {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+            new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+    });
 </script>
 {% endblock %}
 
