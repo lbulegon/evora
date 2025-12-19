@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.config import settings
-from app.api.v1.endpoints import analyze
+from app.api.v1.endpoints import analyze, agent
 from app.models.schemas import HealthResponse
 import logging
 
@@ -41,6 +41,12 @@ app.include_router(
     analyze.router,
     prefix="/api/v1",
     tags=["Análise"]
+)
+
+app.include_router(
+    agent.router,
+    prefix="/api/v1",
+    tags=["Agente"]
 )
 
 

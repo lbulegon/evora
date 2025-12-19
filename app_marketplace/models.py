@@ -2509,6 +2509,294 @@ class EngajamentoAgora(models.Model):
 
 
 # ============================================================================
+# FLUXO CONVERSACIONAL WHATSAPP - Princípios Fundadores Évora
+# ============================================================================
+
+class OfertaProduto(models.Model):
+    """
+    Oferta/postagem de produto no grupo WhatsApp.
+    Deve conter oferta_id para click-to-chat contextualizado.
+    
+    Princípio: Click-to-Chat como Ato Comercial
+    - Toda postagem deve ter identificador (oferta_id)
+    - Deve levar a um click-to-chat
+    - Chat deve iniciar já contextualizado
+    """
+    oferta_id = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="ID único da oferta para click-to-chat (ex: OFT-12345)"
+    )
+    produto = models.ForeignKey(
+        'ProdutoJSON',
+        on_delete=models.CASCADE,
+        related_name='ofertas',
+        help_text="Produto oferecido"
+    )
+    grupo = models.ForeignKey(
+        WhatsappGroup,
+        on_delete=models.CASCADE,
+        related_name='ofertas',
+        help_text="Grupo WhatsApp onde foi postado"
+    )
+    mensagem_postada = models.TextField(
+        help_text="Mensagem original postada no grupo"
+    )
+    imagem_url = models.URLField(
+        blank=True,
+        help_text="URL da imagem do produto (do SinapUm)"
+    )
+    preco_exibido = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Preço exibido na oferta"
+    )
+    moeda = models.CharField(
+        max_length=3,
+        default='BRL',
+        help_text="Moeda (BRL, USD, etc.)"
+    )
+    criado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='ofertas_criadas',
+        help_text="Shopper que criou a oferta"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    ativo = models.BooleanField(default=True)
+    
+    class Meta:
+        verbose_name = 'Oferta de Produto'
+        verbose_name_plural = 'Ofertas de Produto'
+        ordering = ['-criado_em']
+        indexes = [
+            models.Index(fields=['oferta_id']),
+            models.Index(fields=['grupo', '-criado_em']),
+            models.Index(fields=['produto', 'ativo']),
+        ]
+    
+    def __str__(self):
+        return f"{self.oferta_id} - {self.produto.nome_produto if self.produto else 'Produto'}"
+    
+    def save(self, *args, **kwargs):
+        if not self.oferta_id:
+            import uuid
+            self.oferta_id = f"OFT-{uuid.uuid4().hex[:8].upper()}"
+        super().save(*args, **kwargs)
+
+
+class IntencaoSocial(models.Model):
+    """
+    Manifestação de interesse no grupo WhatsApp (Intenção Social Assistida).
+    
+    IMPORTANTE: NÃO é pedido, NÃO gera carrinho, NÃO gera cobrança.
+    
+    Princípio: No grupo nasce o desejo. No privado nasce o compromisso.
+    - Intenção social é visível, reversível, não vinculante
+    - Serve para prova social e influência coletiva
+    """
+    
+    class TipoIntencao(models.TextChoices):
+        EMOJI = 'emoji', 'Emoji (❤️, 👍, etc.)'
+        TEXTO = 'texto', 'Texto ("eu quero", "quanto custa?")'
+        PERGUNTA = 'pergunta', 'Pergunta sobre o produto'
+        COMENTARIO = 'comentario', 'Comentário sobre o produto'
+    
+    oferta = models.ForeignKey(
+        OfertaProduto,
+        on_delete=models.CASCADE,
+        related_name='intencoes_sociais',
+        help_text="Oferta que gerou a intenção"
+    )
+    participante = models.ForeignKey(
+        WhatsappParticipant,
+        on_delete=models.CASCADE,
+        related_name='intencoes_sociais',
+        help_text="Participante que manifestou interesse"
+    )
+    tipo = models.CharField(
+        max_length=20,
+        choices=TipoIntencao.choices,
+        help_text="Tipo de manifestação"
+    )
+    conteudo = models.TextField(
+        help_text="Conteúdo da manifestação (emoji, texto, etc.)"
+    )
+    mensagem_id = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="ID da mensagem no WhatsApp"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Intenção Social'
+        verbose_name_plural = 'Intenções Sociais'
+        ordering = ['-criado_em']
+        indexes = [
+            models.Index(fields=['oferta', '-criado_em']),
+            models.Index(fields=['participante', '-criado_em']),
+        ]
+        unique_together = [['oferta', 'participante', 'mensagem_id']]
+    
+    def __str__(self):
+        return f"{self.participante.name} - {self.get_tipo_display()} - {self.oferta.oferta_id}"
+
+
+class ConversaContextualizada(models.Model):
+    """
+    Conversa privada WhatsApp iniciada via click-to-chat.
+    Já vem contextualizada com produto/oferta.
+    
+    Princípio: Click-to-Chat como Ato Comercial
+    - Chat inicia já com contexto do produto
+    - Permite negociação real no privado
+    """
+    
+    class StatusConversa(models.TextChoices):
+        ABERTA = 'aberta', 'Aberta'
+        NEGOCIANDO = 'negociando', 'Em Negociação'
+        FECHADA = 'fechada', 'Fechada (pedido criado)'
+        CANCELADA = 'cancelada', 'Cancelada'
+    
+    oferta = models.ForeignKey(
+        OfertaProduto,
+        on_delete=models.CASCADE,
+        related_name='conversas_contextualizadas',
+        help_text="Oferta que gerou o click-to-chat"
+    )
+    participante = models.ForeignKey(
+        WhatsappParticipant,
+        on_delete=models.CASCADE,
+        related_name='conversas_contextualizadas',
+        help_text="Participante que iniciou a conversa"
+    )
+    conversa = models.ForeignKey(
+        WhatsappConversation,
+        on_delete=models.CASCADE,
+        related_name='contextos',
+        help_text="Conversa WhatsApp vinculada"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=StatusConversa.choices,
+        default=StatusConversa.ABERTA
+    )
+    mensagem_inicial_enviada = models.BooleanField(
+        default=False,
+        help_text="Mensagem contextualizada inicial foi enviada"
+    )
+    iniciada_em = models.DateTimeField(auto_now_add=True)
+    atualizada_em = models.DateTimeField(auto_now=True)
+    fechada_em = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = 'Conversa Contextualizada'
+        verbose_name_plural = 'Conversas Contextualizadas'
+        ordering = ['-iniciada_em']
+        indexes = [
+            models.Index(fields=['oferta', 'status']),
+            models.Index(fields=['participante', '-iniciada_em']),
+            models.Index(fields=['conversa']),
+        ]
+    
+    def __str__(self):
+        return f"{self.participante.name} - {self.oferta.oferta_id} - {self.get_status_display()}"
+
+
+class CarrinhoInvisivel(models.Model):
+    """
+    Carrinho invisível vinculado a uma conversa privada.
+    
+    Princípio: Carrinho Invisível
+    - Cliente conversa, sistema anota silenciosamente
+    - Nunca exibido como tela obrigatória
+    - Interno, incremental, corrigível
+    """
+    conversa_contextualizada = models.OneToOneField(
+        ConversaContextualizada,
+        on_delete=models.CASCADE,
+        related_name='carrinho_invisivel',
+        help_text="Conversa vinculada ao carrinho"
+    )
+    itens = models.JSONField(
+        default=list,
+        help_text="Lista de itens: [{'produto_id': 1, 'quantidade': 2, 'preco': 89.90, 'nome': '...'}]"
+    )
+    subtotal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Subtotal do carrinho"
+    )
+    total = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Total do carrinho (com taxas, se houver)"
+    )
+    moeda = models.CharField(
+        max_length=3,
+        default='BRL',
+        help_text="Moeda do carrinho"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Carrinho Invisível'
+        verbose_name_plural = 'Carrinhos Invisíveis'
+        ordering = ['-atualizado_em']
+    
+    def __str__(self):
+        return f"Carrinho {self.conversa_contextualizada.participante.name} - {len(self.itens)} itens"
+    
+    def calcular_total(self):
+        """Calcula total do carrinho"""
+        self.subtotal = sum(
+            Decimal(str(item.get('preco', 0))) * Decimal(str(item.get('quantidade', 0)))
+            for item in self.itens
+        )
+        self.total = self.subtotal  # Pode adicionar taxas depois
+        self.save()
+        return self.total
+    
+    def adicionar_item(self, produto_id, quantidade, preco, nome):
+        """Adiciona item ao carrinho invisível"""
+        # Verificar se item já existe
+        for item in self.itens:
+            if item.get('produto_id') == produto_id:
+                item['quantidade'] += quantidade
+                self.calcular_total()
+                return
+        
+        # Adicionar novo item
+        self.itens.append({
+            'produto_id': produto_id,
+            'quantidade': quantidade,
+            'preco': float(preco),
+            'nome': nome
+        })
+        self.calcular_total()
+    
+    def remover_item(self, produto_id):
+        """Remove item do carrinho"""
+        self.itens = [item for item in self.itens if item.get('produto_id') != produto_id]
+        self.calcular_total()
+    
+    def limpar(self):
+        """Limpa o carrinho"""
+        self.itens = []
+        self.subtotal = Decimal('0')
+        self.total = Decimal('0')
+        self.save()
+
+
+# ============================================================================
 # MODELO PRODUTO JSON - Armazenamento em JSON (PostgreSQL JSONB)
 # ============================================================================
 

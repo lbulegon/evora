@@ -10,6 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.db import transaction
+from typing import Optional
 import json
 import logging
 
@@ -20,12 +21,17 @@ from .models import (
     EvolutionMessage
 )
 from .evolution_service import EvolutionAPIService
-from app_marketplace.models import Cliente, PersonalShopper, AddressKeeper
+from app_marketplace.models import (
+    Cliente, PersonalShopper, AddressKeeper,
+    WhatsappGroup, WhatsappParticipant, WhatsappConversation
+)
+from app_marketplace.whatsapp_flow_engine import WhatsAppFlowEngine
 
 logger = logging.getLogger(__name__)
 
-# Inicializar serviço Evolution API
+# Inicializar serviços
 evolution_service = EvolutionAPIService()
+flow_engine = WhatsAppFlowEngine()
 
 
 @csrf_exempt
@@ -158,16 +164,71 @@ def webhook_evolution_api(request):
                 contact.last_message_at = timestamp
                 contact.save()
                 
-                # Processar e responder
-                reply_message = process_message(contact, message_text, message_log)
+                # ============================================================
+                # FLUXO CONVERSACIONAL ÉVORA/VITRINEZAP
+                # ============================================================
+                # Verificar se é mensagem de grupo ou privada
+                is_group = '@g.us' in remote_jid
                 
-                # Enviar resposta se houver
-                if reply_message:
-                    result = evolution_service.send_text_message(contact.phone, reply_message, instance_name=instance.name)
-                    if result.get('success'):
-                        message_log.reply_sent = True
-                        message_log.reply_content = reply_message
-                        evolution_message.processed = True
+                if is_group:
+                    # FLUXO GRUPO: Intenção Social Assistida
+                    grupo = _obter_grupo_por_jid(remote_jid)
+                    if grupo:
+                        participante = _obter_ou_criar_participante(grupo, phone, contact)
+                        resultado = flow_engine.processar_mensagem_grupo(
+                            grupo=grupo,
+                            participante=participante,
+                            mensagem=message_text,
+                            mensagem_id=message_id,
+                            tipo_mensagem=message_type
+                        )
+                        
+                        # Enviar resposta no grupo se houver
+                        if resultado.get('resposta_grupo'):
+                            reply_message = resultado.get('resposta_grupo')
+                            result = evolution_service.send_text_message(
+                                number=remote_jid,
+                                text=reply_message,
+                                instance_name=instance.name
+                            )
+                            if result.get('success'):
+                                message_log.reply_sent = True
+                                message_log.reply_content = reply_message
+                                evolution_message.processed = True
+                else:
+                    # FLUXO PRIVADO: Negociação e Carrinho Invisível
+                    conversa = _obter_ou_criar_conversa(contact, phone)
+                    if conversa:
+                        participante = _obter_participante_da_conversa(conversa, phone, contact)
+                        if participante:
+                            resultado = flow_engine.processar_mensagem_privada(
+                                conversa=conversa,
+                                participante=participante,
+                                mensagem=message_text,
+                                mensagem_id=message_id
+                            )
+                            
+                            # Enviar resposta do IA-Vendedor
+                            if resultado.get('resposta'):
+                                reply_message = resultado.get('resposta')
+                                result = evolution_service.send_text_message(
+                                    number=contact.phone,
+                                    text=reply_message,
+                                    instance_name=instance.name
+                                )
+                                if result.get('success'):
+                                    message_log.reply_sent = True
+                                    message_log.reply_content = reply_message
+                                    evolution_message.processed = True
+                    else:
+                        # Fallback: processar mensagem padrão
+                        reply_message = process_message(contact, message_text, message_log)
+                        if reply_message:
+                            result = evolution_service.send_text_message(contact.phone, reply_message, instance_name=instance.name)
+                            if result.get('success'):
+                                message_log.reply_sent = True
+                                message_log.reply_content = reply_message
+                                evolution_message.processed = True
                 
                 message_log.processed = True
                 message_log.save()
@@ -180,6 +241,84 @@ def webhook_evolution_api(request):
     except Exception as e:
         logger.error(f"Erro ao processar webhook Evolution API: {str(e)}", exc_info=True)
         return JsonResponse({'error': str(e)}, status=500)
+
+
+# ============================================================================
+# FUNÇÕES AUXILIARES PARA FLUXO CONVERSACIONAL
+# ============================================================================
+
+def _obter_grupo_por_jid(jid: str) -> Optional[WhatsappGroup]:
+    """Obtém grupo WhatsApp por JID"""
+    # Extrair chat_id do JID (formato: 5511999999999@g.us)
+    chat_id = jid.split('@')[0] if '@' in jid else jid
+    try:
+        return WhatsappGroup.objects.get(chat_id=chat_id)
+    except WhatsappGroup.DoesNotExist:
+        return None
+
+
+def _obter_ou_criar_participante(
+    grupo: WhatsappGroup,
+    phone: str,
+    contact: WhatsAppContact
+) -> WhatsappParticipant:
+    """Obtém ou cria participante do grupo"""
+    participante, created = WhatsappParticipant.objects.get_or_create(
+        group=grupo,
+        phone=phone,
+        defaults={
+            'name': contact.name or 'Participante'
+        }
+    )
+    return participante
+
+
+def _obter_ou_criar_conversa(
+    contact: WhatsAppContact,
+    phone: str
+) -> Optional[WhatsappConversation]:
+    """Obtém ou cria conversa privada"""
+    try:
+        # Buscar participante por telefone
+        participante = WhatsappParticipant.objects.filter(phone=phone).first()
+        if not participante:
+            return None
+        
+        conversa = WhatsappConversation.objects.filter(
+            participant=participante
+        ).order_by('-last_message_at').first()
+        
+        if not conversa:
+            # Criar nova conversa
+            conversa = WhatsappConversation.objects.create(
+                conversation_id=f"PRIV-{phone}-{timezone.now().timestamp()}",
+                participant=participante,
+                status='open'
+            )
+        
+        return conversa
+    except Exception as e:
+        logger.error(f"Erro ao obter/criar conversa: {e}")
+        return None
+
+
+def _obter_participante_da_conversa(
+    conversa: Optional[WhatsappConversation],
+    phone: str,
+    contact: WhatsAppContact
+) -> Optional[WhatsappParticipant]:
+    """Obtém participante de uma conversa"""
+    if conversa and conversa.participant:
+        return conversa.participant
+    
+    # Buscar participante por telefone em qualquer grupo
+    participante = WhatsappParticipant.objects.filter(phone=phone).first()
+    if not participante:
+        # Criar participante genérico (sem grupo específico)
+        # Nota: Isso pode precisar de ajuste dependendo da estrutura
+        pass
+    
+    return participante
 
 
 @csrf_exempt
