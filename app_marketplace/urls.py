@@ -96,6 +96,12 @@ urlpatterns = [
     path('shopper/orders/', shopper_dashboard_views.shopper_orders, name='shopper_orders'),
     path('shopper/analytics/', shopper_dashboard_views.shopper_analytics, name='shopper_analytics'),
     
+    # CRUD de Empresas/Estabelecimentos
+    path('shopper/empresas/', shopper_dashboard_views.shopper_empresas, name='shopper_empresas'),
+    path('shopper/empresas/create/', shopper_dashboard_views.shopper_empresa_create, name='shopper_empresa_create'),
+    path('shopper/empresas/<int:empresa_id>/edit/', shopper_dashboard_views.shopper_empresa_edit, name='shopper_empresa_edit'),
+    path('shopper/empresas/<int:empresa_id>/delete/', shopper_dashboard_views.shopper_empresa_delete, name='shopper_empresa_delete'),
+    
     # Dashboard de Administração
     path('admin/dashboard/', admin_dashboard_views.admin_dashboard, name='admin_dashboard'),
     

@@ -1,0 +1,182 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}{% if action == 'edit' %}Editar{% else %}Nova{% endif %} Empresa - Shopper Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-card {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    
+    .form-section {
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+    }
+    
+    .form-section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <div class="form-card">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="h4 mb-0">
+                        <i class="fas fa-store text-primary"></i>
+                        {% if action == 'edit' %}Editar Estabelecimento{% else %}Novo Estabelecimento{% endif %}
+                    </h2>
+                    <a href="{% url 'shopper_empresas' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <!-- Identificação -->
+                    <div class="form-section">
+                        <div class="form-section-title">
+                            <i class="fas fa-id-card"></i> Identificação
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="nome" class="form-label">Nome do Estabelecimento <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="nome" name="nome" 
+                                       value="{% if empresa %}{{ empresa.nome }}{% endif %}" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contato -->
+                    <div class="form-section">
+                        <div class="form-section-title">
+                            <i class="fas fa-phone"></i> Contato
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="telefone" class="form-label">Telefone</label>
+                                <input type="text" class="form-control" id="telefone" name="telefone" 
+                                       value="{% if empresa %}{{ empresa.telefone }}{% endif %}" 
+                                       placeholder="(00) 00000-0000">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="website" class="form-label">Website</label>
+                                <input type="url" class="form-control" id="website" name="website" 
+                                       value="{% if empresa %}{{ empresa.website }}{% endif %}" 
+                                       placeholder="https://exemplo.com">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Localização -->
+                    <div class="form-section">
+                        <div class="form-section-title">
+                            <i class="fas fa-map-marker-alt"></i> Localização
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="endereco" class="form-label">Endereço</label>
+                                <textarea class="form-control" id="endereco" name="endereco" rows="2">{% if empresa %}{{ empresa.endereco }}{% endif %}</textarea>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="cidade" class="form-label">Cidade</label>
+                                <input type="text" class="form-control" id="cidade" name="cidade" 
+                                       value="{% if empresa %}{{ empresa.cidade }}{% endif %}" 
+                                       placeholder="Ex: Orlando, Ciudad del Este">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="estado" class="form-label">Estado</label>
+                                <input type="text" class="form-control" id="estado" name="estado" 
+                                       value="{% if empresa %}{{ empresa.estado }}{% endif %}" 
+                                       placeholder="Ex: FL, Alto Paraná">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="pais" class="form-label">País</label>
+                                <select class="form-select" id="pais" name="pais">
+                                    {% for pais in paises_comuns %}
+                                        <option value="{{ pais }}" {% if empresa and empresa.pais == pais %}selected{% elif not empresa and pais == 'USA' %}selected{% endif %}>{{ pais }}</option>
+                                    {% endfor %}
+                                    {% if empresa and empresa.pais not in paises_comuns %}
+                                        <option value="{{ empresa.pais }}" selected>{{ empresa.pais }}</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="latitude" class="form-label">Latitude</label>
+                                <input type="number" step="any" class="form-control" id="latitude" name="latitude" 
+                                       value="{% if empresa %}{{ empresa.latitude }}{% endif %}" 
+                                       placeholder="-25.4284">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="longitude" class="form-label">Longitude</label>
+                                <input type="number" step="any" class="form-control" id="longitude" name="longitude" 
+                                       value="{% if empresa %}{{ empresa.longitude }}{% endif %}" 
+                                       placeholder="-54.5875">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Operacional -->
+                    <div class="form-section">
+                        <div class="form-section-title">
+                            <i class="fas fa-clock"></i> Informações Operacionais
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="horario_funcionamento" class="form-label">Horário de Funcionamento</label>
+                                <textarea class="form-control" id="horario_funcionamento" name="horario_funcionamento" rows="2" 
+                                          placeholder="Ex: Seg-Sex: 9h-18h, Sáb: 9h-14h">{% if empresa %}{{ empresa.horario_funcionamento }}{% endif %}</textarea>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label for="categorias" class="form-label">Categorias (separadas por vírgula ou JSON)</label>
+                                <input type="text" class="form-control" id="categorias" name="categorias" 
+                                       value="{% if empresa %}{{ empresa.categorias|join:', ' }}{% endif %}" 
+                                       placeholder="Ex: Eletrônicos, Roupas, Acessórios">
+                                <small class="form-text text-muted">Separe por vírgula ou use formato JSON: ["Categoria1", "Categoria2"]</small>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="ativo" name="ativo" 
+                                           {% if not empresa or empresa.ativo %}checked{% endif %}>
+                                    <label class="form-check-label" for="ativo">
+                                        Empresa ativa
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botões -->
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'shopper_empresas' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> {% if action == 'edit' %}Atualizar{% else %}Criar{% endif %} Estabelecimento
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,56 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Excluir Empresa - Shopper Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> Confirmar Exclusão
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Atenção!</strong> Esta ação não pode ser desfeita.
+                    </p>
+                    
+                    <p>Você está prestes a excluir a empresa:</p>
+                    <div class="alert alert-info">
+                        <h6 class="mb-1">{{ empresa.nome }}</h6>
+                        {% if empresa.cidade %}
+                        <small class="text-muted">
+                            <i class="fas fa-map-marker-alt"></i> {{ empresa.cidade }}{% if empresa.estado %}, {{ empresa.estado }}{% endif %}
+                        </small>
+                        {% endif %}
+                        {% if empresa.email %}
+                        <br><small class="text-muted">
+                            <i class="fas fa-envelope"></i> {{ empresa.email }}
+                        </small>
+                        {% endif %}
+                    </div>
+                    
+                    <p class="text-muted">Tem certeza que deseja continuar?</p>
+                    
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'shopper_empresas' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Sim, Excluir
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

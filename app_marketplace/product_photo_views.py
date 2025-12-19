@@ -900,6 +900,31 @@ def save_product_json(request):
         categoria = produto.get('categoria')
         codigo_barras = (produto.get('codigo_barras') or '').strip() or None
         
+        # Extrair preço e estoque do formulário se fornecidos
+        preco = data.get('price')
+        estoque = data.get('estoque')
+        
+        # Atualizar JSON com preço e estoque se fornecidos
+        if preco:
+            try:
+                preco_decimal = Decimal(str(preco))
+                # Adicionar preço no produto_viagem se não existir
+                if 'produto_viagem' not in produto_json:
+                    produto_json['produto_viagem'] = {}
+                produto_json['produto_viagem']['preco_venda_brl'] = str(preco_decimal)
+                # Também adicionar no produto se não existir
+                if 'preco' not in produto:
+                    produto['preco'] = str(preco_decimal)
+            except (ValueError, TypeError):
+                logger.warning(f"[SAVE_PRODUCT] Erro ao processar preço: {preco}")
+        
+        if estoque:
+            try:
+                estoque_int = int(estoque)
+                produto['estoque'] = estoque_int
+            except (ValueError, TypeError):
+                logger.warning(f"[SAVE_PRODUCT] Erro ao processar estoque: {estoque}")
+        
         logger.info(f"[SAVE_PRODUCT] Dados extraídos - Nome: {nome_produto}, Marca: {marca}, Categoria: {categoria}, Código: {codigo_barras}")
         
         # Obter caminho da imagem (primeira imagem do array para referência)

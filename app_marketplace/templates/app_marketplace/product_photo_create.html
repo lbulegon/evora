@@ -431,22 +431,32 @@
                 {% csrf_token %}
                 
                 <div class="row">
-                    <div class="col-md-8">
+                    <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label">Nome do Produto *</label>
                             <input type="text" name="name" id="inputName" class="form-control" required>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="mb-3">
                             <label class="form-label">Marca</label>
                             <input type="text" name="brand" id="inputBrand" class="form-control">
                         </div>
                     </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Preço *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="number" name="price" id="inputPrice" class="form-control" 
+                                       step="0.01" min="0" placeholder="0.00" required>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="mb-3">
                             <label class="form-label">Categoria</label>
                             <select name="category" id="inputCategory" class="form-select">
@@ -457,10 +467,17 @@
                             </select>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="mb-3">
                             <label class="form-label">Código de Barras</label>
                             <input type="text" name="codigo_barras" id="inputCodigoBarras" class="form-control">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label class="form-label">Estoque</label>
+                            <input type="number" name="estoque" id="inputEstoque" class="form-control" 
+                                   min="0" placeholder="Quantidade disponível">
                         </div>
                     </div>
                 </div>
@@ -864,6 +881,19 @@ function handleAnalysisResult(result) {
         document.getElementById('inputCategory').value = produto.categoria || '';
         document.getElementById('inputCodigoBarras').value = produto.codigo_barras || '';
         document.getElementById('inputDescription').value = produto.descricao || '';
+        
+        // Preencher preço se disponível
+        const preco = result.produto_json?.produto_viagem?.preco_venda_brl || 
+                     result.produto_json?.produto?.preco || 
+                     produto.preco || '';
+        if (preco) {
+            const priceInput = document.getElementById('inputPrice');
+            if (priceInput) {
+                // Converter para número se for string
+                const priceValue = typeof preco === 'string' ? parseFloat(preco.replace(/[^\d.,]/g, '').replace(',', '.')) : preco;
+                priceInput.value = priceValue || '';
+            }
+        }
     } else {
         console.warn('[HANDLE_ANALYSIS] produto_json ou produto não encontrado no resultado');
     }
@@ -935,6 +965,20 @@ async function saveProduct() {
     jsonData.produto.categoria = document.getElementById('inputCategory').value || jsonData.produto.categoria;
     jsonData.produto.codigo_barras = document.getElementById('inputCodigoBarras').value.trim() || jsonData.produto.codigo_barras;
     jsonData.produto.descricao = document.getElementById('inputDescription').value.trim() || jsonData.produto.descricao;
+    
+    // Atualizar preço e estoque
+    const priceInput = document.getElementById('inputPrice');
+    const estoqueInput = document.getElementById('inputEstoque');
+    if (priceInput && priceInput.value) {
+        jsonData.produto.preco = priceInput.value;
+        if (!jsonData.produto_viagem) {
+            jsonData.produto_viagem = {};
+        }
+        jsonData.produto_viagem.preco_venda_brl = priceInput.value;
+    }
+    if (estoqueInput && estoqueInput.value) {
+        jsonData.produto.estoque = parseInt(estoqueInput.value) || 0;
+    }
     
     // CRÍTICO: Garantir que os caminhos das imagens estejam no array produto.imagens
     if (!jsonData.produto.imagens) {
@@ -1018,6 +1062,12 @@ async function saveProduct() {
         }
     }
     
+    // Obter preço e estoque do formulário
+    const priceInput = document.getElementById('inputPrice');
+    const estoqueInput = document.getElementById('inputEstoque');
+    const price = priceInput && priceInput.value ? priceInput.value : null;
+    const estoque = estoqueInput && estoqueInput.value ? estoqueInput.value : null;
+    
     const saveData = {
         produto_json: jsonData
     };
@@ -1027,9 +1077,19 @@ async function saveProduct() {
         saveData.grupo_id = grupoId;
     }
     
+    // Adicionar preço e estoque
+    if (price) {
+        saveData.price = price;
+    }
+    if (estoque) {
+        saveData.estoque = estoque;
+    }
+    
     console.log('Enviando dados para salvar:', {
         has_produto_json: !!saveData.produto_json,
-        grupo_id: saveData.grupo_id
+        grupo_id: saveData.grupo_id,
+        price: saveData.price,
+        estoque: saveData.estoque
     });
     
     try {

@@ -19,7 +19,7 @@ from decimal import Decimal
 from .models import (
     PersonalShopper, WhatsappGroup, WhatsappParticipant, 
     WhatsappMessage, WhatsappOrder,
-    Cliente, Produto, Categoria, Empresa, ProdutoJSON
+    Cliente, Produto, Categoria, Empresa, Estabelecimento, ProdutoJSON
 )
 from .whatsapp_views import send_message, send_reaction
 from .utils import build_image_url
@@ -964,3 +964,198 @@ def delete_product_json(request, product_id):
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+# ============================================================================
+# GERENCIAMENTO DE EMPRESAS/ESTABELECIMENTOS
+# ============================================================================
+
+@login_required
+def shopper_empresas(request):
+    """Lista estabelecimentos do shopper"""
+    if not request.user.is_shopper:
+        messages.error(request, "Acesso restrito a Personal Shoppers.")
+        return redirect('home')
+    
+    # Buscar todos os estabelecimentos
+    estabelecimentos = Estabelecimento.objects.all().order_by('-criado_em')
+    
+    # Filtros
+    search_query = request.GET.get('search', '')
+    pais_filter = request.GET.get('pais', '')
+    estado_filter = request.GET.get('estado', '')
+    ativo_filter = request.GET.get('ativo', '')
+    
+    if search_query:
+        estabelecimentos = estabelecimentos.filter(
+            Q(nome__icontains=search_query) |
+            Q(cidade__icontains=search_query) |
+            Q(endereco__icontains=search_query)
+        )
+    
+    if pais_filter:
+        estabelecimentos = estabelecimentos.filter(pais=pais_filter)
+    
+    if estado_filter:
+        estabelecimentos = estabelecimentos.filter(estado=estado_filter)
+    
+    if ativo_filter == 'true':
+        estabelecimentos = estabelecimentos.filter(ativo=True)
+    elif ativo_filter == 'false':
+        estabelecimentos = estabelecimentos.filter(ativo=False)
+    
+    # Paginação
+    paginator = Paginator(estabelecimentos, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Estatísticas
+    total_estabelecimentos = Estabelecimento.objects.count()
+    estabelecimentos_ativos = Estabelecimento.objects.filter(ativo=True).count()
+    paises = Estabelecimento.objects.values_list('pais', flat=True).distinct().order_by('pais')
+    estados = Estabelecimento.objects.values_list('estado', flat=True).distinct().order_by('estado')
+    
+    context = {
+        'page_obj': page_obj,
+        'total_empresas': total_estabelecimentos,
+        'empresas_ativas': estabelecimentos_ativos,
+        'paises': paises,
+        'estados': estados,
+        'search_query': search_query,
+        'pais_filter': pais_filter,
+        'estado_filter': estado_filter,
+        'ativo_filter': ativo_filter,
+    }
+    
+    return render(request, 'app_marketplace/shopper_empresas.html', context)
+
+
+@login_required
+def shopper_empresa_create(request):
+    """Criar novo estabelecimento"""
+    if not request.user.is_shopper:
+        messages.error(request, "Acesso restrito a Personal Shoppers.")
+        return redirect('home')
+    
+    if request.method == 'POST':
+        try:
+            # Criar estabelecimento
+            estabelecimento = Estabelecimento.objects.create(
+                nome=request.POST.get('nome'),
+                telefone=request.POST.get('telefone', ''),
+                website=request.POST.get('website', ''),
+                endereco=request.POST.get('endereco', ''),
+                cidade=request.POST.get('cidade', 'Orlando'),
+                estado=request.POST.get('estado', 'FL'),
+                pais=request.POST.get('pais', 'USA'),
+                latitude=request.POST.get('latitude') or None,
+                longitude=request.POST.get('longitude') or None,
+                horario_funcionamento=request.POST.get('horario_funcionamento', ''),
+                ativo=request.POST.get('ativo') == 'on',
+            )
+            
+            # Processar categorias (JSON)
+            categorias_str = request.POST.get('categorias', '')
+            if categorias_str:
+                try:
+                    categorias = json.loads(categorias_str)
+                    estabelecimento.categorias = categorias
+                    estabelecimento.save()
+                except json.JSONDecodeError:
+                    # Se não for JSON válido, tratar como lista separada por vírgulas
+                    categorias = [c.strip() for c in categorias_str.split(',') if c.strip()]
+                    estabelecimento.categorias = categorias
+                    estabelecimento.save()
+            
+            messages.success(request, f'Estabelecimento "{estabelecimento.nome}" criado com sucesso!')
+            return redirect('shopper_empresas')
+            
+        except Exception as e:
+            messages.error(request, f'Erro ao criar estabelecimento: {str(e)}')
+    
+    # Países comuns
+    paises_comuns = ['USA', 'Brasil', 'Paraguai', 'Argentina', 'Chile']
+    
+    context = {
+        'paises_comuns': paises_comuns,
+        'action': 'create',
+    }
+    
+    return render(request, 'app_marketplace/shopper_empresa_form.html', context)
+
+
+@login_required
+def shopper_empresa_edit(request, empresa_id):
+    """Editar estabelecimento"""
+    if not request.user.is_shopper:
+        messages.error(request, "Acesso restrito a Personal Shoppers.")
+        return redirect('home')
+    
+    estabelecimento = get_object_or_404(Estabelecimento, id=empresa_id)
+    
+    if request.method == 'POST':
+        try:
+            estabelecimento.nome = request.POST.get('nome')
+            estabelecimento.telefone = request.POST.get('telefone', '')
+            estabelecimento.website = request.POST.get('website', '')
+            estabelecimento.endereco = request.POST.get('endereco', '')
+            estabelecimento.cidade = request.POST.get('cidade', 'Orlando')
+            estabelecimento.estado = request.POST.get('estado', 'FL')
+            estabelecimento.pais = request.POST.get('pais', 'USA')
+            estabelecimento.latitude = request.POST.get('latitude') or None
+            estabelecimento.longitude = request.POST.get('longitude') or None
+            estabelecimento.horario_funcionamento = request.POST.get('horario_funcionamento', '')
+            estabelecimento.ativo = request.POST.get('ativo') == 'on'
+            
+            # Processar categorias
+            categorias_str = request.POST.get('categorias', '')
+            if categorias_str:
+                try:
+                    categorias = json.loads(categorias_str)
+                    estabelecimento.categorias = categorias
+                except json.JSONDecodeError:
+                    categorias = [c.strip() for c in categorias_str.split(',') if c.strip()]
+                    estabelecimento.categorias = categorias
+            else:
+                estabelecimento.categorias = []
+            
+            estabelecimento.save()
+            
+            messages.success(request, f'Estabelecimento "{estabelecimento.nome}" atualizado com sucesso!')
+            return redirect('shopper_empresas')
+            
+        except Exception as e:
+            messages.error(request, f'Erro ao atualizar estabelecimento: {str(e)}')
+    
+    # Países comuns
+    paises_comuns = ['USA', 'Brasil', 'Paraguai', 'Argentina', 'Chile']
+    
+    context = {
+        'empresa': estabelecimento,
+        'paises_comuns': paises_comuns,
+        'action': 'edit',
+    }
+    
+    return render(request, 'app_marketplace/shopper_empresa_form.html', context)
+
+
+@login_required
+def shopper_empresa_delete(request, empresa_id):
+    """Deletar estabelecimento"""
+    if not request.user.is_shopper:
+        messages.error(request, "Acesso restrito a Personal Shoppers.")
+        return redirect('home')
+    
+    estabelecimento = get_object_or_404(Estabelecimento, id=empresa_id)
+    
+    if request.method == 'POST':
+        nome_estabelecimento = estabelecimento.nome
+        estabelecimento.delete()
+        messages.success(request, f'Estabelecimento "{nome_estabelecimento}" deletado com sucesso!')
+        return redirect('shopper_empresas')
+    
+    context = {
+        'empresa': estabelecimento,
+    }
+    
+    return render(request, 'app_marketplace/shopper_empresa_delete.html', context)

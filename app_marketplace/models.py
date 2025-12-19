@@ -56,6 +56,48 @@ class Empresa(models.Model):
         return self.nome
 
 
+class Estabelecimento(models.Model):
+    """
+    Estabelecimento - Representa lojas/comércios físicos.
+    Usado principalmente para lojas de Orlando (USA), Paraguai, etc.
+    """
+    # Identificação básica
+    nome = models.CharField(max_length=150, help_text="Nome do estabelecimento")
+    endereco = models.CharField(max_length=300, blank=True, help_text="Endereço completo")
+    telefone = models.CharField(max_length=20, blank=True)
+    
+    # Localização
+    cidade = models.CharField(max_length=100, default='Orlando', help_text="Ex: Orlando, Ciudad del Este")
+    estado = models.CharField(max_length=50, default='FL', help_text="Ex: FL, Alto Paraná")
+    pais = models.CharField(max_length=50, default='USA', help_text="País onde está localizado")
+    
+    # Coordenadas geográficas (opcional)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    
+    # Informações operacionais
+    website = models.URLField(blank=True, help_text="Site do estabelecimento")
+    horario_funcionamento = models.TextField(blank=True, help_text="Ex: Seg-Sex: 9h-18h, Sáb: 9h-14h")
+    categorias = models.JSONField(default=list, blank=True, help_text="Categorias de produtos vendidos")
+    
+    # Status
+    ativo = models.BooleanField(default=True)
+    
+    # Timestamps
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Estabelecimento'
+        verbose_name_plural = 'Estabelecimentos'
+        ordering = ['nome']
+
+    def __str__(self):
+        if self.cidade:
+            return f"{self.nome} - {self.cidade}/{self.estado}"
+        return self.nome
+
+
 class Categoria(models.Model):
     nome = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)

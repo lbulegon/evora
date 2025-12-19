@@ -1,0 +1,276 @@
+{% extends 'app_marketplace/base.html' %}
+{% load static %}
+
+{% block title %}Empresas/Estabelecimentos - Shopper Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .empresa-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .empresa-card:hover {
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        transform: translateY(-3px);
+    }
+    
+    .empresa-status {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .status-ativo {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .status-inativo {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    
+    .filter-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .create-empresa-btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.75rem 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .create-empresa-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        color: white;
+    }
+    
+    .stats-badge {
+        background: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 0.5rem;
+        text-align: center;
+        margin: 0.25rem;
+    }
+    
+    .stats-badge .number {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #495057;
+    }
+    
+    .stats-badge .label {
+        font-size: 0.75rem;
+        color: #6c757d;
+        text-transform: uppercase;
+    }
+    
+    .location-badge {
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 0.25rem 0.5rem;
+        border-radius: 5px;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0">
+                        <i class="fas fa-store text-primary"></i>
+                        Empresas/Estabelecimentos
+                    </h1>
+                    <p class="text-muted mb-0">Gerencie empresas e estabelecimentos</p>
+                </div>
+                <a href="{% url 'shopper_empresa_create' %}" class="btn create-empresa-btn">
+                    <i class="fas fa-plus"></i> Nova Empresa
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-badge">
+                <div class="number">{{ total_empresas }}</div>
+                <div class="label">Total</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-badge">
+                <div class="number">{{ empresas_ativas }}</div>
+                <div class="label">Ativas</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filter-card">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="search" class="form-label">Buscar</label>
+                <input type="text" class="form-control" id="search" name="search" 
+                       value="{{ search_query }}" placeholder="Nome, cidade, email...">
+            </div>
+            <div class="col-md-2">
+                <label for="pais" class="form-label">País</label>
+                <select class="form-select" id="pais" name="pais">
+                    <option value="">Todos</option>
+                    {% for pais in paises %}
+                        <option value="{{ pais }}" {% if pais_filter == pais %}selected{% endif %}>{{ pais }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="estado" class="form-label">Estado</label>
+                <select class="form-select" id="estado" name="estado">
+                    <option value="">Todos</option>
+                    {% for estado in estados %}
+                        <option value="{{ estado }}" {% if estado_filter == estado %}selected{% endif %}>{{ estado }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="ativo" class="form-label">Status</label>
+                <select class="form-select" id="ativo" name="ativo">
+                    <option value="">Todos</option>
+                    <option value="true" {% if ativo_filter == 'true' %}selected{% endif %}>Ativo</option>
+                    <option value="false" {% if ativo_filter == 'false' %}selected{% endif %}>Inativo</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-search"></i> Filtrar
+                </button>
+                <a href="{% url 'shopper_empresas' %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Limpar
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Lista de Empresas -->
+    <div class="row">
+        {% for empresa in page_obj %}
+        <div class="col-md-6 col-lg-4">
+            <div class="empresa-card">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h5 class="mb-1">{{ empresa.nome }}</h5>
+                        {% if empresa.cidade %}
+                        <span class="location-badge">
+                            <i class="fas fa-map-marker-alt"></i> {{ empresa.cidade }}{% if empresa.estado %}, {{ empresa.estado }}{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <span class="empresa-status {% if empresa.ativo %}status-ativo{% else %}status-inativo{% endif %}">
+                        {% if empresa.ativo %}Ativo{% else %}Inativo{% endif %}
+                    </span>
+                </div>
+                
+                <div class="mb-2">
+                    {% if empresa.pais %}
+                    <small class="text-muted">
+                        <i class="fas fa-globe"></i> {{ empresa.pais }}
+                    </small>
+                    {% endif %}
+                </div>
+                
+                {% if empresa.email %}
+                <div class="mb-2">
+                    <small class="text-muted">
+                        <i class="fas fa-envelope"></i> {{ empresa.email }}
+                    </small>
+                </div>
+                {% endif %}
+                
+                {% if empresa.telefone %}
+                <div class="mb-2">
+                    <small class="text-muted">
+                        <i class="fas fa-phone"></i> {{ empresa.telefone }}
+                    </small>
+                </div>
+                {% endif %}
+                
+                {% if empresa.cnpj %}
+                <div class="mb-2">
+                    <small class="text-muted">
+                        <i class="fas fa-id-card"></i> CNPJ: {{ empresa.cnpj }}
+                    </small>
+                </div>
+                {% endif %}
+                
+                <div class="mt-3 d-flex gap-2">
+                    <a href="{% url 'shopper_empresa_edit' empresa.id %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-edit"></i> Editar
+                    </a>
+                    <a href="{% url 'shopper_empresa_delete' empresa.id %}" class="btn btn-sm btn-danger">
+                        <i class="fas fa-trash"></i> Excluir
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle"></i> Nenhuma empresa encontrada.
+                <a href="{% url 'shopper_empresa_create' %}" class="alert-link">Criar primeira empresa</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Paginação -->
+    {% if page_obj.has_other_pages %}
+    <nav aria-label="Paginação">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if pais_filter %}&pais={{ pais_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if ativo_filter %}&ativo={{ ativo_filter }}{% endif %}">Primeira</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if pais_filter %}&pais={{ pais_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if ativo_filter %}&ativo={{ ativo_filter }}{% endif %}">Anterior</a>
+            </li>
+            {% endif %}
+            
+            <li class="page-item active">
+                <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+            </li>
+            
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if pais_filter %}&pais={{ pais_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if ativo_filter %}&ativo={{ ativo_filter }}{% endif %}">Próxima</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if pais_filter %}&pais={{ pais_filter }}{% endif %}{% if estado_filter %}&estado={{ estado_filter }}{% endif %}{% if ativo_filter %}&ativo={{ ativo_filter }}{% endif %}">Última</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}
+
