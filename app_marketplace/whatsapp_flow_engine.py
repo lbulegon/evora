@@ -19,13 +19,15 @@ RETORNO AO GRUPO → Prova social → Reaquecimento do ciclo
 """
 
 import logging
+import requests
 from typing import Dict, Optional, List
 from django.utils import timezone
 from django.db import transaction
+from django.conf import settings
 from .models import (
     WhatsappGroup, WhatsappParticipant, WhatsappConversation,
     OfertaProduto, IntencaoSocial, ConversaContextualizada, CarrinhoInvisivel,
-    ProdutoJSON
+    ProdutoJSON, PersonalShopper, AddressKeeper
 )
 from app_whatsapp_integration.evolution_service import EvolutionAPIService
 
@@ -310,69 +312,162 @@ class WhatsAppFlowEngine:
             conversa_contextualizada.status = ConversaContextualizada.StatusConversa.NEGOCIANDO
             conversa_contextualizada.save()
         
-        # Processar intenção da mensagem
-        intencao = self._detectar_intencao_negociacao(mensagem)
-        
-        # Processar com IA-Vendedor
-        from .ia_vendedor_agent import IAVendedorAgent
-        ia_vendedor = IAVendedorAgent()
-        resposta = ia_vendedor.processar_mensagem(
+        # Processar com Agente Ágnosto do SinapUm
+        resposta = self._processar_com_agente_sinapum(
             conversa_contextualizada=conversa_contextualizada,
             mensagem_cliente=mensagem,
-            intencao=intencao
+            participante=participante
         )
         
         return {
             'tipo': 'negociacao_privada',
-            'intencao': intencao,
-            'resposta': resposta,
-            'carrinho_atualizado': resposta.get('carrinho_atualizado', False)
+            'resposta': resposta.get('resposta', ''),
+            'acao_tomada': resposta.get('acao_tomada', 'conversa_geral'),
+            'carrinho_atualizado': resposta.get('carrinho_atualizado', False),
+            'dados_adicionais': resposta.get('dados_adicionais', {})
         }
     
-    def _detectar_intencao_negociacao(self, mensagem: str) -> Dict:
-        """Detecta intenção na mensagem do cliente"""
-        mensagem_lower = mensagem.lower()
+    def _processar_com_agente_sinapum(
+        self,
+        conversa_contextualizada: ConversaContextualizada,
+        mensagem_cliente: str,
+        participante: WhatsappParticipant
+    ) -> Dict:
+        """
+        Processa mensagem usando Agente Ágnosto do SinapUm.
         
-        # Adicionar ao pedido
-        if any(palavra in mensagem_lower for palavra in ['quero', 'adiciona', 'coloca', 'vou querer']):
-            return {'acao': 'adicionar_pedido', 'quantidade': self._extrair_quantidade(mensagem)}
+        Toda a lógica de IA fica no SinapUm - Django apenas faz chamada HTTP.
+        """
+        sinapum_url = getattr(
+            settings,
+            'SINAPUM_AGENT_URL',
+            'http://69.169.102.84:8000/api/v1/process-message'
+        )
+        sinapum_api_key = getattr(
+            settings,
+            'SINAPUM_API_KEY',
+            getattr(settings, 'OPENMIND_AI_API_KEY', None)
+        )
         
-        # Pergunta sobre preço
-        if any(palavra in mensagem_lower for palavra in ['quanto', 'preço', 'custa', 'valor']):
-            return {'acao': 'pergunta_preco'}
+        if not sinapum_api_key:
+            logger.error("SINAPUM_API_KEY não configurada")
+            return {
+                'resposta': 'Desculpe, o sistema de atendimento está temporariamente indisponível.',
+                'acao_tomada': 'erro',
+                'carrinho_atualizado': False
+            }
         
-        # Pergunta sobre entrega
-        if any(palavra in mensagem_lower for palavra in ['entrega', 'envio', 'frete', 'chega']):
-            return {'acao': 'pergunta_entrega'}
-        
-        # Finalizar pedido
-        if any(palavra in mensagem_lower for palavra in ['finalizar', 'fechar', 'pagar', 'confirmar']):
-            return {'acao': 'finalizar_pedido'}
-        
-        # Quantidade específica
-        if any(palavra in mensagem_lower for palavra in ['2x', '3x', 'duas', 'três', 'quatro']):
-            return {'acao': 'definir_quantidade', 'quantidade': self._extrair_quantidade(mensagem)}
-        
-        return {'acao': 'conversa_geral'}
+        try:
+            # Preparar contexto
+            oferta = conversa_contextualizada.oferta
+            conversa = conversa_contextualizada.conversa
+            
+            # Obter idioma do usuário
+            idioma = self._obter_idioma_usuario(conversa_contextualizada)
+            
+            # Preparar payload para SinapUm
+            payload = {
+                "message": mensagem_cliente,
+                "conversation_id": conversa.conversation_id,
+                "user_phone": participante.phone,
+                "user_name": participante.name,
+                "group_id": conversa.group.chat_id if conversa.group else None,
+                "is_group": False,  # Sempre privado aqui
+                "offer_id": oferta.oferta_id if oferta else None,
+                "language": idioma,
+                "agent_role": "vendedor",
+                "metadata": {
+                    "produto_id": oferta.produto.id if oferta else None,
+                    "produto_nome": oferta.produto.nome_produto if oferta else None,
+                    "preco": str(oferta.preco_exibido) if oferta and oferta.preco_exibido else None,
+                    "moeda": oferta.moeda if oferta else 'BRL',
+                    "imagem_url": oferta.imagem_url if oferta else None
+                }
+            }
+            
+            # Chamar agente SinapUm
+            headers = {
+                "Authorization": f"Bearer {sinapum_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            logger.info(f"[FLOW_ENGINE] Chamando agente SinapUm: {sinapum_url}")
+            response = requests.post(
+                sinapum_url,
+                json=payload,
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"[FLOW_ENGINE] Resposta do SinapUm: {data.get('action', 'N/A')}")
+                
+                # Processar ação se necessário (ex: adicionar ao carrinho)
+                if data.get('action') == 'add_to_cart':
+                    quantidade = data.get('data', {}).get('quantity', 1)
+                    self.adicionar_ao_carrinho_invisivel(
+                        conversa_contextualizada,
+                        quantidade=quantidade
+                    )
+                
+                return {
+                    'resposta': data.get('message', ''),
+                    'acao_tomada': data.get('action', 'conversa_geral'),
+                    'carrinho_atualizado': data.get('action') == 'add_to_cart',
+                    'dados_adicionais': data.get('data', {})
+                }
+            else:
+                logger.error(f"Erro ao chamar agente SinapUm: {response.status_code} - {response.text}")
+                return {
+                    'resposta': 'Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente.',
+                    'acao_tomada': 'erro',
+                    'carrinho_atualizado': False
+                }
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Erro de conexão com agente SinapUm: {e}")
+            return {
+                'resposta': 'Desculpe, o sistema de atendimento está temporariamente indisponível. Tente novamente em alguns instantes.',
+                'acao_tomada': 'erro',
+                'carrinho_atualizado': False
+            }
+        except Exception as e:
+            logger.error(f"Erro ao processar com agente SinapUm: {e}", exc_info=True)
+            return {
+                'resposta': 'Desculpe, ocorreu um erro inesperado. Nossa equipe foi notificada.',
+                'acao_tomada': 'erro',
+                'carrinho_atualizado': False
+            }
     
-    def _extrair_quantidade(self, mensagem: str) -> int:
-        """Extrai quantidade mencionada na mensagem"""
-        import re
-        # Buscar padrões como "2x", "duas", "3 unidades"
-        match = re.search(r'(\d+)\s*(x|unidades?|un\.?)', mensagem.lower())
-        if match:
-            return int(match.group(1))
+    def _obter_idioma_usuario(
+        self,
+        conversa_contextualizada: ConversaContextualizada
+    ) -> str:
+        """
+        Obtém idioma preferido do usuário (Shopper ou Keeper).
+        """
+        grupo = conversa_contextualizada.conversa.group
+        owner = grupo.owner if grupo else None
         
-        # Buscar palavras numéricas
-        numeros = {
-            'uma': 1, 'um': 1, 'dois': 2, 'duas': 2,
-            'três': 3, 'quatro': 4, 'cinco': 5
-        }
-        for palavra, num in numeros.items():
-            if palavra in mensagem.lower():
-                return num
+        if not owner:
+            return 'pt-BR'
         
-        return 1
+        # Verificar se é PersonalShopper
+        try:
+            shopper = PersonalShopper.objects.get(user=owner)
+            return shopper.idioma or 'pt-BR'
+        except PersonalShopper.DoesNotExist:
+            pass
+        
+        # Verificar se é AddressKeeper
+        try:
+            keeper = AddressKeeper.objects.get(user=owner)
+            return keeper.idioma or 'pt-BR'
+        except AddressKeeper.DoesNotExist:
+            pass
+        
+        return 'pt-BR'
     
     # ========================================================================
     # CARRINHO INVISÍVEL

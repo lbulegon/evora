@@ -20,27 +20,32 @@ O agente ágnosto foi criado no servidor **SinapUm** (openmind-ai-server) para p
 - **`GET /api/v1/agent/capabilities`**: Lista capacidades do agente
 - **`GET /api/v1/agent/roles`**: Lista papéis disponíveis
 
-### 3. Integração Django (`app_marketplace/ia_vendedor_agent.py`)
+### 3. Integração Django (`app_marketplace/whatsapp_flow_engine.py`)
 
-- **`IAVendedorAgent`**: Atualizado para usar agente SinapUm quando disponível
-- **Fallback**: Processa localmente se SinapUm não disponível
+- **`WhatsAppFlowEngine._processar_com_agente_sinapum()`**: Chama agente SinapUm via HTTP
+- **Sem fallback local**: Se SinapUm não disponível, retorna erro apropriado
 - **Configuração**: Via `SINAPUM_AGENT_URL` e `SINAPUM_API_KEY`
+- **`IAVendedorAgent`**: DEPRECATED - mantido apenas para compatibilidade
 
 ## 🔄 Fluxo de Integração
+
+**IMPORTANTE: Toda a lógica de IA está no SinapUm. Django apenas faz chamadas HTTP.**
 
 ```
 WhatsApp → Evolution API → Django Webhook
                               ↓
                     WhatsAppFlowEngine
                               ↓
-                    IAVendedorAgent
+                    HTTP POST → Agente Ágnosto SinapUm
                               ↓
-                    [Tenta SinapUm] → Agente Ágnosto SinapUm
-                              ↓                    ↓
-                    [Fallback Local] ←────────────┘
+                    [Processa com IA] → Resposta
                               ↓
-                    Resposta ao Cliente
+                    Django recebe resposta
+                              ↓
+                    Resposta ao Cliente via Evolution API
 ```
+
+**NÃO há processamento local no Django. Se SinapUm não estiver disponível, retorna erro apropriado.**
 
 ## 🚀 Como Usar
 
@@ -126,10 +131,11 @@ Content-Type: application/json
 6. ⏳ Melhorar detecção de intenções com NLP
 7. ⏳ Adicionar memória de conversa
 
-## 📝 Notas
+## 📝 Notas Importantes
 
-- O agente roda no servidor SinapUm (69.169.102.84:8000)
-- Django chama o agente via HTTP quando necessário
-- Fallback local garante funcionamento mesmo se SinapUm estiver offline
-- Agente respeita todos os princípios fundadores do Évora/VitrineZap
+- ✅ **Toda a lógica de IA está no servidor SinapUm** (69.169.102.84:8000)
+- ✅ Django **apenas faz chamadas HTTP** ao SinapUm - não processa mensagens localmente
+- ✅ Se SinapUm não estiver disponível, Django retorna erro apropriado (sem fallback local)
+- ✅ Agente respeita todos os princípios fundadores do Évora/VitrineZap
+- ⚠️ **NÃO há processamento local de IA no Django** - tudo roda no SinapUm
 

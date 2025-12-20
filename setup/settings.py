@@ -24,6 +24,13 @@ OPENMIND_AI_KEY = config("OPENMIND_AI_KEY", default="")
 OPENMIND_AI_TIMEOUT = config("OPENMIND_AI_TIMEOUT", default=30, cast=int)
 OPENMIND_ORG_MODEL = config("OPENMIND_ORG_MODEL", default="qwen2.5-vl-72b-instruct")
 
+# Agente Ágnosto SinapUm - Para processamento de mensagens WhatsApp
+SINAPUM_AGENT_URL = config("SINAPUM_AGENT_URL", default="http://69.169.102.84:8000/api/v1/process-message")
+SINAPUM_API_KEY = config("SINAPUM_API_KEY", default=None)
+# Fallback: usar mesma chave do OpenMind AI se não especificada
+if not SINAPUM_API_KEY:
+    SINAPUM_API_KEY = OPENMIND_AI_KEY
+
 # Evolution API - WhatsApp Integration
 EVOLUTION_API_URL = config("EVOLUTION_API_URL", default="http://69.169.102.84:8004")
 EVOLUTION_API_KEY = config("EVOLUTION_API_KEY", default="GKvy6psn-8HHpBQ4HAHKFOXnwjHR-oSzeGZzCaws0xg")
