@@ -61,7 +61,7 @@ OPENMIND_ORG_MODEL=qwen2.5-vl-72b-instruct
 # AGENTE ÁGNOSTO SINAPUM - Para processamento de mensagens WhatsApp
 # =============================================================================
 # URL do endpoint do agente no servidor SinapUm
-SINAPUM_AGENT_URL=http://69.169.102.84:8000/api/v1/process-message
+SINAPUM_AGENT_URL=http://69.169.102.84:8001/api/v1/process-message
 # API Key (pode usar a mesma do OpenMind AI ou uma específica)
 SINAPUM_API_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506038ea6b9921efb9d9833045d1
 # ou deixar vazio para usar OPENMIND_AI_KEY automaticamente
