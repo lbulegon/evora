@@ -200,49 +200,76 @@ def create_session(request):
                     'error': error_msg,
                 }, status=response_create.status_code)
             else:
-                logger.info(f"Instância {INSTANCE_NAME} criada com sucesso!")
+                logger.info(f"Instância {INSTANCE_NAME} criada com sucesso! Aguardando 2 segundos para gerar QR Code...")
+                import time
+                time.sleep(2)  # Aguardar instância processar
         
-        # 2. Obter QR Code
+        # 2. Obter QR Code (com retry)
         url_connect = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
         logger.info(f"Obtendo QR Code: {url_connect}")
-        try:
-            response = requests.get(url_connect, headers=headers, timeout=30)
-            logger.info(f"Resposta QR Code: {response.status_code}")
-        except Exception as e:
-            logger.error(f"Erro ao obter QR Code: {str(e)}", exc_info=True)
-            raise
         
-        if response.status_code == 200:
+        qrcode_base64 = None
+        qrcode_url = None
+        
+        # Tentar obter QR Code até 3 vezes com intervalo
+        for attempt in range(3):
             try:
-                data = response.json()
-                logger.info(f"Dados QR Code recebidos: {list(data.keys()) if isinstance(data, dict) else 'não é dict'}")
-                qrcode_data = data.get('qrcode', {})
-                qrcode_base64 = qrcode_data.get('base64')
-                qrcode_url = qrcode_data.get('url')
+                response = requests.get(url_connect, headers=headers, timeout=30)
+                logger.info(f"Resposta QR Code (tentativa {attempt + 1}): {response.status_code}")
                 
-                logger.info(f"QR Code base64 presente: {bool(qrcode_base64)}")
-                
-                # Configurar webhook
-                webhook_url = f"{request.build_absolute_uri('/')[:-1]}/api/whatsapp/webhook/evolution/"
-                url_webhook = f"{EVOLUTION_API_URL}/webhook/set/{INSTANCE_NAME}"
-                webhook_payload = {
-                    "url": webhook_url,
-                    "webhook_by_events": True,
-                    "events": [
-                        "MESSAGES_UPSERT",
-                        "MESSAGES_UPDATE",
-                        "MESSAGES_DELETE",
-                        "SEND_MESSAGE",
-                        "CONNECTION_UPDATE",
-                        "QRCODE_UPDATED"
-                    ]
-                }
-                logger.info(f"Configurando webhook: {url_webhook}")
-                try:
-                    webhook_response = requests.post(url_webhook, json=webhook_payload, headers=headers, timeout=10)
-                    logger.info(f"Webhook configurado: {webhook_response.status_code}")
-                except Exception as e:
-                    logger.warning(f"Erro ao configurar webhook (não crítico): {str(e)}")
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.info(f"Dados QR Code recebidos: {list(data.keys()) if isinstance(data, dict) else 'não é dict'}")
+                    
+                    # Verificar se retornou qrcode diretamente ou dentro de um objeto
+                    if isinstance(data, dict):
+                        qrcode_data = data.get('qrcode', {})
+                        if not qrcode_data and 'base64' in data:
+                            qrcode_data = data
+                        qrcode_base64 = qrcode_data.get('base64') if isinstance(qrcode_data, dict) else None
+                        qrcode_url = qrcode_data.get('url') if isinstance(qrcode_data, dict) else None
+                    
+                    if qrcode_base64:
+                        logger.info(f"QR Code obtido com sucesso na tentativa {attempt + 1}!")
+                        break
+                    else:
+                        logger.info(f"QR Code ainda não disponível (tentativa {attempt + 1}/3)")
+                        if attempt < 2:
+                            time.sleep(2)  # Aguardar 2 segundos antes de tentar novamente
+                else:
+                    logger.warning(f"Erro ao obter QR Code: {response.status_code}")
+                    if attempt < 2:
+                        time.sleep(2)
+            except Exception as e:
+                logger.error(f"Erro ao obter QR Code (tentativa {attempt + 1}): {str(e)}", exc_info=True)
+                if attempt < 2:
+                    time.sleep(2)
+        
+        # Configurar webhook (antes de retornar)
+        webhook_url = f"{request.build_absolute_uri('/')[:-1]}/api/whatsapp/webhook/evolution/"
+        url_webhook = f"{EVOLUTION_API_URL}/webhook/set/{INSTANCE_NAME}"
+        webhook_payload = {
+            "url": webhook_url,
+            "webhook_by_events": True,
+            "events": [
+                "MESSAGES_UPSERT",
+                "MESSAGES_UPDATE",
+                "MESSAGES_DELETE",
+                "SEND_MESSAGE",
+                "CONNECTION_UPDATE",
+                "QRCODE_UPDATED"
+            ]
+        }
+        logger.info(f"Configurando webhook: {url_webhook} para {webhook_url}")
+        try:
+            webhook_response = requests.post(url_webhook, json=webhook_payload, headers=headers, timeout=10)
+            logger.info(f"Webhook resposta: {webhook_response.status_code} - {webhook_response.text[:200]}")
+            if webhook_response.status_code not in [200, 201]:
+                logger.warning(f"Erro ao configurar webhook: {webhook_response.status_code} - {webhook_response.text}")
+        except Exception as e:
+            logger.warning(f"Erro ao configurar webhook (não crítico): {str(e)}")
+        
+        if qrcode_base64:
                 
                 if qrcode_base64:
                     logger.info(f"Retornando QR Code com sucesso para {request.user.username}")
@@ -275,13 +302,22 @@ def create_session(request):
                 'error': error_msg,
             }, status=response.status_code)
     
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"Erro de conexão com Evolution API em {EVOLUTION_API_URL}: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
             'error': 'Evolution API não está rodando! Verifique se o serviço está ativo.',
         }, status=503)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Erro na requisição para Evolution API: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': f'Erro ao comunicar com Evolution API: {str(e)}',
+        }, status=500)
     except Exception as e:
         logger.error(f"EXCEÇÃO em create_session para {request.user.username}: {str(e)}", exc_info=True)
+        import traceback
+        logger.error(f"Traceback completo: {traceback.format_exc()}")
         return JsonResponse({
             'success': False,
             'error': f'Erro ao criar sessão: {str(e)}',
