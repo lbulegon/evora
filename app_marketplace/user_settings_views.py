@@ -70,29 +70,26 @@ def update_profile(request):
         
         # Atualizar perfil específico
         if user.is_shopper:
-            profile = getattr(user, 'personalshopper', None)
-            if profile:
-                if 'phone' in request.POST:
-                    profile.telefone = request.POST['phone']
-                if 'bio' in request.POST:
-                    profile.bio = request.POST['bio']
-                profile.save()
+            profile, created = PersonalShopper.objects.get_or_create(user=user)
+            if 'phone' in request.POST:
+                profile.telefone = request.POST['phone']
+            if 'bio' in request.POST:
+                profile.bio = request.POST['bio']
+            profile.save()
         
         elif user.is_address_keeper:
-            profile = getattr(user, 'address_keeper', None)
-            if profile:
-                if 'phone' in request.POST:
-                    profile.telefone = request.POST['phone']
-                if 'address' in request.POST:
-                    profile.endereco = request.POST['address']
-                profile.save()
+            profile, created = AddressKeeper.objects.get_or_create(user=user)
+            if 'phone' in request.POST:
+                profile.telefone = request.POST['phone']
+            if 'address' in request.POST:
+                profile.endereco = request.POST['address']
+            profile.save()
         
         elif user.is_cliente:
-            profile = getattr(user, 'cliente', None)
-            if profile:
-                if 'phone' in request.POST:
-                    profile.telefone = request.POST['phone']
-                profile.save()
+            profile, created = Cliente.objects.get_or_create(user=user)
+            if 'phone' in request.POST:
+                profile.telefone = request.POST['phone']
+            profile.save()
         
         messages.success(request, 'Perfil atualizado com sucesso!')
         return JsonResponse({'success': True})

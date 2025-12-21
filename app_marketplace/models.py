@@ -208,6 +208,7 @@ class PersonalShopper(models.Model):
     user      = models.OneToOneField(User, on_delete=models.CASCADE, related_name='personalshopper')
     nome      = models.CharField(max_length=150, blank=True)
     bio       = models.TextField(blank=True)
+    telefone  = models.CharField(max_length=20, blank=True, help_text="Telefone de contato")
     
     # Redes sociais
     facebook  = models.URLField(blank=True)
