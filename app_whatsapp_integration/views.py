@@ -35,7 +35,8 @@ flow_engine = WhatsAppFlowEngine()
 
 
 @csrf_exempt
-@require_http_methods(["POST"])
+@csrf_exempt
+@require_http_methods(["POST", "GET"])  # Evolution API pode usar GET ou POST
 def webhook_evolution_api(request):
     """
     Endpoint que recebe webhooks da Evolution API
