@@ -73,32 +73,34 @@ def create_session(request):
     
     logger = logging.getLogger(__name__)
     
+    # Log detalhado para debug
+    logger.info(f"Verificando permissão para usuário: {request.user.username} (ID: {request.user.id}, Superuser: {request.user.is_superuser})")
+    
     has_permission = False
     if request.user.is_superuser:
         has_permission = True
         logger.info(f"Usuário {request.user.username} é superuser - permitindo acesso")
     else:
         # Verificar se tem perfil PersonalShopper
-        try:
-            shopper = PersonalShopper.objects.get(user=request.user)
+        shopper_exists = PersonalShopper.objects.filter(user=request.user).exists()
+        logger.info(f"Usuário {request.user.username} - PersonalShopper existe: {shopper_exists}")
+        
+        if shopper_exists:
             has_permission = True
             logger.info(f"Usuário {request.user.username} tem perfil PersonalShopper - permitindo acesso")
-        except PersonalShopper.DoesNotExist:
-            logger.debug(f"Usuário {request.user.username} não tem perfil PersonalShopper")
-        
-        # Verificar se tem perfil AddressKeeper
-        if not has_permission:
-            try:
-                keeper = AddressKeeper.objects.get(user=request.user)
+        else:
+            # Verificar se tem perfil AddressKeeper
+            keeper_exists = AddressKeeper.objects.filter(user=request.user).exists()
+            logger.info(f"Usuário {request.user.username} - AddressKeeper existe: {keeper_exists}")
+            
+            if keeper_exists:
                 has_permission = True
                 logger.info(f"Usuário {request.user.username} tem perfil AddressKeeper - permitindo acesso")
-            except AddressKeeper.DoesNotExist:
-                logger.debug(f"Usuário {request.user.username} não tem perfil AddressKeeper")
     
     if not has_permission:
-        logger.warning(f"Usuário {request.user.username} (ID: {request.user.id}) tentou conectar WhatsApp sem permissão")
+        logger.warning(f"ACESSO NEGADO: Usuário {request.user.username} (ID: {request.user.id}) tentou conectar WhatsApp sem permissão")
         return JsonResponse({
-            'error': 'Sem permissão. Você precisa ser um Personal Shopper, Address Keeper ou administrador para conectar WhatsApp.'
+            'error': 'Sem permissão. Você precisa ser um Personal Shopper, Address Keeper ou administrador para conectar WhatsApp. Verifique se seu perfil está criado corretamente.'
         }, status=403)
     
     try:
