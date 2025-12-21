@@ -75,9 +75,18 @@ def create_session(request):
         
         instance_exists = False
         if response_check.status_code == 200:
-            instances = response_check.json().get('instance', [])
+            data_check = response_check.json()
+            # A Evolution API pode retornar uma lista diretamente ou um dict com 'instance'
+            if isinstance(data_check, list):
+                instances = data_check
+            elif isinstance(data_check, dict):
+                instances = data_check.get('instance', [])
+            else:
+                instances = []
+            
             for inst in instances:
-                if inst.get('instanceName') == INSTANCE_NAME:
+                # Verificar se inst é um dict antes de usar .get()
+                if isinstance(inst, dict) and inst.get('instanceName') == INSTANCE_NAME:
                     instance_exists = True
                     break
         
@@ -238,14 +247,26 @@ def get_session_status():
         status_result = evolution_service.get_instance_status(INSTANCE_NAME)
         
         if status_result.get('success'):
-            instance_data = status_result.get('data', {})
-            evolution_status = instance_data.get('status', 'close')
-            phone = instance_data.get('phone_number')
-            phone_name = instance_data.get('phone_name')
+            # O status pode vir diretamente ou dentro de 'data'
+            evolution_status = status_result.get('status', 'close')
+            
+            # Tentar pegar de 'data' se disponível
+            data = status_result.get('data', {})
+            if isinstance(data, dict) and data.get('status'):
+                evolution_status = data.get('status', evolution_status)
+            
+            # Pegar phone e name de 'data' ou diretamente
+            if isinstance(data, dict):
+                phone = data.get('phone_number') or status_result.get('instance', {}).get('phone_number')
+                phone_name = data.get('phone_name') or status_result.get('instance', {}).get('phone_name')
+            else:
+                instance_info = status_result.get('instance', {})
+                phone = instance_info.get('phone_number') if isinstance(instance_info, dict) else None
+                phone_name = instance_info.get('phone_name') if isinstance(instance_info, dict) else None
             
             return {
                 'success': True,
-                'status': evolution_status,
+                'status': evolution_status or 'close',
                 'connected': evolution_status == 'open',
                 'phone': phone,
                 'name': phone_name,

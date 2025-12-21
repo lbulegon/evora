@@ -81,12 +81,20 @@ class EvolutionAPIService:
             
             if response.status_code == 200:
                 data = response.json()
-                instances = data.get('instance', [])
+                
+                # A Evolution API pode retornar uma lista diretamente ou um dict com 'instance'
+                if isinstance(data, list):
+                    instances = data
+                elif isinstance(data, dict):
+                    instances = data.get('instance', [])
+                else:
+                    instances = []
                 
                 # Procurar instância específica
                 evolution_instance_data = None
                 for inst in instances:
-                    if inst.get('instanceName') == instance_name:
+                    # Verificar se inst é um dict antes de usar .get()
+                    if isinstance(inst, dict) and inst.get('instanceName') == instance_name:
                         evolution_instance_data = inst
                         break
                 
@@ -109,7 +117,12 @@ class EvolutionAPIService:
                     
                     return {
                         'success': True,
-                        'status': instance.status,
+                        'data': {
+                            'status': evolution_status,
+                            'phone_number': instance.phone_number,
+                            'phone_name': instance.phone_name,
+                        },
+                        'status': evolution_status,
                         'instance': {
                             'id': instance.id,
                             'name': instance.name,
