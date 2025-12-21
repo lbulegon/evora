@@ -188,16 +188,29 @@ def create_session(request):
                 "integration": "WHATSAPP-BAILEYS"
             }
             logger.info(f"Enviando POST para criar instância: {url_create}")
-            response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
-            logger.info(f"Resposta criação instância: {response_create.status_code}")
+            logger.info(f"Payload: {payload_create}")
+            logger.info(f"Headers: {headers}")
+            try:
+                response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
+                logger.info(f"Resposta criação instância: {response_create.status_code}")
+                logger.info(f"Resposta texto: {response_create.text[:500]}")
+            except Exception as e:
+                logger.error(f"Exceção ao criar instância: {str(e)}", exc_info=True)
+                raise
             
             if response_create.status_code not in [200, 201]:
-                error_data = response_create.json() if response_create.text else {}
-                error_msg = error_data.get('message', f'Erro ao criar instância: {response_create.status_code}')
-                logger.error(f"Erro ao criar instância: {error_msg}")
+                error_data = {}
+                try:
+                    error_data = response_create.json() if response_create.text else {}
+                except:
+                    error_data = {'raw': response_create.text[:500]}
+                
+                error_msg = error_data.get('message') or error_data.get('error') or f'Erro ao criar instância: {response_create.status_code}'
+                logger.error(f"Erro ao criar instância: {error_msg} - Dados completos: {error_data}")
                 return JsonResponse({
                     'success': False,
                     'error': error_msg,
+                    'details': error_data if isinstance(error_data, dict) else str(error_data),
                 }, status=response_create.status_code)
             else:
                 logger.info(f"Instância {INSTANCE_NAME} criada com sucesso! Aguardando 2 segundos para gerar QR Code...")
