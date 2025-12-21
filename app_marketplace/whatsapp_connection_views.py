@@ -60,27 +60,34 @@ def create_session(request):
     """
     # Verificar permissões - permitir para usuários autenticados que são shoppers, keepers ou superusers
     from app_marketplace.models import PersonalShopper, AddressKeeper
+    import logging
+    
+    logger = logging.getLogger(__name__)
     
     has_permission = False
     if request.user.is_superuser:
         has_permission = True
+        logger.info(f"Usuário {request.user.username} é superuser - permitindo acesso")
     else:
         # Verificar se tem perfil PersonalShopper
         try:
-            PersonalShopper.objects.get(user=request.user)
+            shopper = PersonalShopper.objects.get(user=request.user)
             has_permission = True
+            logger.info(f"Usuário {request.user.username} tem perfil PersonalShopper - permitindo acesso")
         except PersonalShopper.DoesNotExist:
-            pass
+            logger.debug(f"Usuário {request.user.username} não tem perfil PersonalShopper")
         
         # Verificar se tem perfil AddressKeeper
         if not has_permission:
             try:
-                AddressKeeper.objects.get(user=request.user)
+                keeper = AddressKeeper.objects.get(user=request.user)
                 has_permission = True
+                logger.info(f"Usuário {request.user.username} tem perfil AddressKeeper - permitindo acesso")
             except AddressKeeper.DoesNotExist:
-                pass
+                logger.debug(f"Usuário {request.user.username} não tem perfil AddressKeeper")
     
     if not has_permission:
+        logger.warning(f"Usuário {request.user.username} (ID: {request.user.id}) tentou conectar WhatsApp sem permissão")
         return JsonResponse({
             'error': 'Sem permissão. Você precisa ser um Personal Shopper, Address Keeper ou administrador para conectar WhatsApp.'
         }, status=403)
