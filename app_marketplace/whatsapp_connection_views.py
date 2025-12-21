@@ -288,17 +288,6 @@ def create_session(request):
                 'error': 'QR Code não disponível. A instância pode estar conectada ou ainda processando. Tente novamente em alguns segundos.',
                 'status': 'processing',
             })
-            except Exception as e:
-                logger.error(f"Erro ao processar resposta QR Code: {str(e)}", exc_info=True)
-                raise
-        else:
-            error_data = response.json() if response.text else {}
-            error_msg = error_data.get('message', f'Erro ao obter QR Code: {response.status_code}')
-            logger.error(f"Erro ao obter QR Code: {error_msg}")
-            return JsonResponse({
-                'success': False,
-                'error': error_msg,
-            }, status=response.status_code)
     
     except requests.exceptions.ConnectionError as e:
         logger.error(f"Erro de conexão com Evolution API em {EVOLUTION_API_URL}: {str(e)}", exc_info=True)
