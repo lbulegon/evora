@@ -568,7 +568,7 @@ def create_session(request):
             'success': False,
             'error': 'Evolution API não está rodando! Verifique se o serviço está ativo.',
         }, status=503)
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         logger.error(f"Erro na requisição para Evolution API: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
