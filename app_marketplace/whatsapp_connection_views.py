@@ -74,6 +74,9 @@ def create_session(request):
     
     logger = logging.getLogger(__name__)
     
+    # Log no início da função para confirmar que está sendo chamada
+    logger.info(f"[CREATE_SESSION] Função chamada para usuário: {request.user.username} (ID: {request.user.id}, Autenticado: {request.user.is_authenticated}, Superuser: {request.user.is_superuser})")
+    
     # Log detalhado para debug
     logger.info(f"Verificando permissão para usuário: {request.user.username} (ID: {request.user.id}, Superuser: {request.user.is_superuser})")
     
