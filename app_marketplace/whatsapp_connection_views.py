@@ -168,7 +168,26 @@ def create_session(request):
                 delete_response = requests.delete(url_delete, headers=headers, timeout=10)
                 logger.info(f"Resposta DELETE: {delete_response.status_code}")
                 if delete_response.status_code in [200, 201]:
-                    logger.info(f"Instância {INSTANCE_NAME} deletada com sucesso")
+                    logger.info(f"Instância {INSTANCE_NAME} deletada com sucesso. Aguardando processamento...")
+                    import time
+                    time.sleep(3)  # Aguardar processamento da deleção
+                    
+                    # Verificar se realmente foi deletada
+                    verify_response = requests.get(url_check, headers=headers, timeout=10)
+                    if verify_response.status_code == 200:
+                        verify_data = verify_response.json()
+                        verify_instances = verify_data if isinstance(verify_data, list) else verify_data.get('instance', [])
+                        still_exists = any(
+                            isinstance(inst, dict) and inst.get('name') == INSTANCE_NAME 
+                            for inst in verify_instances
+                        )
+                        if still_exists:
+                            logger.warning(f"Instância {INSTANCE_NAME} ainda existe após deleção. Tentando novamente...")
+                            # Tentar deletar novamente
+                            requests.delete(url_delete, headers=headers, timeout=10)
+                            time.sleep(2)
+                        else:
+                            logger.info(f"Instância {INSTANCE_NAME} confirmada como deletada")
                     instance_exists = False
                 else:
                     logger.warning(f"Erro ao deletar instância: {delete_response.status_code} - {delete_response.text}")
@@ -177,7 +196,7 @@ def create_session(request):
         
         logger.info(f"Estado final: instance_exists={instance_exists}, prosseguindo para criação se necessário...")
         
-        # Criar instância se não existir
+        # Se instância não existe ou foi deletada, criar nova
         if not instance_exists:
             logger.info(f"Criando nova instância {INSTANCE_NAME}...")
             url_create = f"{EVOLUTION_API_URL}/instance/create"
@@ -213,9 +232,9 @@ def create_session(request):
                     'details': error_data if isinstance(error_data, dict) else str(error_data),
                 }, status=response_create.status_code)
             else:
-                logger.info(f"Instância {INSTANCE_NAME} criada com sucesso! Aguardando 2 segundos para gerar QR Code...")
+                logger.info(f"Instância {INSTANCE_NAME} criada com sucesso! Aguardando 3 segundos para processar...")
                 import time
-                time.sleep(2)  # Aguardar instância processar
+                time.sleep(3)  # Aguardar instância processar completamente
         
         # 2. Obter QR Code (com retry)
         url_connect = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
