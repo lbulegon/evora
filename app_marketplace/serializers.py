@@ -7,7 +7,7 @@ from .models import (
     Agente, Cliente, ClienteRelacao, Produto, EstoqueItem,
     Oferta, TrustlineKeeper, RoleStats, Pedido, ItemPedido,
     Pagamento, TransacaoGateway, Evento,
-    PublicacaoAgora, EngajamentoAgora, ProdutoJSON
+    PublicacaoAgora, EngajamentoAgora, ProdutoJSON, OfertaProduto
 )
 from .utils import build_image_url
 
@@ -704,6 +704,22 @@ class ProdutoJSONSerializer(serializers.ModelSerializer):
                     image_urls.append(url)
         
         return image_urls
+
+
+class OfertaProdutoSerializer(serializers.ModelSerializer):
+    """Serializer para OfertaProduto (WhatsApp)"""
+    produto = ProdutoJSONSerializer(read_only=True)
+    grupo_nome = serializers.CharField(source='grupo.name', read_only=True)
+    criado_por_nome = serializers.CharField(source='criado_por.get_full_name', read_only=True)
+    
+    class Meta:
+        model = OfertaProduto
+        fields = [
+            'oferta_id', 'produto', 'grupo', 'grupo_nome',
+            'mensagem_postada', 'imagem_url', 'preco_exibido', 'moeda',
+            'criado_por', 'criado_por_nome', 'criado_em', 'atualizado_em', 'ativo'
+        ]
+        read_only_fields = ['oferta_id', 'criado_em', 'atualizado_em']
 
 
 

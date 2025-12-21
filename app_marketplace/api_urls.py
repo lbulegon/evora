@@ -25,6 +25,7 @@ urlpatterns = [
     path('catalogo/<int:cliente_id>/', api_views.catalogo_cliente, name='api_catalogo_cliente'),
     path('agente/<int:agente_id>/score/', api_views.score_agente, name='api_score_agente'),
     path('resolver-operacao/', api_views.resolver_operacao, name='api_resolver_operacao'),
+    path('oferta-produto/<str:oferta_id>/', api_views.buscar_oferta_por_id, name='api_buscar_oferta_por_id'),
 ]
 
 

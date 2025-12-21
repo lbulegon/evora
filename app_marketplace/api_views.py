@@ -4,7 +4,7 @@ API Views para KMN (Keeper Mesh Network)
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.contrib.auth.models import User
@@ -12,14 +12,15 @@ from django.contrib.auth.models import User
 from .models import (
     Agente, Cliente, ClienteRelacao, Produto, EstoqueItem,
     Oferta, TrustlineKeeper, RoleStats, Pedido, EnderecoEntrega,
-    ProdutoJSON
+    ProdutoJSON, OfertaProduto
 )
 from .serializers import (
     AgenteSerializer, ClienteSerializer, ClienteRelacaoSerializer,
     ProdutoSerializer, EstoqueItemSerializer, OfertaSerializer,
     OfertaCreateSerializer, TrustlineKeeperSerializer, TrustlineCreateSerializer,
     RoleStatsSerializer, CatalogoSerializer, PedidoKMNCreateSerializer,
-    PedidoKMNSerializer, ScoreAgenteSerializer, ProdutoJSONSerializer
+    PedidoKMNSerializer, ScoreAgenteSerializer, ProdutoJSONSerializer,
+    OfertaProdutoSerializer
 )
 from .services import KMNRoleEngine, KMNStatsService, CatalogoService
 
@@ -465,6 +466,22 @@ class ProdutoJSONViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-criado_em')
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])  # Permitir acesso do agente (com API key)
+def buscar_oferta_por_id(request, oferta_id):
+    """
+    Busca uma OfertaProduto por oferta_id.
+    Usado pelo agente ágnosto para buscar preço e informações do produto.
+    """
+    try:
+        oferta = OfertaProduto.objects.get(oferta_id=oferta_id, ativo=True)
+        serializer = OfertaProdutoSerializer(oferta)
+        return Response(serializer.data)
+    except OfertaProduto.DoesNotExist:
+        return Response(
+            {'error': f'Oferta com ID {oferta_id} não encontrada ou inativa'},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
 
 

@@ -120,7 +120,7 @@
         </div>
         
         <!-- Status da Conexão -->
-        <div class="status-card {% if is_connected %}status-connected{% elif is_paired %}status-pairing{% else %}status-disconnected{% endif %}" id="statusCard">
+        <div class="status-card {% if is_connected %}status-connected{% elif is_connecting %}status-pairing{% else %}status-disconnected{% endif %}" id="statusCard">
             {% if is_connected %}
             <div class="phone-info">
                 <i class="fas fa-check-circle"></i>
@@ -136,7 +136,7 @@
                     {% endif %}
                 </div>
             </div>
-            {% elif is_paired %}
+            {% elif is_connecting %}
             <div>
                 <div class="loading-spinner mb-3"></div>
                 <h5>Aguardando conexão...</h5>
@@ -213,11 +213,11 @@
         <div class="status-card">
             <h6 class="mb-3">⚙️ Configuração</h6>
             <div class="small text-muted">
-                <p><strong>WPPConnect URL:</strong> <code>{{ wpp_base }}</code></p>
-                <p><strong>Sessão:</strong> <code>{{ wpp_session }}</code></p>
+                <p><strong>Evolution API URL:</strong> <code>{{ evolution_api_url }}</code></p>
+                <p><strong>Instância:</strong> <code>{{ instance_name }}</code></p>
                 <p class="mb-0">
                     <i class="fas fa-info-circle"></i> 
-                    Certifique-se de que o serviço WPPConnect está rodando.
+                    Certifique-se de que o serviço Evolution API está rodando.
                 </p>
             </div>
         </div>
@@ -331,15 +331,15 @@
             const response = await fetch('/whatsapp/connection/status/');
             const data = await response.json();
             
-            if (data.connected) {
+            if (data.connected || data.status === 'open') {
                 // Conectado - recarregar página
                 stopStatusCheck();
                 location.reload();
-            } else if (data.status === 'PAIRING') {
+            } else if (data.status === 'connecting') {
                 // Aguardando confirmação - continuar verificando
                 updateStatusCard(data);
             } else {
-                // Desconectado
+                // Desconectado (close, unpaired, etc)
                 updateStatusCard(data);
             }
         } catch (error) {

@@ -10,7 +10,8 @@ from django.db import transaction
 from django.utils import timezone
 from decimal import Decimal
 
-from .models import Pedido, ItemPedido, Pagamento, TransacaoGateway, Produto, Evento
+from .models import Pedido, ItemPedido, Pagamento, TransacaoGateway, Produto, Evento, WhatsappOrder
+from .whatsapp_flow_engine import WhatsAppFlowEngine
 from .serializers import (
     CheckoutCreateSerializer, PedidoSerializer, PagamentoSerializer
 )
@@ -296,6 +297,63 @@ def regerar_link_pagamento(request, pedido_codigo):
             'pagamento': serializer.data,
             'mensagem': 'Link de pagamento regerado com sucesso'
         })
+    
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def webhook_whatsapp_order(request):
+    """
+    Webhook para atualizar WhatsappOrder quando pagamento for confirmado.
+    POST /api/v1/pagamentos/webhook/whatsapp-order/
+    
+    Payload esperado:
+    {
+        "pedido_id": 123,
+        "gateway_payment_id": "mp_123456",
+        "status": "approved",
+        "gateway": "mercadopago"
+    }
+    """
+    import json
+    
+    try:
+        payload = json.loads(request.body)
+        
+        pedido_id = payload.get('pedido_id')
+        gateway_payment_id = payload.get('gateway_payment_id')
+        status_pagamento = payload.get('status')
+        gateway = payload.get('gateway', 'mercadopago')
+        
+        if not all([pedido_id, gateway_payment_id, status_pagamento]):
+            return Response(
+                {'error': 'pedido_id, gateway_payment_id e status são obrigatórios'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Processar confirmação de pagamento
+        flow_engine = WhatsAppFlowEngine()
+        resultado = flow_engine.processar_confirmacao_pagamento(
+            pedido_id=pedido_id,
+            gateway_payment_id=gateway_payment_id,
+            status_pagamento=status_pagamento,
+            gateway=gateway
+        )
+        
+        if resultado.get('sucesso'):
+            return Response({
+                'status': 'ok',
+                'pedido_numero': resultado.get('pedido_numero'),
+                'status_anterior': resultado.get('status_anterior'),
+                'status_novo': resultado.get('status_novo')
+            })
+        else:
+            return Response(
+                {'error': resultado.get('erro', 'Erro desconhecido')},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

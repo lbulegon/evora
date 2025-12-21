@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('app_marketplace', '__latest__'),
+        ('app_marketplace', '0036_add_whatsapporder_channel'),
         ('app_whatsapp_integration', '0001_initial'),
     ]
 

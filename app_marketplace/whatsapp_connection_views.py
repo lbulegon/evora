@@ -1,5 +1,5 @@
 """
-Views para gerenciar conexão do WhatsApp via QR Code - WPPConnect
+Views para gerenciar conexão do WhatsApp via QR Code - Evolution API
 """
 import os
 import json
@@ -12,10 +12,16 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
+from django.conf import settings
+from app_whatsapp_integration.evolution_service import EvolutionAPIService
 
-# Configurações WPPConnect
-WPP_BASE = os.getenv("WPP_BASE", "http://localhost:21465")
-WPP_SESSION = os.getenv("WPP_SESSION", "session-evora")
+# Configurações Evolution API
+EVOLUTION_API_URL = getattr(settings, 'EVOLUTION_API_URL', 'http://69.169.102.84:8004')
+EVOLUTION_API_KEY = getattr(settings, 'EVOLUTION_API_KEY', 'GKvy6psn-8HHpBQ4HAHKFOXnwjHR-oSzeGZzCaws0xg')
+INSTANCE_NAME = getattr(settings, 'EVOLUTION_INSTANCE_NAME', 'default')
+
+# Inicializar serviço
+evolution_service = EvolutionAPIService()
 
 
 # ============================================================================
@@ -25,21 +31,21 @@ WPP_SESSION = os.getenv("WPP_SESSION", "session-evora")
 @login_required
 def whatsapp_connect(request):
     """
-    Página principal para conectar WhatsApp via QR Code
+    Página principal para conectar WhatsApp via QR Code - Evolution API
     """
     if not (request.user.is_shopper or request.user.is_address_keeper or request.user.is_superuser):
         messages.error(request, "Acesso restrito.")
         return redirect('home')
     
-    # Verificar status da sessão
+    # Verificar status da instância Evolution API
     session_status = get_session_status()
     
     context = {
-        'wpp_base': WPP_BASE,
-        'wpp_session': WPP_SESSION,
+        'evolution_api_url': EVOLUTION_API_URL,
+        'instance_name': INSTANCE_NAME,
         'session_status': session_status,
-        'is_connected': session_status.get('status') == 'CONNECTED',
-        'is_paired': session_status.get('status') == 'PAIRING',
+        'is_connected': session_status.get('status') == 'open',
+        'is_connecting': session_status.get('status') == 'connecting',
     }
     
     return render(request, 'app_marketplace/whatsapp_connect.html', context)
@@ -49,42 +55,103 @@ def whatsapp_connect(request):
 @require_http_methods(["POST"])
 def create_session(request):
     """
-    Criar nova sessão do WPPConnect
+    Criar instância e obter QR Code - Evolution API
     POST /whatsapp/connection/create/
     """
     if not (request.user.is_shopper or request.user.is_address_keeper or request.user.is_superuser):
         return JsonResponse({'error': 'Sem permissão'}, status=403)
     
     try:
-        # Criar sessão no WPPConnect
-        url = f"{WPP_BASE}/api/{WPP_SESSION}/start-session"
-        payload = {
-            "webhook": f"{request.build_absolute_uri('/')[:-1]}/webhooks/whatsapp/",
-            "waitQrCode": True,  # Aguardar QR Code
+        # 1. Criar instância se não existir
+        headers = {
+            "Content-Type": "application/json",
+            "apikey": EVOLUTION_API_KEY,
+            "Authorization": f"Bearer {EVOLUTION_API_KEY}"
         }
         
-        response = requests.post(url, json=payload, timeout=30)
+        # Verificar se instância já existe
+        url_check = f"{EVOLUTION_API_URL}/instance/fetchInstances"
+        response_check = requests.get(url_check, headers=headers, timeout=10)
         
-        if response.status_code == 201:
+        instance_exists = False
+        if response_check.status_code == 200:
+            instances = response_check.json().get('instance', [])
+            for inst in instances:
+                if inst.get('instanceName') == INSTANCE_NAME:
+                    instance_exists = True
+                    break
+        
+        # Criar instância se não existir
+        if not instance_exists:
+            url_create = f"{EVOLUTION_API_URL}/instance/create"
+            payload_create = {
+                "instanceName": INSTANCE_NAME,
+                "token": EVOLUTION_API_KEY,
+                "qrcode": True,
+                "integration": "WHATSAPP-BAILEYS"
+            }
+            response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
+            
+            if response_create.status_code not in [200, 201]:
+                error_data = response_create.json() if response_create.text else {}
+                return JsonResponse({
+                    'success': False,
+                    'error': error_data.get('message', f'Erro ao criar instância: {response_create.status_code}'),
+                }, status=response_create.status_code)
+        
+        # 2. Obter QR Code
+        url_connect = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
+        response = requests.get(url_connect, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
             data = response.json()
-            return JsonResponse({
-                'success': True,
-                'session': WPP_SESSION,
-                'status': data.get('status'),
-                'qrCode': data.get('qrcode', {}).get('base64'),
-                'message': 'Sessão criada com sucesso! Escaneie o QR Code.',
-            })
+            qrcode_data = data.get('qrcode', {})
+            qrcode_base64 = qrcode_data.get('base64')
+            qrcode_url = qrcode_data.get('url')
+            
+            # Configurar webhook
+            webhook_url = f"{request.build_absolute_uri('/')[:-1]}/api/whatsapp/webhook/evolution/"
+            url_webhook = f"{EVOLUTION_API_URL}/webhook/set/{INSTANCE_NAME}"
+            webhook_payload = {
+                "url": webhook_url,
+                "webhook_by_events": True,
+                "events": [
+                    "MESSAGES_UPSERT",
+                    "MESSAGES_UPDATE",
+                    "MESSAGES_DELETE",
+                    "SEND_MESSAGE",
+                    "CONNECTION_UPDATE",
+                    "QRCODE_UPDATED"
+                ]
+            }
+            requests.post(url_webhook, json=webhook_payload, headers=headers, timeout=10)
+            
+            if qrcode_base64:
+                return JsonResponse({
+                    'success': True,
+                    'instance': INSTANCE_NAME,
+                    'status': 'connecting',
+                    'qrCode': qrcode_base64,
+                    'qrCodeUrl': qrcode_url,
+                    'message': 'Instância criada! Escaneie o QR Code.',
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'QR Code não disponível. Instância pode já estar conectada.',
+                    'status': data.get('status', 'unknown'),
+                })
         else:
-            error_data = response.json() if response.content else {}
+            error_data = response.json() if response.text else {}
             return JsonResponse({
                 'success': False,
-                'error': error_data.get('message', f'Erro ao criar sessão: {response.status_code}'),
+                'error': error_data.get('message', f'Erro ao obter QR Code: {response.status_code}'),
             }, status=response.status_code)
     
     except requests.exceptions.ConnectionError:
         return JsonResponse({
             'success': False,
-            'error': 'WPPConnect não está rodando! Verifique se o serviço está ativo.',
+            'error': 'Evolution API não está rodando! Verifique se o serviço está ativo.',
         }, status=503)
     except Exception as e:
         return JsonResponse({
@@ -96,43 +163,52 @@ def create_session(request):
 @login_required
 def get_qr_code(request):
     """
-    Obter QR Code atual da sessão
+    Obter QR Code atual da instância - Evolution API
     GET /whatsapp/connection/qrcode/
     """
     if not (request.user.is_shopper or request.user.is_address_keeper or request.user.is_superuser):
         return JsonResponse({'error': 'Sem permissão'}, status=403)
     
     try:
-        # Obter QR Code da sessão
-        url = f"{WPP_BASE}/api/{WPP_SESSION}/qrcode"
-        response = requests.get(url, timeout=10)
+        headers = {
+            "Content-Type": "application/json",
+            "apikey": EVOLUTION_API_KEY,
+            "Authorization": f"Bearer {EVOLUTION_API_KEY}"
+        }
+        
+        url = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
+        response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
-            qr_code = data.get('qrcode', {}).get('base64')
+            qrcode_data = data.get('qrcode', {})
+            qr_code = qrcode_data.get('base64')
+            qrcode_url = qrcode_data.get('url')
             
             if qr_code:
                 return JsonResponse({
                     'success': True,
                     'qrCode': qr_code,
-                    'status': data.get('status'),
+                    'qrCodeUrl': qrcode_url,
+                    'status': data.get('status', 'connecting'),
                 })
             else:
                 return JsonResponse({
                     'success': False,
-                    'error': 'QR Code não disponível. A sessão pode estar conectada ou expirada.',
-                    'status': data.get('status'),
+                    'error': 'QR Code não disponível. A instância pode estar conectada ou expirada.',
+                    'status': data.get('status', 'unknown'),
                 })
         else:
+            error_data = response.json() if response.text else {}
             return JsonResponse({
                 'success': False,
-                'error': f'Erro ao obter QR Code: {response.status_code}',
+                'error': error_data.get('message', f'Erro ao obter QR Code: {response.status_code}'),
             }, status=response.status_code)
     
     except requests.exceptions.ConnectionError:
         return JsonResponse({
             'success': False,
-            'error': 'WPPConnect não está rodando!',
+            'error': 'Evolution API não está rodando!',
         }, status=503)
     except Exception as e:
         return JsonResponse({
@@ -156,40 +232,36 @@ def get_session_status(request):
 
 def get_session_status():
     """
-    Função auxiliar para obter status da sessão
+    Função auxiliar para obter status da instância - Evolution API
     """
     try:
-        url = f"{WPP_BASE}/api/{WPP_SESSION}/check-connection-session"
-        response = requests.get(url, timeout=5)
+        status_result = evolution_service.get_instance_status(INSTANCE_NAME)
         
-        if response.status_code == 200:
-            data = response.json()
+        if status_result.get('success'):
+            instance_data = status_result.get('data', {})
+            evolution_status = instance_data.get('status', 'close')
+            phone = instance_data.get('phone_number')
+            phone_name = instance_data.get('phone_name')
+            
             return {
                 'success': True,
-                'status': data.get('status', 'DISCONNECTED'),
-                'connected': data.get('status') == 'CONNECTED',
-                'phone': data.get('phone', {}).get('number'),
-                'name': data.get('phone', {}).get('pushname'),
+                'status': evolution_status,
+                'connected': evolution_status == 'open',
+                'phone': phone,
+                'name': phone_name,
             }
         else:
             return {
                 'success': False,
-                'status': 'DISCONNECTED',
+                'status': 'close',
                 'connected': False,
-                'error': f'Erro ao verificar conexão: {response.status_code}',
+                'error': status_result.get('error', 'Erro ao verificar conexão'),
             }
     
-    except requests.exceptions.ConnectionError:
-        return {
-            'success': False,
-            'status': 'DISCONNECTED',
-            'connected': False,
-            'error': 'WPPConnect não está rodando!',
-        }
     except Exception as e:
         return {
             'success': False,
-            'status': 'DISCONNECTED',
+            'status': 'close',
             'connected': False,
             'error': str(e),
         }
@@ -199,31 +271,38 @@ def get_session_status():
 @require_http_methods(["POST"])
 def logout_session(request):
     """
-    Desconectar sessão do WhatsApp
+    Desconectar instância do WhatsApp - Evolution API
     POST /whatsapp/connection/logout/
     """
     if not (request.user.is_shopper or request.user.is_address_keeper or request.user.is_superuser):
         return JsonResponse({'error': 'Sem permissão'}, status=403)
     
     try:
-        url = f"{WPP_BASE}/api/{WPP_SESSION}/logout-session"
-        response = requests.post(url, timeout=10)
+        headers = {
+            "Content-Type": "application/json",
+            "apikey": EVOLUTION_API_KEY,
+            "Authorization": f"Bearer {EVOLUTION_API_KEY}"
+        }
         
-        if response.status_code == 200:
+        url = f"{EVOLUTION_API_URL}/instance/logout/{INSTANCE_NAME}"
+        response = requests.delete(url, headers=headers, timeout=10)
+        
+        if response.status_code in [200, 204]:
             return JsonResponse({
                 'success': True,
-                'message': 'Sessão desconectada com sucesso!',
+                'message': 'Instância desconectada com sucesso!',
             })
         else:
+            error_data = response.json() if response.text else {}
             return JsonResponse({
                 'success': False,
-                'error': f'Erro ao desconectar: {response.status_code}',
+                'error': error_data.get('message', f'Erro ao desconectar: {response.status_code}'),
             }, status=response.status_code)
     
     except requests.exceptions.ConnectionError:
         return JsonResponse({
             'success': False,
-            'error': 'WPPConnect não está rodando!',
+            'error': 'Evolution API não está rodando!',
         }, status=503)
     except Exception as e:
         return JsonResponse({
@@ -236,31 +315,38 @@ def logout_session(request):
 @require_http_methods(["DELETE", "POST"])
 def delete_session(request):
     """
-    Deletar sessão completamente
+    Deletar instância completamente - Evolution API
     DELETE /whatsapp/connection/delete/
     """
     if not (request.user.is_shopper or request.user.is_address_keeper or request.user.is_superuser):
         return JsonResponse({'error': 'Sem permissão'}, status=403)
     
     try:
-        url = f"{WPP_BASE}/api/{WPP_SESSION}/close-session"
-        response = requests.delete(url, timeout=10)
+        headers = {
+            "Content-Type": "application/json",
+            "apikey": EVOLUTION_API_KEY,
+            "Authorization": f"Bearer {EVOLUTION_API_KEY}"
+        }
         
-        if response.status_code == 200:
+        url = f"{EVOLUTION_API_URL}/instance/delete/{INSTANCE_NAME}"
+        response = requests.delete(url, headers=headers, timeout=10)
+        
+        if response.status_code in [200, 204]:
             return JsonResponse({
                 'success': True,
-                'message': 'Sessão deletada com sucesso!',
+                'message': 'Instância deletada com sucesso!',
             })
         else:
+            error_data = response.json() if response.text else {}
             return JsonResponse({
                 'success': False,
-                'error': f'Erro ao deletar sessão: {response.status_code}',
+                'error': error_data.get('message', f'Erro ao deletar instância: {response.status_code}'),
             }, status=response.status_code)
     
     except requests.exceptions.ConnectionError:
         return JsonResponse({
             'success': False,
-            'error': 'WPPConnect não está rodando!',
+            'error': 'Evolution API não está rodando!',
         }, status=503)
     except Exception as e:
         return JsonResponse({
