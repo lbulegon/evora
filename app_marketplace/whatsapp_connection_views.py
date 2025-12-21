@@ -251,10 +251,15 @@ def create_session(request):
                 time.sleep(10)  # Aguardar Evolution API processar e gerar QR Code
         
         # 2. Obter QR Code (com retry)
-        # O endpoint correto é /instance/connect/{instanceName} que retorna o QR Code quando disponível
-        # Mas também podemos tentar /instance/fetchInstances e verificar o qrcode dentro da instância
+        # Na Evolution API v2.1.1, o QR Code pode ser obtido via:
+        # - /instance/connect/{instanceName} (GET) - retorna qrcode quando disponível
+        # - Webhook QRCODE_UPDATED - quando o QR Code é gerado
+        # Vamos tentar ambos os métodos
         url_connect = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
         logger.info(f"Obtendo QR Code: {url_connect}")
+        
+        # Também tentar buscar via fetchInstances para ver se o QR Code está lá
+        url_fetch = f"{EVOLUTION_API_URL}/instance/fetchInstances"
         
         qrcode_base64 = None
         qrcode_url = None
@@ -262,6 +267,7 @@ def create_session(request):
         # Tentar obter QR Code até 10 vezes com intervalo maior (QR Code pode demorar para ser gerado)
         for attempt in range(10):
             try:
+                # Método 1: Tentar /instance/connect/{instanceName}
                 response = requests.get(url_connect, headers=headers, timeout=30)
                 logger.info(f"Resposta QR Code (tentativa {attempt + 1}/10): {response.status_code}")
                 
@@ -289,6 +295,27 @@ def create_session(request):
                             break
                         else:
                             logger.info(f"QR Code ainda não disponível (tentativa {attempt + 1}/10). Dados: {data}")
+                            
+                            # Método 2: Tentar buscar via fetchInstances
+                            if attempt >= 2:  # Tentar este método após algumas tentativas
+                                try:
+                                    fetch_response = requests.get(url_fetch, headers=headers, timeout=10)
+                                    if fetch_response.status_code == 200:
+                                        fetch_data = fetch_response.json()
+                                        instances = fetch_data if isinstance(fetch_data, list) else fetch_data.get('instance', [])
+                                        for inst in instances:
+                                            if isinstance(inst, dict) and inst.get('name') == INSTANCE_NAME:
+                                                inst_qrcode = inst.get('qrcode', {})
+                                                if isinstance(inst_qrcode, dict) and inst_qrcode.get('base64'):
+                                                    qrcode_base64 = inst_qrcode.get('base64')
+                                                    qrcode_url = inst_qrcode.get('url')
+                                                    logger.info(f"QR Code encontrado via fetchInstances na tentativa {attempt + 1}!")
+                                                    break
+                                except Exception as fetch_error:
+                                    logger.warning(f"Erro ao buscar QR Code via fetchInstances: {str(fetch_error)}")
+                                
+                                if qrcode_base64:
+                                    break
                     else:
                         logger.info(f"Resposta não é dict: {type(data)}")
                     
