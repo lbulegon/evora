@@ -133,6 +133,7 @@ def create_session(request):
             raise
         
         instance_exists = False
+        instance_status = None
         if response_check.status_code == 200:
             try:
                 data_check = response_check.json()
@@ -148,13 +149,28 @@ def create_session(request):
                 logger.info(f"Total de instâncias encontradas: {len(instances)}")
                 for inst in instances:
                     # Verificar se inst é um dict antes de usar .get()
-                    if isinstance(inst, dict) and inst.get('instanceName') == INSTANCE_NAME:
+                    if isinstance(inst, dict) and inst.get('name') == INSTANCE_NAME:
                         instance_exists = True
-                        logger.info(f"Instância {INSTANCE_NAME} já existe")
+                        instance_status = inst.get('connectionStatus', 'unknown')
+                        logger.info(f"Instância {INSTANCE_NAME} já existe com status: {instance_status}")
                         break
             except Exception as e:
                 logger.error(f"Erro ao processar resposta de instâncias: {str(e)}", exc_info=True)
                 raise
+        
+        # Se instância existe mas está desconectada, deletar para recriar
+        if instance_exists and instance_status in ['close', 'unpaired']:
+            logger.info(f"Instância {INSTANCE_NAME} está desconectada ({instance_status}). Deletando para recriar...")
+            url_delete = f"{EVOLUTION_API_URL}/instance/delete/{INSTANCE_NAME}"
+            try:
+                delete_response = requests.delete(url_delete, headers=headers, timeout=10)
+                if delete_response.status_code in [200, 201]:
+                    logger.info(f"Instância {INSTANCE_NAME} deletada com sucesso")
+                    instance_exists = False
+                else:
+                    logger.warning(f"Erro ao deletar instância: {delete_response.status_code}")
+            except Exception as e:
+                logger.warning(f"Erro ao deletar instância (continuando): {str(e)}")
         
         # Criar instância se não existir
         if not instance_exists:
