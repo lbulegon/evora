@@ -110,6 +110,8 @@ def create_session(request):
     logger.info(f"Permissão confirmada para {request.user.username} - prosseguindo com criação de sessão")
     
     try:
+        logger.info(f"Iniciando criação de sessão - Evolution API URL: {EVOLUTION_API_URL}")
+        
         # 1. Criar instância se não existir
         headers = {
             "Content-Type": "application/json",
@@ -119,7 +121,9 @@ def create_session(request):
         
         # Verificar se instância já existe
         url_check = f"{EVOLUTION_API_URL}/instance/fetchInstances"
+        logger.info(f"Verificando instâncias existentes: {url_check}")
         response_check = requests.get(url_check, headers=headers, timeout=10)
+        logger.info(f"Resposta check instâncias: {response_check.status_code}")
         
         instance_exists = False
         if response_check.status_code == 200:
