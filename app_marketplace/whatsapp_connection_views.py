@@ -277,20 +277,23 @@ def create_session(request):
                 if attempt < 2:
                     time.sleep(2)
         
-        # Configurar webhook (antes de retornar)
+        # Configurar webhook (antes de retornar) - Formato correto da Evolution API
         webhook_url = f"{request.build_absolute_uri('/')[:-1]}/api/whatsapp/webhook/evolution/"
         url_webhook = f"{EVOLUTION_API_URL}/webhook/set/{INSTANCE_NAME}"
+        # Formato correto: webhook como objeto com url e events
         webhook_payload = {
-            "url": webhook_url,
-            "webhook_by_events": True,
-            "events": [
-                "MESSAGES_UPSERT",
-                "MESSAGES_UPDATE",
-                "MESSAGES_DELETE",
-                "SEND_MESSAGE",
-                "CONNECTION_UPDATE",
-                "QRCODE_UPDATED"
-            ]
+            "webhook": {
+                "url": webhook_url,
+                "webhook_by_events": True,
+                "events": [
+                    "MESSAGES_UPSERT",
+                    "MESSAGES_UPDATE",
+                    "MESSAGES_DELETE",
+                    "SEND_MESSAGE",
+                    "CONNECTION_UPDATE",
+                    "QRCODE_UPDATED"
+                ]
+            }
         }
         logger.info(f"Configurando webhook: {url_webhook} para {webhook_url}")
         try:
