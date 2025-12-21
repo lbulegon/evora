@@ -124,146 +124,113 @@ def create_session(request):
             "Authorization": f"Bearer {EVOLUTION_API_KEY}"
         }
         
-        # Verificar se instância já existe
+        # ========== ESTRATÉGIA DEFINITIVA: SEMPRE DELETAR E RECRIAR ==========
+        # Para garantir QR Code limpo, sempre deletamos a instância existente (se houver)
+        # e criamos uma nova instância limpa
+        logger.info(f"[CLEAN_INSTANCE] ========== LIMPEZA E CRIAÇÃO DE INSTÂNCIA ==========")
+        logger.info(f"[CLEAN_INSTANCE] Instância alvo: {INSTANCE_NAME}")
+        
         url_check = f"{EVOLUTION_API_URL}/instance/fetchInstances"
-        logger.info(f"Verificando instâncias existentes: {url_check}")
+        url_delete = f"{EVOLUTION_API_URL}/instance/delete/{INSTANCE_NAME}"
+        
+        # PASSO 1: Verificar se instância existe e SEMPRE deletar (se existir)
+        logger.info(f"[CLEAN_INSTANCE] PASSO 1: Verificando e deletando instância existente (se houver)...")
+        instance_exists = False
+        
         try:
             response_check = requests.get(url_check, headers=headers, timeout=10)
-            logger.info(f"Resposta check instâncias: {response_check.status_code}")
-        except Exception as e:
-            logger.error(f"Erro ao verificar instâncias: {str(e)}", exc_info=True)
-            raise
-        
-        instance_exists = False
-        instance_status = None
-        if response_check.status_code == 200:
-            try:
-                data_check = response_check.json()
-                logger.info(f"[CHECK_INSTANCES] ========== VERIFICANDO INSTÂNCIAS ==========")
-                logger.info(f"[CHECK_INSTANCES] Status code: {response_check.status_code}")
-                logger.info(f"[CHECK_INSTANCES] Dados recebidos (tipo: {type(data_check)}): {json.dumps(data_check, indent=2) if isinstance(data_check, (dict, list)) else str(data_check)[:1000]}")
-                
-                # A Evolution API pode retornar uma lista diretamente ou um dict com 'instance'
-                if isinstance(data_check, list):
-                    instances = data_check
-                    logger.info(f"[CHECK_INSTANCES] Resposta é uma lista com {len(instances)} itens")
-                elif isinstance(data_check, dict):
-                    instances = data_check.get('instance', [])
-                    logger.info(f"[CHECK_INSTANCES] Resposta é um dict, instâncias: {len(instances)}")
-                else:
-                    instances = []
-                    logger.warning(f"[CHECK_INSTANCES] Resposta não é lista nem dict: {type(data_check)}")
-                
-                logger.info(f"[CHECK_INSTANCES] Total de instâncias encontradas: {len(instances)}")
-                for idx, inst in enumerate(instances):
-                    logger.info(f"[CHECK_INSTANCES] Instância {idx}: {json.dumps(inst, indent=2) if isinstance(inst, dict) else str(inst)[:500]}")
-                    # Verificar se inst é um dict antes de usar .get()
-                    if isinstance(inst, dict):
-                        inst_name = inst.get('name')
-                        inst_status = inst.get('connectionStatus', 'unknown')
-                        logger.info(f"[CHECK_INSTANCES] Instância {idx} - name: {inst_name}, status: {inst_status}")
-                        if inst_name == INSTANCE_NAME:
-                            instance_exists = True
-                            instance_status = inst_status
-                            logger.info(f"[CHECK_INSTANCES] ✅ Instância {INSTANCE_NAME} encontrada com status: {instance_status}")
-                            logger.info(f"[CHECK_INSTANCES] Dados completos da instância: {json.dumps(inst, indent=2)}")
-                            break
-                    else:
-                        logger.warning(f"[CHECK_INSTANCES] Instância {idx} não é dict: {type(inst)}")
-            except Exception as e:
-                logger.error(f"[CHECK_INSTANCES] ❌ Erro ao processar resposta de instâncias: {str(e)}", exc_info=True)
-                raise
-        
-        # Se instância existe mas está desconectada, deletar para recriar
-        if instance_exists and instance_status in ['close', 'unpaired']:
-            logger.info(f"Instância {INSTANCE_NAME} está desconectada ({instance_status}). Deletando para recriar...")
-            url_delete = f"{EVOLUTION_API_URL}/instance/delete/{INSTANCE_NAME}"
-            try:
-                delete_response = requests.delete(url_delete, headers=headers, timeout=10)
-                logger.info(f"Resposta DELETE: {delete_response.status_code}")
-                if delete_response.status_code in [200, 201]:
-                    logger.info(f"Instância {INSTANCE_NAME} deletada com sucesso. Aguardando processamento...")
-                    import time
-                    time.sleep(3)  # Aguardar processamento da deleção
+            logger.info(f"[CLEAN_INSTANCE] GET /instance/fetchInstances - Status: {response_check.status_code}")
+            
+            if response_check.status_code == 200:
+                try:
+                    data_check = response_check.json()
+                    logger.info(f"[CLEAN_INSTANCE] Dados recebidos (tipo: {type(data_check)}): {json.dumps(data_check, indent=2) if isinstance(data_check, (dict, list)) else str(data_check)[:500]}")
                     
-                    # Verificar se realmente foi deletada
-                    verify_response = requests.get(url_check, headers=headers, timeout=10)
-                    if verify_response.status_code == 200:
-                        verify_data = verify_response.json()
-                        verify_instances = verify_data if isinstance(verify_data, list) else verify_data.get('instance', [])
-                        still_exists = any(
-                            isinstance(inst, dict) and inst.get('name') == INSTANCE_NAME 
-                            for inst in verify_instances
-                        )
-                        if still_exists:
-                            logger.warning(f"Instância {INSTANCE_NAME} ainda existe após deleção. Tentando novamente...")
-                            # Tentar deletar novamente
-                            requests.delete(url_delete, headers=headers, timeout=10)
-                            time.sleep(2)
-                        else:
-                            logger.info(f"Instância {INSTANCE_NAME} confirmada como deletada")
-                    instance_exists = False
-                else:
-                    logger.warning(f"Erro ao deletar instância: {delete_response.status_code} - {delete_response.text}")
-            except Exception as e:
-                logger.warning(f"Erro ao deletar instância (continuando): {str(e)}")
-        
-        logger.info(f"Estado final: instance_exists={instance_exists}, prosseguindo para criação se necessário...")
-        
-        # Se instância não existe ou foi deletada, criar nova
-        if not instance_exists:
-            logger.info(f"Criando nova instância {INSTANCE_NAME}...")
-            url_create = f"{EVOLUTION_API_URL}/instance/create"
-            payload_create = {
-                "instanceName": INSTANCE_NAME,
-                "token": EVOLUTION_API_KEY,
-                "qrcode": True,
-                "integration": "WHATSAPP-BAILEYS"
-            }
-            logger.info(f"Enviando POST para criar instância: {url_create}")
-            logger.info(f"Payload: {payload_create}")
-            logger.info(f"Headers: {headers}")
-            try:
-                response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
-                logger.info(f"[CREATE_INSTANCE] Resposta criação instância: {response_create.status_code}")
-                logger.info(f"[CREATE_INSTANCE] Resposta texto completo: {response_create.text}")
-                logger.info(f"[CREATE_INSTANCE] Headers da resposta: {dict(response_create.headers)}")
-                
-                # Verificar se o QR Code já vem na resposta de criação
-                if response_create.status_code in [200, 201]:
-                    try:
-                        create_data = response_create.json()
-                        logger.info(f"[CREATE_INSTANCE] Dados parseados (tipo: {type(create_data)}): {json.dumps(create_data, indent=2)}")
+                    # A Evolution API pode retornar uma lista diretamente ou um dict com 'instance'
+                    if isinstance(data_check, list):
+                        instances = data_check
+                    elif isinstance(data_check, dict):
+                        instances = data_check.get('instance', [])
+                    else:
+                        instances = []
+                    
+                    logger.info(f"[CLEAN_INSTANCE] Total de instâncias encontradas: {len(instances)}")
+                    
+                    # Verificar se nossa instância existe
+                    for inst in instances:
+                        if isinstance(inst, dict) and inst.get('name') == INSTANCE_NAME:
+                            instance_exists = True
+                            instance_status = inst.get('connectionStatus', 'unknown')
+                            logger.info(f"[CLEAN_INSTANCE] ✅ Instância '{INSTANCE_NAME}' encontrada com status: {instance_status}")
+                            break
+                    
+                    # Se instância existe, SEMPRE DELETAR (independente do status)
+                    if instance_exists:
+                        logger.info(f"[CLEAN_INSTANCE] Instância existe. DELETANDO para criar uma nova limpa...")
+                        delete_response = requests.delete(url_delete, headers=headers, timeout=15)
+                        logger.info(f"[CLEAN_INSTANCE] DELETE /instance/delete/{INSTANCE_NAME} - Status: {delete_response.status_code}")
+                        logger.info(f"[CLEAN_INSTANCE] DELETE Response: {delete_response.text[:500]}")
                         
-                        # Verificar se o QR Code está na resposta
-                        if isinstance(create_data, dict):
-                            logger.info(f"[CREATE_INSTANCE] Chaves no dict: {list(create_data.keys())}")
-                            qrcode_in_response = create_data.get('qrcode', {})
-                            logger.info(f"[CREATE_INSTANCE] QR Code na resposta (tipo: {type(qrcode_in_response)}): {qrcode_in_response}")
+                        if delete_response.status_code in [200, 201, 204]:
+                            logger.info(f"[CLEAN_INSTANCE] ✅ Instância deletada! Aguardando 5 segundos para processamento completo...")
+                            time.sleep(5)
                             
-                            if isinstance(qrcode_in_response, dict):
-                                logger.info(f"[CREATE_INSTANCE] Chaves no qrcode: {list(qrcode_in_response.keys())}")
-                                logger.info(f"[CREATE_INSTANCE] qrcode.count: {qrcode_in_response.get('count')}")
-                                logger.info(f"[CREATE_INSTANCE] qrcode.base64 existe: {'base64' in qrcode_in_response}")
-                                logger.info(f"[CREATE_INSTANCE] qrcode.url existe: {'url' in qrcode_in_response}")
-                                
-                                if qrcode_in_response.get('base64'):
-                                    logger.info(f"[CREATE_INSTANCE] ✅ QR Code encontrado na resposta de criação! Tamanho base64: {len(qrcode_in_response.get('base64', ''))}")
-                                    qrcode_base64 = qrcode_in_response.get('base64')
-                                    qrcode_url = qrcode_in_response.get('url')
-                                else:
-                                    logger.warning(f"[CREATE_INSTANCE] ⚠️ QR Code na resposta mas sem base64. Dados completos: {qrcode_in_response}")
-                            
-                            # Verificar também dentro de instance
-                            instance_data = create_data.get('instance', {})
-                            if isinstance(instance_data, dict):
-                                logger.info(f"[CREATE_INSTANCE] Dados da instância: {json.dumps(instance_data, indent=2)}")
-                                logger.info(f"[CREATE_INSTANCE] Status da instância: {instance_data.get('status')}")
-                    except Exception as parse_error:
-                        logger.error(f"[CREATE_INSTANCE] ❌ Erro ao parsear resposta de criação: {str(parse_error)}", exc_info=True)
-            except Exception as e:
-                logger.error(f"Exceção ao criar instância: {str(e)}", exc_info=True)
-                raise
+                            # Verificar se realmente foi deletada (até 3 tentativas)
+                            for verify_attempt in range(3):
+                                verify_response = requests.get(url_check, headers=headers, timeout=10)
+                                if verify_response.status_code == 200:
+                                    verify_data = verify_response.json()
+                                    verify_instances = verify_data if isinstance(verify_data, list) else verify_data.get('instance', [])
+                                    still_exists = any(
+                                        isinstance(inst, dict) and inst.get('name') == INSTANCE_NAME 
+                                        for inst in verify_instances
+                                    )
+                                    
+                                    if not still_exists:
+                                        logger.info(f"[CLEAN_INSTANCE] ✅ Instância confirmada como deletada (tentativa {verify_attempt + 1})")
+                                        instance_exists = False
+                                        break
+                                    else:
+                                        logger.warning(f"[CLEAN_INSTANCE] ⚠️ Instância ainda existe (tentativa {verify_attempt + 1}/3). Aguardando mais 3 segundos...")
+                                        time.sleep(3)
+                                        if verify_attempt == 2:
+                                            # Última tentativa: forçar deleção novamente
+                                            logger.warning(f"[CLEAN_INSTANCE] Forçando deleção novamente...")
+                                            requests.delete(url_delete, headers=headers, timeout=15)
+                                            time.sleep(3)
+                        else:
+                            logger.warning(f"[CLEAN_INSTANCE] ⚠️ Erro ao deletar: {delete_response.status_code} - {delete_response.text[:500]}")
+                            # Continuar mesmo assim, tentar criar nova instância
+                    else:
+                        logger.info(f"[CLEAN_INSTANCE] ✅ Instância '{INSTANCE_NAME}' não existe. Prosseguindo para criação...")
+                        
+                except Exception as e:
+                    logger.error(f"[CLEAN_INSTANCE] ❌ Erro ao processar verificação: {str(e)}", exc_info=True)
+                    # Continuar para tentar criar instância
+            else:
+                logger.warning(f"[CLEAN_INSTANCE] ⚠️ Erro ao verificar instâncias: {response_check.status_code}")
+                # Continuar para tentar criar instância
+        except Exception as e:
+            logger.error(f"[CLEAN_INSTANCE] ❌ Erro ao verificar/deletar instância: {str(e)}", exc_info=True)
+            # Continuar para tentar criar instância
+        
+        # PASSO 2: Criar nova instância limpa (sempre criar, mesmo que a anterior não tenha sido deletada)
+        logger.info(f"[CLEAN_INSTANCE] PASSO 2: Criando nova instância limpa...")
+        url_create = f"{EVOLUTION_API_URL}/instance/create"
+        payload_create = {
+            "instanceName": INSTANCE_NAME,
+            "token": EVOLUTION_API_KEY,
+            "qrcode": True,
+            "integration": "WHATSAPP-BAILEYS"
+        }
+        logger.info(f"[CREATE_INSTANCE] Enviando POST para: {url_create}")
+        logger.info(f"[CREATE_INSTANCE] Payload: {json.dumps(payload_create, indent=2)}")
+        logger.info(f"[CREATE_INSTANCE] Headers: {headers}")
+        
+        try:
+            response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
+            logger.info(f"[CREATE_INSTANCE] Status: {response_create.status_code}")
+            logger.info(f"[CREATE_INSTANCE] Resposta completa: {response_create.text}")
             
             if response_create.status_code not in [200, 201]:
                 error_data = {}
@@ -273,76 +240,99 @@ def create_session(request):
                     error_data = {'raw': response_create.text[:500]}
                 
                 error_msg = error_data.get('message') or error_data.get('error') or f'Erro ao criar instância: {response_create.status_code}'
-                logger.error(f"Erro ao criar instância: {error_msg} - Dados completos: {error_data}")
-                return JsonResponse({
-                    'success': False,
-                    'error': error_msg,
-                    'details': error_data if isinstance(error_data, dict) else str(error_data),
-                }, status=response_create.status_code)
-            else:
-                logger.info(f"Instância {INSTANCE_NAME} criada com sucesso! Aguardando 10 segundos para Evolution API gerar QR Code...")
-                import time
-                time.sleep(10)  # Aguardar Evolution API processar e gerar QR Code
+                
+                # Se erro é "already in use", tentar deletar novamente e recriar
+                if 'already in use' in str(error_msg).lower() or 'already exists' in str(error_msg).lower():
+                    logger.warning(f"[CREATE_INSTANCE] ⚠️ Instância ainda existe. Forçando deleção novamente...")
+                    delete_response = requests.delete(url_delete, headers=headers, timeout=15)
+                    logger.info(f"[CREATE_INSTANCE] DELETE forçado - Status: {delete_response.status_code}")
+                    time.sleep(5)
+                    
+                    # Tentar criar novamente
+                    logger.info(f"[CREATE_INSTANCE] Tentando criar novamente após deleção forçada...")
+                    response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
+                    logger.info(f"[CREATE_INSTANCE] Status (2ª tentativa): {response_create.status_code}")
+                    logger.info(f"[CREATE_INSTANCE] Resposta (2ª tentativa): {response_create.text}")
+                    
+                    if response_create.status_code not in [200, 201]:
+                        error_data = {}
+                        try:
+                            error_data = response_create.json() if response_create.text else {}
+                        except:
+                            error_data = {'raw': response_create.text[:500]}
+                        error_msg = error_data.get('message') or error_data.get('error') or f'Erro ao criar instância após deleção: {response_create.status_code}'
+                        logger.error(f"[CREATE_INSTANCE] ❌ Erro após 2ª tentativa: {error_msg}")
+                        return JsonResponse({
+                            'success': False,
+                            'error': error_msg,
+                            'details': error_data if isinstance(error_data, dict) else str(error_data),
+                        }, status=response_create.status_code)
+                
+                if response_create.status_code not in [200, 201]:
+                    logger.error(f"[CREATE_INSTANCE] ❌ Erro: {error_msg}")
+                    return JsonResponse({
+                        'success': False,
+                        'error': error_msg,
+                        'details': error_data if isinstance(error_data, dict) else str(error_data),
+                    }, status=response_create.status_code)
+            
+            logger.info(f"[CREATE_INSTANCE] ✅ Instância criada com sucesso! Aguardando 5 segundos para Evolution API processar...")
+            time.sleep(5)  # Aguardar Evolution API processar e iniciar geração do QR Code
+            
+        except Exception as e:
+            logger.error(f"[CREATE_INSTANCE] ❌ Exceção: {str(e)}", exc_info=True)
+            return JsonResponse({
+                'success': False,
+                'error': f'Erro ao criar instância: {str(e)}'
+            }, status=500)
         
-        # 2. Obter QR Code (com retry)
-        # Na Evolution API v2.1.1, o QR Code pode ser obtido via:
-        # - /instance/connect/{instanceName} (GET) - retorna qrcode quando disponível
-        # - /instance/connect/{instanceName} (POST) - força reconexão e gera QR Code se necessário
-        # - Webhook QRCODE_UPDATED - quando o QR Code é gerado
-        # Vamos tentar ambos os métodos
+        # 2. OBTER QR CODE - ESTRATÉGIA DEFINITIVA
+        # Quando a instância está "close", GET retorna {"count": 0}
+        # SOLUÇÃO: Usar POST para forçar conexão e gerar QR Code
         url_connect = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
-        logger.info(f"Obtendo QR Code: {url_connect}")
-        
-        # Também tentar buscar via fetchInstances para ver se o QR Code está lá
         url_fetch = f"{EVOLUTION_API_URL}/instance/fetchInstances"
         
         qrcode_base64 = None
         qrcode_url = None
         
-        # PRIMEIRO: Se a instância está "close", forçar reconexão via POST
-        # Isso é necessário para gerar um novo QR Code
-        logger.info(f"[FORCE_CONNECT] Verificando se precisa forçar reconexão...")
-        try:
-            # Verificar status atual da instância
-            fetch_response = requests.get(url_fetch, headers=headers, timeout=10)
-            if fetch_response.status_code == 200:
-                fetch_data = fetch_response.json()
-                instances = fetch_data if isinstance(fetch_data, list) else fetch_data.get('instance', [])
-                for inst in instances:
-                    if isinstance(inst, dict) and inst.get('name') == INSTANCE_NAME:
-                        connection_status = inst.get('connectionStatus', '').lower()
-                        logger.info(f"[FORCE_CONNECT] Status atual da instância '{INSTANCE_NAME}': {connection_status}")
-                        
-                        # Se está "close", forçar reconexão via POST
-                        if connection_status == 'close':
-                            logger.info(f"[FORCE_CONNECT] Instância está 'close'. Forçando reconexão via POST para gerar QR Code...")
-                            post_connect_response = requests.post(url_connect, headers=headers, timeout=30)
-                            logger.info(f"[FORCE_CONNECT] POST /instance/connect/{INSTANCE_NAME} - Status: {post_connect_response.status_code}")
-                            logger.info(f"[FORCE_CONNECT] Resposta: {post_connect_response.text[:500]}")
-                            
-                            # Verificar se o QR Code veio na resposta do POST
-                            if post_connect_response.status_code in [200, 201]:
-                                try:
-                                    post_data = post_connect_response.json()
-                                    logger.info(f"[FORCE_CONNECT] Dados do POST: {json.dumps(post_data, indent=2)}")
-                                    
-                                    # Verificar se há QR Code na resposta
-                                    post_qrcode = post_data.get('qrcode', {})
-                                    if isinstance(post_qrcode, dict) and post_qrcode.get('base64'):
-                                        logger.info(f"[FORCE_CONNECT] ✅ QR Code obtido via POST! Tamanho: {len(post_qrcode.get('base64', ''))}")
-                                        qrcode_base64 = post_qrcode.get('base64')
-                                        qrcode_url = post_qrcode.get('url')
-                                    else:
-                                        logger.info(f"[FORCE_CONNECT] QR Code não veio no POST, aguardando 5 segundos...")
-                                        time.sleep(5)
-                                except Exception as e:
-                                    logger.warning(f"[FORCE_CONNECT] Erro ao parsear resposta do POST: {str(e)}")
-                            break
-        except Exception as e:
-            logger.warning(f"[FORCE_CONNECT] Erro ao verificar/forçar conexão: {str(e)}", exc_info=True)
+        logger.info(f"[GET_QRCODE] ========== INICIANDO BUSCA DE QR CODE ==========")
+        logger.info(f"[GET_QRCODE] Instância: {INSTANCE_NAME}")
+        logger.info(f"[GET_QRCODE] URL Connect: {url_connect}")
+        logger.info(f"[GET_QRCODE] URL Fetch: {url_fetch}")
         
-        # Tentar obter QR Code até 10 vezes com intervalo maior (QR Code pode demorar para ser gerado)
-        for attempt in range(10):
+        # PASSO 1: Forçar conexão via POST (isso gera o QR Code)
+        logger.info(f"[GET_QRCODE] PASSO 1: Forçando conexão via POST para gerar QR Code...")
+        try:
+            post_response = requests.post(url_connect, headers=headers, timeout=30)
+            logger.info(f"[GET_QRCODE] POST /instance/connect/{INSTANCE_NAME} - Status: {post_response.status_code}")
+            logger.info(f"[GET_QRCODE] POST Response: {post_response.text[:1000]}")
+            
+            if post_response.status_code in [200, 201]:
+                try:
+                    post_data = post_response.json()
+                    logger.info(f"[GET_QRCODE] POST Data (tipo: {type(post_data)}): {json.dumps(post_data, indent=2)}")
+                    
+                    # Verificar se QR Code veio no POST
+                    post_qrcode = post_data.get('qrcode', {})
+                    if isinstance(post_qrcode, dict) and post_qrcode.get('base64'):
+                        logger.info(f"[GET_QRCODE] ✅✅✅ QR Code obtido via POST! ✅✅✅")
+                        qrcode_base64 = post_qrcode.get('base64')
+                        qrcode_url = post_qrcode.get('url')
+                    else:
+                        logger.info(f"[GET_QRCODE] QR Code não veio no POST, aguardando 5 segundos...")
+                        time.sleep(5)
+                except Exception as e:
+                    logger.warning(f"[GET_QRCODE] Erro ao parsear POST: {str(e)}")
+            else:
+                logger.warning(f"[GET_QRCODE] POST falhou com status {post_response.status_code}")
+        except Exception as e:
+            logger.error(f"[GET_QRCODE] Erro no POST: {str(e)}", exc_info=True)
+        
+        # PASSO 2: Tentar obter QR Code via GET (com retry)
+        # Tentar até 15 vezes com intervalos progressivos
+        if not qrcode_base64:
+            logger.info(f"[GET_QRCODE] PASSO 2: Buscando QR Code via GET (com retry)...")
+            for attempt in range(15):
             try:
                 logger.info(f"[GET_QRCODE] ========== TENTATIVA {attempt + 1}/10 ==========")
                 logger.info(f"[GET_QRCODE] URL: {url_connect}")
@@ -356,7 +346,7 @@ def create_session(request):
                 
                 if response.status_code == 200:
                     try:
-                        data = response.json()
+            data = response.json()
                         logger.info(f"[GET_QRCODE] Tipo da resposta: {type(data)}")
                         logger.info(f"[GET_QRCODE] Dados completos (JSON): {json.dumps(data, indent=2)}")
                         
