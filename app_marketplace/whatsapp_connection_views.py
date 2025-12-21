@@ -352,7 +352,7 @@ def create_session(request):
                             
                             # Verificar se retornou qrcode diretamente ou dentro de um objeto
                             if isinstance(data, dict):
-                            logger.info(f"[GET_QRCODE] Chaves no dict: {list(data.keys())}")
+                                logger.info(f"[GET_QRCODE] Chaves no dict: {list(data.keys())}")
                             
                             # Tentar diferentes formatos de resposta
                             qrcode_data = data.get('qrcode', {})
