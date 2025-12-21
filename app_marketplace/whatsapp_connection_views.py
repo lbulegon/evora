@@ -60,8 +60,8 @@ def whatsapp_connect(request):
     return render(request, 'app_marketplace/whatsapp_connect.html', context)
 
 
-@login_required
 @csrf_exempt
+@login_required
 @require_http_methods(["POST"])
 def create_session(request):
     """
