@@ -58,8 +58,32 @@ def create_session(request):
     Criar instância e obter QR Code - Evolution API
     POST /whatsapp/connection/create/
     """
-    if not (request.user.is_shopper or request.user.is_address_keeper or request.user.is_superuser):
-        return JsonResponse({'error': 'Sem permissão'}, status=403)
+    # Verificar permissões - permitir para usuários autenticados que são shoppers, keepers ou superusers
+    from app_marketplace.models import PersonalShopper, AddressKeeper
+    
+    has_permission = False
+    if request.user.is_superuser:
+        has_permission = True
+    else:
+        # Verificar se tem perfil PersonalShopper
+        try:
+            PersonalShopper.objects.get(user=request.user)
+            has_permission = True
+        except PersonalShopper.DoesNotExist:
+            pass
+        
+        # Verificar se tem perfil AddressKeeper
+        if not has_permission:
+            try:
+                AddressKeeper.objects.get(user=request.user)
+                has_permission = True
+            except AddressKeeper.DoesNotExist:
+                pass
+    
+    if not has_permission:
+        return JsonResponse({
+            'error': 'Sem permissão. Você precisa ser um Personal Shopper, Address Keeper ou administrador para conectar WhatsApp.'
+        }, status=403)
     
     try:
         # 1. Criar instância se não existir
