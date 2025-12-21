@@ -349,9 +349,9 @@ def create_session(request):
                             data = response.json()
                             logger.info(f"[GET_QRCODE] Tipo da resposta: {type(data)}")
                             logger.info(f"[GET_QRCODE] Dados completos (JSON): {json.dumps(data, indent=2)}")
-                        
-                        # Verificar se retornou qrcode diretamente ou dentro de um objeto
-                        if isinstance(data, dict):
+                            
+                            # Verificar se retornou qrcode diretamente ou dentro de um objeto
+                            if isinstance(data, dict):
                             logger.info(f"[GET_QRCODE] Chaves no dict: {list(data.keys())}")
                             
                             # Tentar diferentes formatos de resposta
