@@ -562,7 +562,7 @@ def create_session(request):
                 'status': 'processing',
             })
     
-    except requests.exceptions.ConnectionError as e:
+    except RequestsConnectionError as e:
         logger.error(f"Erro de conexão com Evolution API em {EVOLUTION_API_URL}: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
@@ -629,7 +629,7 @@ def get_qr_code(request):
                 'error': error_data.get('message', f'Erro ao obter QR Code: {response.status_code}'),
             }, status=response.status_code)
     
-    except requests.exceptions.ConnectionError:
+    except RequestsConnectionError:
         return JsonResponse({
             'success': False,
             'error': 'Evolution API não está rodando!',
@@ -735,7 +735,7 @@ def logout_session(request):
                 'error': error_data.get('message', f'Erro ao desconectar: {response.status_code}'),
             }, status=response.status_code)
     
-    except requests.exceptions.ConnectionError:
+    except RequestsConnectionError:
         return JsonResponse({
             'success': False,
             'error': 'Evolution API não está rodando!',
@@ -779,7 +779,7 @@ def delete_session(request):
                 'error': error_data.get('message', f'Erro ao deletar instância: {response.status_code}'),
             }, status=response.status_code)
     
-    except requests.exceptions.ConnectionError:
+    except RequestsConnectionError:
         return JsonResponse({
             'success': False,
             'error': 'Evolution API não está rodando!',
