@@ -422,12 +422,12 @@ def create_session(request):
                                 
                                 if qrcode_base64:
                                     break
-                        else:
-                            logger.warning(f"[GET_QRCODE] ⚠️ Resposta não é dict: {type(data)}")
-                            logger.warning(f"[GET_QRCODE] Conteúdo: {str(data)[:500]}")
-                    except json.JSONDecodeError as json_error:
-                        logger.error(f"[GET_QRCODE] ❌ Erro ao parsear JSON: {str(json_error)}")
-                        logger.error(f"[GET_QRCODE] Response text: {response.text[:500]}")
+                            else:
+                                logger.warning(f"[GET_QRCODE] ⚠️ Resposta não é dict: {type(data)}")
+                                logger.warning(f"[GET_QRCODE] Conteúdo: {str(data)[:500]}")
+                        except json.JSONDecodeError as json_error:
+                            logger.error(f"[GET_QRCODE] ❌ Erro ao parsear JSON: {str(json_error)}")
+                            logger.error(f"[GET_QRCODE] Response text: {response.text[:500]}")
                     
                     # Se ainda não tem QR Code, aguardar antes da próxima tentativa
                     if not qrcode_base64:
