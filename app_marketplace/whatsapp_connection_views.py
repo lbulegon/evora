@@ -33,8 +33,17 @@ def whatsapp_connect(request):
     """
     Página principal para conectar WhatsApp via QR Code - Evolution API
     """
-    if not (request.user.is_shopper or request.user.is_address_keeper or request.user.is_superuser):
-        messages.error(request, "Acesso restrito.")
+    from app_marketplace.models import PersonalShopper, AddressKeeper
+    
+    # Verificar permissões de forma mais robusta
+    has_permission = (
+        request.user.is_superuser or
+        PersonalShopper.objects.filter(user=request.user).exists() or
+        AddressKeeper.objects.filter(user=request.user).exists()
+    )
+    
+    if not has_permission:
+        messages.error(request, "Acesso restrito. Você precisa ser um Personal Shopper, Address Keeper ou administrador.")
         return redirect('home')
     
     # Verificar status da instância Evolution API
