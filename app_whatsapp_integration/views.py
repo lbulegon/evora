@@ -57,8 +57,22 @@ def webhook_evolution_api(request):
         }
     }
     """
+    logger.info(f"Webhook Evolution API recebido - Método: {request.method}, Content-Type: {request.content_type}, Body length: {len(request.body)}")
+    
     try:
-        data = json.loads(request.body)
+        # Tentar obter dados do body (POST/PUT) ou query params (GET)
+        if request.method == 'GET':
+            data = request.GET.dict()
+            logger.info(f"Webhook GET recebido: {data}")
+            return JsonResponse({'status': 'ok', 'message': 'Webhook recebido (GET)'}, status=200)
+        
+        # Para POST/PUT, ler do body
+        body = request.body
+        if not body:
+            logger.warning("Webhook recebido sem body")
+            return JsonResponse({'status': 'ok', 'message': 'Webhook recebido sem dados'}, status=200)
+        
+        data = json.loads(body)
         event = data.get('event')
         instance = data.get('instance')
         event_data = data.get('data', {})
