@@ -61,6 +61,7 @@ def whatsapp_connect(request):
 
 
 @login_required
+@csrf_exempt
 @require_http_methods(["POST"])
 def create_session(request):
     """
@@ -102,6 +103,8 @@ def create_session(request):
         return JsonResponse({
             'error': 'Sem permissão. Você precisa ser um Personal Shopper, Address Keeper ou administrador para conectar WhatsApp. Verifique se seu perfil está criado corretamente.'
         }, status=403)
+    
+    logger.info(f"Permissão confirmada para {request.user.username} - prosseguindo com criação de sessão")
     
     try:
         # 1. Criar instância se não existir
