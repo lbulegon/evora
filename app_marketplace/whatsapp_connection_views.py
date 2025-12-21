@@ -237,6 +237,8 @@ def create_session(request):
                 time.sleep(10)  # Aguardar Evolution API processar e gerar QR Code
         
         # 2. Obter QR Code (com retry)
+        # O endpoint correto é /instance/connect/{instanceName} que retorna o QR Code quando disponível
+        # Mas também podemos tentar /instance/fetchInstances e verificar o qrcode dentro da instância
         url_connect = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
         logger.info(f"Obtendo QR Code: {url_connect}")
         

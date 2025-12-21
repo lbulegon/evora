@@ -78,6 +78,26 @@ def webhook_evolution_api(request):
         
         logger.info(f"Webhook Evolution API recebido: {event} da instância {instance}")
         
+        # Processar evento de QR Code atualizado
+        if event == 'qrcode.updated' or event == 'QRCODE_UPDATED':
+            qrcode_data = event_data.get('qrcode', {}) or event_data
+            qrcode_base64 = qrcode_data.get('base64') if isinstance(qrcode_data, dict) else None
+            qrcode_url = qrcode_data.get('url') if isinstance(qrcode_data, dict) else None
+            
+            logger.info(f"QR Code atualizado recebido via webhook para instância {instance}")
+            if qrcode_base64:
+                logger.info(f"QR Code base64 recebido (tamanho: {len(qrcode_base64)} caracteres)")
+                # Aqui você pode salvar o QR Code em cache ou banco de dados para ser recuperado depois
+                # Por enquanto, apenas logamos
+                return JsonResponse({
+                    'status': 'ok',
+                    'message': 'QR Code recebido via webhook',
+                    'has_qrcode': True
+                }, status=200)
+            else:
+                logger.warning(f"QR Code atualizado mas sem base64. Dados: {event_data}")
+                return JsonResponse({'status': 'ok', 'message': 'QR Code atualizado (sem dados)'}, status=200)
+        
         # Processar apenas eventos de mensagens
         if event == 'messages.upsert':
             key = event_data.get('key', {})
