@@ -76,26 +76,57 @@ def webhook_evolution_api(request):
         instance = data.get('instance')
         event_data = data.get('data', {})
         
-        logger.info(f"Webhook Evolution API recebido: {event} da instância {instance}")
+        logger.info(f"[WEBHOOK] ========== WEBHOOK RECEBIDO ==========")
+        logger.info(f"[WEBHOOK] Event: {event}")
+        logger.info(f"[WEBHOOK] Instance: {instance}")
+        logger.info(f"[WEBHOOK] Event data (tipo: {type(event_data)}): {json.dumps(event_data, indent=2) if isinstance(event_data, (dict, list)) else str(event_data)[:1000]}")
+        logger.info(f"[WEBHOOK] Dados completos do webhook: {json.dumps(data, indent=2)}")
         
         # Processar evento de QR Code atualizado
-        if event == 'qrcode.updated' or event == 'QRCODE_UPDATED':
-            qrcode_data = event_data.get('qrcode', {}) or event_data
-            qrcode_base64 = qrcode_data.get('base64') if isinstance(qrcode_data, dict) else None
-            qrcode_url = qrcode_data.get('url') if isinstance(qrcode_data, dict) else None
+        if event == 'qrcode.updated' or event == 'QRCODE_UPDATED' or 'qrcode' in str(event).lower():
+            logger.info(f"[WEBHOOK] ✅✅✅ EVENTO DE QR CODE DETECTADO! ✅✅✅")
+            logger.info(f"[WEBHOOK] Event: {event}")
+            logger.info(f"[WEBHOOK] Event data completo: {json.dumps(event_data, indent=2)}")
             
-            logger.info(f"QR Code atualizado recebido via webhook para instância {instance}")
+            # Tentar diferentes formatos de dados do QR Code
+            qrcode_data = None
+            if isinstance(event_data, dict):
+                qrcode_data = event_data.get('qrcode', {}) or event_data.get('data', {}) or event_data
+            else:
+                qrcode_data = event_data
+            
+            logger.info(f"[WEBHOOK] qrcode_data (tipo: {type(qrcode_data)}): {json.dumps(qrcode_data, indent=2) if isinstance(qrcode_data, dict) else str(qrcode_data)[:500]}")
+            
+            if isinstance(qrcode_data, dict):
+                logger.info(f"[WEBHOOK] Chaves no qrcode_data: {list(qrcode_data.keys())}")
+                qrcode_base64 = qrcode_data.get('base64') or qrcode_data.get('qrcode') or qrcode_data.get('code')
+                qrcode_url = qrcode_data.get('url')
+                
+                logger.info(f"[WEBHOOK] qrcode_base64 existe: {qrcode_base64 is not None}")
+                logger.info(f"[WEBHOOK] qrcode_base64 tipo: {type(qrcode_base64)}")
+                if qrcode_base64:
+                    logger.info(f"[WEBHOOK] ✅✅✅ QR Code base64 recebido! Tamanho: {len(str(qrcode_base64))} caracteres ✅✅✅")
+                    logger.info(f"[WEBHOOK] Primeiros 100 caracteres: {str(qrcode_base64)[:100]}")
+                else:
+                    logger.warning(f"[WEBHOOK] ⚠️ QR Code atualizado mas sem base64")
+                    logger.warning(f"[WEBHOOK] Dados completos: {json.dumps(qrcode_data, indent=2)}")
+            else:
+                logger.warning(f"[WEBHOOK] ⚠️ qrcode_data não é dict: {type(qrcode_data)}")
+                qrcode_base64 = None
+                qrcode_url = None
+            
             if qrcode_base64:
-                logger.info(f"QR Code base64 recebido (tamanho: {len(qrcode_base64)} caracteres)")
+                logger.info(f"[WEBHOOK] ✅✅✅ QR Code recebido via webhook para instância {instance}! ✅✅✅")
                 # Aqui você pode salvar o QR Code em cache ou banco de dados para ser recuperado depois
                 # Por enquanto, apenas logamos
                 return JsonResponse({
                     'status': 'ok',
                     'message': 'QR Code recebido via webhook',
-                    'has_qrcode': True
+                    'has_qrcode': True,
+                    'instance': instance
                 }, status=200)
             else:
-                logger.warning(f"QR Code atualizado mas sem base64. Dados: {event_data}")
+                logger.warning(f"[WEBHOOK] ⚠️ QR Code atualizado mas sem base64. Dados: {json.dumps(event_data, indent=2) if isinstance(event_data, dict) else str(event_data)[:500]}")
                 return JsonResponse({'status': 'ok', 'message': 'QR Code atualizado (sem dados)'}, status=200)
         
         # Processar apenas eventos de mensagens

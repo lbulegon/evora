@@ -211,22 +211,42 @@ def create_session(request):
             logger.info(f"Headers: {headers}")
             try:
                 response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
-                logger.info(f"Resposta criação instância: {response_create.status_code}")
-                logger.info(f"Resposta texto: {response_create.text[:500]}")
+                logger.info(f"[CREATE_INSTANCE] Resposta criação instância: {response_create.status_code}")
+                logger.info(f"[CREATE_INSTANCE] Resposta texto completo: {response_create.text}")
+                logger.info(f"[CREATE_INSTANCE] Headers da resposta: {dict(response_create.headers)}")
                 
                 # Verificar se o QR Code já vem na resposta de criação
                 if response_create.status_code in [200, 201]:
                     try:
                         create_data = response_create.json()
+                        logger.info(f"[CREATE_INSTANCE] Dados parseados (tipo: {type(create_data)}): {json.dumps(create_data, indent=2)}")
+                        
                         # Verificar se o QR Code está na resposta
                         if isinstance(create_data, dict):
+                            logger.info(f"[CREATE_INSTANCE] Chaves no dict: {list(create_data.keys())}")
                             qrcode_in_response = create_data.get('qrcode', {})
-                            if isinstance(qrcode_in_response, dict) and qrcode_in_response.get('base64'):
-                                logger.info("QR Code encontrado na resposta de criação da instância!")
-                                qrcode_base64 = qrcode_in_response.get('base64')
-                                qrcode_url = qrcode_in_response.get('url')
+                            logger.info(f"[CREATE_INSTANCE] QR Code na resposta (tipo: {type(qrcode_in_response)}): {qrcode_in_response}")
+                            
+                            if isinstance(qrcode_in_response, dict):
+                                logger.info(f"[CREATE_INSTANCE] Chaves no qrcode: {list(qrcode_in_response.keys())}")
+                                logger.info(f"[CREATE_INSTANCE] qrcode.count: {qrcode_in_response.get('count')}")
+                                logger.info(f"[CREATE_INSTANCE] qrcode.base64 existe: {'base64' in qrcode_in_response}")
+                                logger.info(f"[CREATE_INSTANCE] qrcode.url existe: {'url' in qrcode_in_response}")
+                                
+                                if qrcode_in_response.get('base64'):
+                                    logger.info(f"[CREATE_INSTANCE] ✅ QR Code encontrado na resposta de criação! Tamanho base64: {len(qrcode_in_response.get('base64', ''))}")
+                                    qrcode_base64 = qrcode_in_response.get('base64')
+                                    qrcode_url = qrcode_in_response.get('url')
+                                else:
+                                    logger.warning(f"[CREATE_INSTANCE] ⚠️ QR Code na resposta mas sem base64. Dados completos: {qrcode_in_response}")
+                            
+                            # Verificar também dentro de instance
+                            instance_data = create_data.get('instance', {})
+                            if isinstance(instance_data, dict):
+                                logger.info(f"[CREATE_INSTANCE] Dados da instância: {json.dumps(instance_data, indent=2)}")
+                                logger.info(f"[CREATE_INSTANCE] Status da instância: {instance_data.get('status')}")
                     except Exception as parse_error:
-                        logger.warning(f"Erro ao parsear resposta de criação: {str(parse_error)}")
+                        logger.error(f"[CREATE_INSTANCE] ❌ Erro ao parsear resposta de criação: {str(parse_error)}", exc_info=True)
             except Exception as e:
                 logger.error(f"Exceção ao criar instância: {str(e)}", exc_info=True)
                 raise
@@ -267,69 +287,118 @@ def create_session(request):
         # Tentar obter QR Code até 10 vezes com intervalo maior (QR Code pode demorar para ser gerado)
         for attempt in range(10):
             try:
+                logger.info(f"[GET_QRCODE] ========== TENTATIVA {attempt + 1}/10 ==========")
+                logger.info(f"[GET_QRCODE] URL: {url_connect}")
+                logger.info(f"[GET_QRCODE] Headers: {headers}")
+                
                 # Método 1: Tentar /instance/connect/{instanceName}
                 response = requests.get(url_connect, headers=headers, timeout=30)
-                logger.info(f"Resposta QR Code (tentativa {attempt + 1}/10): {response.status_code}")
+                logger.info(f"[GET_QRCODE] Status code: {response.status_code}")
+                logger.info(f"[GET_QRCODE] Response headers: {dict(response.headers)}")
+                logger.info(f"[GET_QRCODE] Response text (primeiros 1000 chars): {response.text[:1000]}")
                 
                 if response.status_code == 200:
-                    data = response.json()
-                    logger.info(f"Dados QR Code recebidos: {list(data.keys()) if isinstance(data, dict) else 'não é dict'}")
-                    
-                    # Verificar se retornou qrcode diretamente ou dentro de um objeto
-                    if isinstance(data, dict):
-                        # Tentar diferentes formatos de resposta
-                        qrcode_data = data.get('qrcode', {})
-                        if not qrcode_data and 'base64' in data:
-                            qrcode_data = data
-                        elif not qrcode_data and 'instance' in data:
-                            # Pode estar dentro de instance
-                            instance_data = data.get('instance', {})
-                            qrcode_data = instance_data.get('qrcode', {})
+                    try:
+                        data = response.json()
+                        logger.info(f"[GET_QRCODE] Tipo da resposta: {type(data)}")
+                        logger.info(f"[GET_QRCODE] Dados completos (JSON): {json.dumps(data, indent=2)}")
                         
-                        qrcode_base64 = qrcode_data.get('base64') if isinstance(qrcode_data, dict) else None
-                        qrcode_url = qrcode_data.get('url') if isinstance(qrcode_data, dict) else None
-                        
-                        # Log detalhado
-                        if qrcode_base64:
-                            logger.info(f"QR Code obtido com sucesso na tentativa {attempt + 1}!")
-                            break
-                        else:
-                            logger.info(f"QR Code ainda não disponível (tentativa {attempt + 1}/10). Dados: {data}")
+                        # Verificar se retornou qrcode diretamente ou dentro de um objeto
+                        if isinstance(data, dict):
+                            logger.info(f"[GET_QRCODE] Chaves no dict: {list(data.keys())}")
+                            
+                            # Tentar diferentes formatos de resposta
+                            qrcode_data = data.get('qrcode', {})
+                            logger.info(f"[GET_QRCODE] qrcode_data (tipo: {type(qrcode_data)}): {qrcode_data}")
+                            
+                            if not qrcode_data and 'base64' in data:
+                                logger.info(f"[GET_QRCODE] base64 encontrado diretamente no dict")
+                                qrcode_data = data
+                            elif not qrcode_data and 'instance' in data:
+                                logger.info(f"[GET_QRCODE] Verificando dentro de instance...")
+                                instance_data = data.get('instance', {})
+                                logger.info(f"[GET_QRCODE] instance_data: {json.dumps(instance_data, indent=2)}")
+                                qrcode_data = instance_data.get('qrcode', {})
+                                logger.info(f"[GET_QRCODE] qrcode_data dentro de instance: {qrcode_data}")
+                            
+                            if isinstance(qrcode_data, dict):
+                                logger.info(f"[GET_QRCODE] Chaves no qrcode_data: {list(qrcode_data.keys())}")
+                                logger.info(f"[GET_QRCODE] qrcode_data.count: {qrcode_data.get('count')}")
+                                logger.info(f"[GET_QRCODE] qrcode_data.base64 existe: {'base64' in qrcode_data}")
+                                logger.info(f"[GET_QRCODE] qrcode_data.url existe: {'url' in qrcode_data}")
+                                
+                                if 'base64' in qrcode_data:
+                                    base64_value = qrcode_data.get('base64')
+                                    logger.info(f"[GET_QRCODE] base64 encontrado! Tipo: {type(base64_value)}, Tamanho: {len(str(base64_value)) if base64_value else 0}")
+                                
+                                qrcode_base64 = qrcode_data.get('base64') if isinstance(qrcode_data, dict) else None
+                                qrcode_url = qrcode_data.get('url') if isinstance(qrcode_data, dict) else None
+                                
+                                # Log detalhado
+                                if qrcode_base64:
+                                    logger.info(f"[GET_QRCODE] ✅✅✅ QR Code obtido com sucesso na tentativa {attempt + 1}! ✅✅✅")
+                                    logger.info(f"[GET_QRCODE] Tamanho do base64: {len(qrcode_base64)} caracteres")
+                                    logger.info(f"[GET_QRCODE] URL do QR Code: {qrcode_url}")
+                                    break
+                                else:
+                                    logger.warning(f"[GET_QRCODE] ⚠️ QR Code ainda não disponível (tentativa {attempt + 1}/10)")
+                                    logger.warning(f"[GET_QRCODE] Dados completos: {json.dumps(data, indent=2)}")
+                            else:
+                                logger.warning(f"[GET_QRCODE] qrcode_data não é dict: {type(qrcode_data)}")
                             
                             # Método 2: Tentar buscar via fetchInstances
-                            if attempt >= 2:  # Tentar este método após algumas tentativas
+                            if attempt >= 2 and not qrcode_base64:  # Tentar este método após algumas tentativas
+                                logger.info(f"[GET_QRCODE] Tentando método alternativo: fetchInstances...")
                                 try:
                                     fetch_response = requests.get(url_fetch, headers=headers, timeout=10)
+                                    logger.info(f"[GET_QRCODE] fetchInstances status: {fetch_response.status_code}")
                                     if fetch_response.status_code == 200:
                                         fetch_data = fetch_response.json()
+                                        logger.info(f"[GET_QRCODE] fetchInstances dados (tipo: {type(fetch_data)}): {json.dumps(fetch_data, indent=2) if isinstance(fetch_data, (dict, list)) else str(fetch_data)[:500]}")
+                                        
                                         instances = fetch_data if isinstance(fetch_data, list) else fetch_data.get('instance', [])
-                                        for inst in instances:
+                                        logger.info(f"[GET_QRCODE] Total de instâncias: {len(instances)}")
+                                        
+                                        for idx, inst in enumerate(instances):
+                                            logger.info(f"[GET_QRCODE] Instância {idx}: {json.dumps(inst, indent=2) if isinstance(inst, dict) else inst}")
                                             if isinstance(inst, dict) and inst.get('name') == INSTANCE_NAME:
+                                                logger.info(f"[GET_QRCODE] ✅ Instância '{INSTANCE_NAME}' encontrada!")
+                                                logger.info(f"[GET_QRCODE] Status da instância: {inst.get('connectionStatus')}")
                                                 inst_qrcode = inst.get('qrcode', {})
-                                                if isinstance(inst_qrcode, dict) and inst_qrcode.get('base64'):
-                                                    qrcode_base64 = inst_qrcode.get('base64')
-                                                    qrcode_url = inst_qrcode.get('url')
-                                                    logger.info(f"QR Code encontrado via fetchInstances na tentativa {attempt + 1}!")
-                                                    break
+                                                logger.info(f"[GET_QRCODE] QR Code na instância (tipo: {type(inst_qrcode)}): {inst_qrcode}")
+                                                
+                                                if isinstance(inst_qrcode, dict):
+                                                    logger.info(f"[GET_QRCODE] Chaves no qrcode: {list(inst_qrcode.keys())}")
+                                                    if inst_qrcode.get('base64'):
+                                                        qrcode_base64 = inst_qrcode.get('base64')
+                                                        qrcode_url = inst_qrcode.get('url')
+                                                        logger.info(f"[GET_QRCODE] ✅✅✅ QR Code encontrado via fetchInstances na tentativa {attempt + 1}! ✅✅✅")
+                                                        logger.info(f"[GET_QRCODE] Tamanho do base64: {len(qrcode_base64)} caracteres")
+                                                        break
                                 except Exception as fetch_error:
-                                    logger.warning(f"Erro ao buscar QR Code via fetchInstances: {str(fetch_error)}")
+                                    logger.error(f"[GET_QRCODE] ❌ Erro ao buscar QR Code via fetchInstances: {str(fetch_error)}", exc_info=True)
                                 
                                 if qrcode_base64:
                                     break
-                    else:
-                        logger.info(f"Resposta não é dict: {type(data)}")
+                        else:
+                            logger.warning(f"[GET_QRCODE] ⚠️ Resposta não é dict: {type(data)}")
+                            logger.warning(f"[GET_QRCODE] Conteúdo: {str(data)[:500]}")
+                    except json.JSONDecodeError as json_error:
+                        logger.error(f"[GET_QRCODE] ❌ Erro ao parsear JSON: {str(json_error)}")
+                        logger.error(f"[GET_QRCODE] Response text: {response.text[:500]}")
                     
                     if not qrcode_base64 and attempt < 9:
                         # Aumentar tempo de espera progressivamente: 5s, 5s, 7s, 7s, 10s...
                         wait_time = 5 if attempt < 2 else (7 if attempt < 5 else 10)
-                        logger.info(f"Aguardando {wait_time} segundos antes da próxima tentativa...")
+                        logger.info(f"[GET_QRCODE] ⏳ Aguardando {wait_time} segundos antes da próxima tentativa...")
                         time.sleep(wait_time)
                 else:
-                    logger.warning(f"Erro ao obter QR Code: {response.status_code}")
+                    logger.error(f"[GET_QRCODE] ❌ Erro ao obter QR Code: {response.status_code}")
+                    logger.error(f"[GET_QRCODE] Response text: {response.text[:500]}")
                     if attempt < 9:
                         time.sleep(5)
             except Exception as e:
-                logger.error(f"Erro ao obter QR Code (tentativa {attempt + 1}): {str(e)}", exc_info=True)
+                logger.error(f"[GET_QRCODE] ❌❌❌ Erro ao obter QR Code (tentativa {attempt + 1}): {str(e)}", exc_info=True)
                 if attempt < 9:
                     time.sleep(5)
         
