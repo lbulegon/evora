@@ -139,25 +139,39 @@ def create_session(request):
         if response_check.status_code == 200:
             try:
                 data_check = response_check.json()
-                logger.info(f"Dados recebidos da Evolution API: tipo={type(data_check)}")
+                logger.info(f"[CHECK_INSTANCES] ========== VERIFICANDO INSTÂNCIAS ==========")
+                logger.info(f"[CHECK_INSTANCES] Status code: {response_check.status_code}")
+                logger.info(f"[CHECK_INSTANCES] Dados recebidos (tipo: {type(data_check)}): {json.dumps(data_check, indent=2) if isinstance(data_check, (dict, list)) else str(data_check)[:1000]}")
+                
                 # A Evolution API pode retornar uma lista diretamente ou um dict com 'instance'
                 if isinstance(data_check, list):
                     instances = data_check
+                    logger.info(f"[CHECK_INSTANCES] Resposta é uma lista com {len(instances)} itens")
                 elif isinstance(data_check, dict):
                     instances = data_check.get('instance', [])
+                    logger.info(f"[CHECK_INSTANCES] Resposta é um dict, instâncias: {len(instances)}")
                 else:
                     instances = []
+                    logger.warning(f"[CHECK_INSTANCES] Resposta não é lista nem dict: {type(data_check)}")
                 
-                logger.info(f"Total de instâncias encontradas: {len(instances)}")
-                for inst in instances:
+                logger.info(f"[CHECK_INSTANCES] Total de instâncias encontradas: {len(instances)}")
+                for idx, inst in enumerate(instances):
+                    logger.info(f"[CHECK_INSTANCES] Instância {idx}: {json.dumps(inst, indent=2) if isinstance(inst, dict) else str(inst)[:500]}")
                     # Verificar se inst é um dict antes de usar .get()
-                    if isinstance(inst, dict) and inst.get('name') == INSTANCE_NAME:
-                        instance_exists = True
-                        instance_status = inst.get('connectionStatus', 'unknown')
-                        logger.info(f"Instância {INSTANCE_NAME} já existe com status: {instance_status}")
-                        break
+                    if isinstance(inst, dict):
+                        inst_name = inst.get('name')
+                        inst_status = inst.get('connectionStatus', 'unknown')
+                        logger.info(f"[CHECK_INSTANCES] Instância {idx} - name: {inst_name}, status: {inst_status}")
+                        if inst_name == INSTANCE_NAME:
+                            instance_exists = True
+                            instance_status = inst_status
+                            logger.info(f"[CHECK_INSTANCES] ✅ Instância {INSTANCE_NAME} encontrada com status: {instance_status}")
+                            logger.info(f"[CHECK_INSTANCES] Dados completos da instância: {json.dumps(inst, indent=2)}")
+                            break
+                    else:
+                        logger.warning(f"[CHECK_INSTANCES] Instância {idx} não é dict: {type(inst)}")
             except Exception as e:
-                logger.error(f"Erro ao processar resposta de instâncias: {str(e)}", exc_info=True)
+                logger.error(f"[CHECK_INSTANCES] ❌ Erro ao processar resposta de instâncias: {str(e)}", exc_info=True)
                 raise
         
         # Se instância existe mas está desconectada, deletar para recriar
