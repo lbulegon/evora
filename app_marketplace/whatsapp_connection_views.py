@@ -230,14 +230,14 @@ def create_session(request):
             else:
                 logger.warning(f"[CLEAN_INSTANCE] ⚠️ Erro ao verificar instâncias: {response_check.status_code}")
                 # Continuar para tentar criar instância
-        except requests.exceptions.Timeout as timeout_error:
+        except Timeout as timeout_error:
             logger.error(f"[CLEAN_INSTANCE] ❌ Timeout ao conectar com Evolution API: {str(timeout_error)}")
             return JsonResponse({
                 'success': False,
                 'error': f'Evolution API não está respondendo (timeout). Verifique se o serviço está rodando em {EVOLUTION_API_URL}',
                 'details': str(timeout_error)
             }, status=503)
-        except requests.exceptions.ConnectionError as conn_error:
+        except RequestsConnectionError as conn_error:
             logger.error(f"[CLEAN_INSTANCE] ❌ Erro de conexão com Evolution API: {str(conn_error)}")
             return JsonResponse({
                 'success': False,
