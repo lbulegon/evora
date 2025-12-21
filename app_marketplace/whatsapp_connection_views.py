@@ -287,6 +287,7 @@ def create_session(request):
         # 2. Obter QR Code (com retry)
         # Na Evolution API v2.1.1, o QR Code pode ser obtido via:
         # - /instance/connect/{instanceName} (GET) - retorna qrcode quando disponível
+        # - /instance/connect/{instanceName} (POST) - força reconexão e gera QR Code se necessário
         # - Webhook QRCODE_UPDATED - quando o QR Code é gerado
         # Vamos tentar ambos os métodos
         url_connect = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
@@ -298,6 +299,48 @@ def create_session(request):
         qrcode_base64 = None
         qrcode_url = None
         
+        # PRIMEIRO: Se a instância está "close", forçar reconexão via POST
+        # Isso é necessário para gerar um novo QR Code
+        logger.info(f"[FORCE_CONNECT] Verificando se precisa forçar reconexão...")
+        try:
+            # Verificar status atual da instância
+            fetch_response = requests.get(url_fetch, headers=headers, timeout=10)
+            if fetch_response.status_code == 200:
+                fetch_data = fetch_response.json()
+                instances = fetch_data if isinstance(fetch_data, list) else fetch_data.get('instance', [])
+                for inst in instances:
+                    if isinstance(inst, dict) and inst.get('name') == INSTANCE_NAME:
+                        connection_status = inst.get('connectionStatus', '').lower()
+                        logger.info(f"[FORCE_CONNECT] Status atual da instância '{INSTANCE_NAME}': {connection_status}")
+                        
+                        # Se está "close", forçar reconexão via POST
+                        if connection_status == 'close':
+                            logger.info(f"[FORCE_CONNECT] Instância está 'close'. Forçando reconexão via POST para gerar QR Code...")
+                            post_connect_response = requests.post(url_connect, headers=headers, timeout=30)
+                            logger.info(f"[FORCE_CONNECT] POST /instance/connect/{INSTANCE_NAME} - Status: {post_connect_response.status_code}")
+                            logger.info(f"[FORCE_CONNECT] Resposta: {post_connect_response.text[:500]}")
+                            
+                            # Verificar se o QR Code veio na resposta do POST
+                            if post_connect_response.status_code in [200, 201]:
+                                try:
+                                    post_data = post_connect_response.json()
+                                    logger.info(f"[FORCE_CONNECT] Dados do POST: {json.dumps(post_data, indent=2)}")
+                                    
+                                    # Verificar se há QR Code na resposta
+                                    post_qrcode = post_data.get('qrcode', {})
+                                    if isinstance(post_qrcode, dict) and post_qrcode.get('base64'):
+                                        logger.info(f"[FORCE_CONNECT] ✅ QR Code obtido via POST! Tamanho: {len(post_qrcode.get('base64', ''))}")
+                                        qrcode_base64 = post_qrcode.get('base64')
+                                        qrcode_url = post_qrcode.get('url')
+                                    else:
+                                        logger.info(f"[FORCE_CONNECT] QR Code não veio no POST, aguardando 5 segundos...")
+                                        time.sleep(5)
+                                except Exception as e:
+                                    logger.warning(f"[FORCE_CONNECT] Erro ao parsear resposta do POST: {str(e)}")
+                            break
+        except Exception as e:
+            logger.warning(f"[FORCE_CONNECT] Erro ao verificar/forçar conexão: {str(e)}", exc_info=True)
+        
         # Tentar obter QR Code até 10 vezes com intervalo maior (QR Code pode demorar para ser gerado)
         for attempt in range(10):
             try:
@@ -305,7 +348,7 @@ def create_session(request):
                 logger.info(f"[GET_QRCODE] URL: {url_connect}")
                 logger.info(f"[GET_QRCODE] Headers: {headers}")
                 
-                # Método 1: Tentar /instance/connect/{instanceName}
+                # Método 1: Tentar /instance/connect/{instanceName} (GET)
                 response = requests.get(url_connect, headers=headers, timeout=30)
                 logger.info(f"[GET_QRCODE] Status code: {response.status_code}")
                 logger.info(f"[GET_QRCODE] Response headers: {dict(response.headers)}")
