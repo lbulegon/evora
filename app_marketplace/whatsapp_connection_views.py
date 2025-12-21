@@ -5,6 +5,7 @@ import os
 import json
 import base64
 import requests
+from requests.exceptions import Timeout, ConnectionError as RequestsConnectionError
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -319,14 +320,14 @@ def create_session(request):
             logger.info(f"[CREATE_INSTANCE] ✅ Instância criada com sucesso! Aguardando 10 segundos para Evolution API processar e gerar QR Code...")
             time.sleep(10)  # Aguardar Evolution API processar e iniciar geração do QR Code
             
-        except requests.exceptions.Timeout as timeout_error:
+        except Timeout as timeout_error:
             logger.error(f"[CREATE_INSTANCE] ❌ Timeout ao criar instância: {str(timeout_error)}")
             return JsonResponse({
                 'success': False,
                 'error': f'Evolution API não está respondendo (timeout ao criar instância). O serviço pode estar sobrecarregado.',
                 'details': str(timeout_error)
             }, status=503)
-        except requests.exceptions.ConnectionError as conn_error:
+        except RequestsConnectionError as conn_error:
             logger.error(f"[CREATE_INSTANCE] ❌ Erro de conexão: {str(conn_error)}")
             return JsonResponse({
                 'success': False,
