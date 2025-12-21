@@ -125,25 +125,36 @@ def create_session(request):
         # Verificar se instância já existe
         url_check = f"{EVOLUTION_API_URL}/instance/fetchInstances"
         logger.info(f"Verificando instâncias existentes: {url_check}")
-        response_check = requests.get(url_check, headers=headers, timeout=10)
-        logger.info(f"Resposta check instâncias: {response_check.status_code}")
+        try:
+            response_check = requests.get(url_check, headers=headers, timeout=10)
+            logger.info(f"Resposta check instâncias: {response_check.status_code}")
+        except Exception as e:
+            logger.error(f"Erro ao verificar instâncias: {str(e)}", exc_info=True)
+            raise
         
         instance_exists = False
         if response_check.status_code == 200:
-            data_check = response_check.json()
-            # A Evolution API pode retornar uma lista diretamente ou um dict com 'instance'
-            if isinstance(data_check, list):
-                instances = data_check
-            elif isinstance(data_check, dict):
-                instances = data_check.get('instance', [])
-            else:
-                instances = []
-            
-            for inst in instances:
-                # Verificar se inst é um dict antes de usar .get()
-                if isinstance(inst, dict) and inst.get('instanceName') == INSTANCE_NAME:
-                    instance_exists = True
-                    break
+            try:
+                data_check = response_check.json()
+                logger.info(f"Dados recebidos da Evolution API: tipo={type(data_check)}")
+                # A Evolution API pode retornar uma lista diretamente ou um dict com 'instance'
+                if isinstance(data_check, list):
+                    instances = data_check
+                elif isinstance(data_check, dict):
+                    instances = data_check.get('instance', [])
+                else:
+                    instances = []
+                
+                logger.info(f"Total de instâncias encontradas: {len(instances)}")
+                for inst in instances:
+                    # Verificar se inst é um dict antes de usar .get()
+                    if isinstance(inst, dict) and inst.get('instanceName') == INSTANCE_NAME:
+                        instance_exists = True
+                        logger.info(f"Instância {INSTANCE_NAME} já existe")
+                        break
+            except Exception as e:
+                logger.error(f"Erro ao processar resposta de instâncias: {str(e)}", exc_info=True)
+                raise
         
         # Criar instância se não existir
         if not instance_exists:
