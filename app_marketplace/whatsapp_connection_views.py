@@ -213,6 +213,20 @@ def create_session(request):
                 response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
                 logger.info(f"Resposta criação instância: {response_create.status_code}")
                 logger.info(f"Resposta texto: {response_create.text[:500]}")
+                
+                # Verificar se o QR Code já vem na resposta de criação
+                if response_create.status_code in [200, 201]:
+                    try:
+                        create_data = response_create.json()
+                        # Verificar se o QR Code está na resposta
+                        if isinstance(create_data, dict):
+                            qrcode_in_response = create_data.get('qrcode', {})
+                            if isinstance(qrcode_in_response, dict) and qrcode_in_response.get('base64'):
+                                logger.info("QR Code encontrado na resposta de criação da instância!")
+                                qrcode_base64 = qrcode_in_response.get('base64')
+                                qrcode_url = qrcode_in_response.get('url')
+                    except Exception as parse_error:
+                        logger.warning(f"Erro ao parsear resposta de criação: {str(parse_error)}")
             except Exception as e:
                 logger.error(f"Exceção ao criar instância: {str(e)}", exc_info=True)
                 raise
