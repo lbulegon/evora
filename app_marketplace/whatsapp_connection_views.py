@@ -243,11 +243,11 @@ def create_session(request):
         qrcode_base64 = None
         qrcode_url = None
         
-        # Tentar obter QR Code até 3 vezes com intervalo
-        for attempt in range(3):
+        # Tentar obter QR Code até 5 vezes com intervalo maior
+        for attempt in range(5):
             try:
                 response = requests.get(url_connect, headers=headers, timeout=30)
-                logger.info(f"Resposta QR Code (tentativa {attempt + 1}): {response.status_code}")
+                logger.info(f"Resposta QR Code (tentativa {attempt + 1}/5): {response.status_code}")
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -255,27 +255,39 @@ def create_session(request):
                     
                     # Verificar se retornou qrcode diretamente ou dentro de um objeto
                     if isinstance(data, dict):
+                        # Tentar diferentes formatos de resposta
                         qrcode_data = data.get('qrcode', {})
                         if not qrcode_data and 'base64' in data:
                             qrcode_data = data
+                        elif not qrcode_data and 'instance' in data:
+                            # Pode estar dentro de instance
+                            instance_data = data.get('instance', {})
+                            qrcode_data = instance_data.get('qrcode', {})
+                        
                         qrcode_base64 = qrcode_data.get('base64') if isinstance(qrcode_data, dict) else None
                         qrcode_url = qrcode_data.get('url') if isinstance(qrcode_data, dict) else None
-                    
-                    if qrcode_base64:
-                        logger.info(f"QR Code obtido com sucesso na tentativa {attempt + 1}!")
-                        break
+                        
+                        # Log detalhado
+                        if qrcode_base64:
+                            logger.info(f"QR Code obtido com sucesso na tentativa {attempt + 1}!")
+                            break
+                        else:
+                            logger.info(f"QR Code ainda não disponível (tentativa {attempt + 1}/5). Dados: {data}")
                     else:
-                        logger.info(f"QR Code ainda não disponível (tentativa {attempt + 1}/3)")
-                        if attempt < 2:
-                            time.sleep(2)  # Aguardar 2 segundos antes de tentar novamente
+                        logger.info(f"Resposta não é dict: {type(data)}")
+                    
+                    if not qrcode_base64 and attempt < 4:
+                        wait_time = 3 if attempt < 2 else 5  # Aguardar mais tempo nas últimas tentativas
+                        logger.info(f"Aguardando {wait_time} segundos antes da próxima tentativa...")
+                        time.sleep(wait_time)
                 else:
                     logger.warning(f"Erro ao obter QR Code: {response.status_code}")
-                    if attempt < 2:
-                        time.sleep(2)
+                    if attempt < 4:
+                        time.sleep(3)
             except Exception as e:
                 logger.error(f"Erro ao obter QR Code (tentativa {attempt + 1}): {str(e)}", exc_info=True)
-                if attempt < 2:
-                    time.sleep(2)
+                if attempt < 4:
+                    time.sleep(3)
         
         # Configurar webhook (antes de retornar) - Formato correto da Evolution API
         webhook_url = f"{request.build_absolute_uri('/')[:-1]}/api/whatsapp/webhook/evolution/"
@@ -317,7 +329,7 @@ def create_session(request):
             logger.info(f"JsonResponse criado, retornando...")
             return result
         else:
-            logger.warning(f"QR Code não disponível para {request.user.username} após 3 tentativas")
+            logger.warning(f"QR Code não disponível para {request.user.username} após 5 tentativas")
             return JsonResponse({
                 'success': False,
                 'error': 'QR Code não disponível. A instância pode estar conectada ou ainda processando. Tente novamente em alguns segundos.',
