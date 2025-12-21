@@ -61,13 +61,16 @@ def whatsapp_connect(request):
 
 
 @csrf_exempt
-@login_required
 @require_http_methods(["POST"])
 def create_session(request):
     """
     Criar instância e obter QR Code - Evolution API
     POST /whatsapp/connection/create/
     """
+    # Verificar autenticação manualmente (já que removemos @login_required para debug)
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Não autenticado'}, status=401)
+    
     # Verificar permissões - permitir para usuários autenticados que são shoppers, keepers ou superusers
     from app_marketplace.models import PersonalShopper, AddressKeeper
     import logging
