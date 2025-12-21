@@ -124,6 +124,11 @@ def create_session(request):
             "Authorization": f"Bearer {EVOLUTION_API_KEY}"
         }
         
+        # Timeouts aumentados para operações que podem demorar
+        SHORT_TIMEOUT = 15  # Para verificações rápidas
+        MEDIUM_TIMEOUT = 30  # Para operações normais
+        LONG_TIMEOUT = 60  # Para criação de instância e obtenção de QR Code
+        
         # ========== ESTRATÉGIA DEFINITIVA: SEMPRE DELETAR E RECRIAR ==========
         # Para garantir QR Code limpo, sempre deletamos a instância existente (se houver)
         # e criamos uma nova instância limpa
@@ -138,7 +143,21 @@ def create_session(request):
         instance_exists = False
         
         try:
-            response_check = requests.get(url_check, headers=headers, timeout=10)
+            # Verificar se Evolution API está acessível primeiro
+            logger.info(f"[CLEAN_INSTANCE] Verificando se Evolution API está acessível...")
+            try:
+                health_check = requests.get(f"{EVOLUTION_API_URL}/health", headers=headers, timeout=5)
+                if health_check.status_code != 200:
+                    logger.warning(f"[CLEAN_INSTANCE] ⚠️ Evolution API health check retornou {health_check.status_code}")
+            except Exception as health_error:
+                logger.error(f"[CLEAN_INSTANCE] ❌ Evolution API não está acessível: {str(health_error)}")
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Evolution API não está acessível em {EVOLUTION_API_URL}. Verifique se o serviço está rodando.',
+                    'details': str(health_error)
+                }, status=503)
+            
+            response_check = requests.get(url_check, headers=headers, timeout=SHORT_TIMEOUT)
             logger.info(f"[CLEAN_INSTANCE] GET /instance/fetchInstances - Status: {response_check.status_code}")
             
             if response_check.status_code == 200:
@@ -167,7 +186,7 @@ def create_session(request):
                     # Se instância existe, SEMPRE DELETAR (independente do status)
                     if instance_exists:
                         logger.info(f"[CLEAN_INSTANCE] Instância existe. DELETANDO para criar uma nova limpa...")
-                        delete_response = requests.delete(url_delete, headers=headers, timeout=15)
+                        delete_response = requests.delete(url_delete, headers=headers, timeout=MEDIUM_TIMEOUT)
                         logger.info(f"[CLEAN_INSTANCE] DELETE /instance/delete/{INSTANCE_NAME} - Status: {delete_response.status_code}")
                         logger.info(f"[CLEAN_INSTANCE] DELETE Response: {delete_response.text[:500]}")
                         
@@ -177,7 +196,7 @@ def create_session(request):
                             
                             # Verificar se realmente foi deletada (até 3 tentativas)
                             for verify_attempt in range(3):
-                                verify_response = requests.get(url_check, headers=headers, timeout=10)
+                                verify_response = requests.get(url_check, headers=headers, timeout=SHORT_TIMEOUT)
                                 if verify_response.status_code == 200:
                                     verify_data = verify_response.json()
                                     verify_instances = verify_data if isinstance(verify_data, list) else verify_data.get('instance', [])
@@ -196,7 +215,7 @@ def create_session(request):
                                         if verify_attempt == 2:
                                             # Última tentativa: forçar deleção novamente
                                             logger.warning(f"[CLEAN_INSTANCE] Forçando deleção novamente...")
-                                            requests.delete(url_delete, headers=headers, timeout=15)
+                                            requests.delete(url_delete, headers=headers, timeout=MEDIUM_TIMEOUT)
                                             time.sleep(3)
                         else:
                             logger.warning(f"[CLEAN_INSTANCE] ⚠️ Erro ao deletar: {delete_response.status_code} - {delete_response.text[:500]}")
@@ -210,8 +229,29 @@ def create_session(request):
             else:
                 logger.warning(f"[CLEAN_INSTANCE] ⚠️ Erro ao verificar instâncias: {response_check.status_code}")
                 # Continuar para tentar criar instância
+        except requests.exceptions.Timeout as timeout_error:
+            logger.error(f"[CLEAN_INSTANCE] ❌ Timeout ao conectar com Evolution API: {str(timeout_error)}")
+            return JsonResponse({
+                'success': False,
+                'error': f'Evolution API não está respondendo (timeout). Verifique se o serviço está rodando em {EVOLUTION_API_URL}',
+                'details': str(timeout_error)
+            }, status=503)
+        except requests.exceptions.ConnectionError as conn_error:
+            logger.error(f"[CLEAN_INSTANCE] ❌ Erro de conexão com Evolution API: {str(conn_error)}")
+            return JsonResponse({
+                'success': False,
+                'error': f'Não foi possível conectar com Evolution API em {EVOLUTION_API_URL}. Verifique se o serviço está rodando.',
+                'details': str(conn_error)
+            }, status=503)
         except Exception as e:
             logger.error(f"[CLEAN_INSTANCE] ❌ Erro ao verificar/deletar instância: {str(e)}", exc_info=True)
+            # Se for timeout ou connection error, retornar erro específico
+            if 'timeout' in str(e).lower() or 'connection' in str(e).lower():
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Erro de conexão com Evolution API: {str(e)}',
+                    'details': 'Verifique se a Evolution API está rodando e acessível'
+                }, status=503)
             # Continuar para tentar criar instância
         
         # PASSO 2: Criar nova instância limpa (sempre criar, mesmo que a anterior não tenha sido deletada)
@@ -228,7 +268,7 @@ def create_session(request):
         logger.info(f"[CREATE_INSTANCE] Headers: {headers}")
         
         try:
-            response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
+            response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=LONG_TIMEOUT)
             logger.info(f"[CREATE_INSTANCE] Status: {response_create.status_code}")
             logger.info(f"[CREATE_INSTANCE] Resposta completa: {response_create.text}")
             
@@ -250,7 +290,7 @@ def create_session(request):
                     
                     # Tentar criar novamente
                     logger.info(f"[CREATE_INSTANCE] Tentando criar novamente após deleção forçada...")
-                    response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
+                    response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=LONG_TIMEOUT)
                     logger.info(f"[CREATE_INSTANCE] Status (2ª tentativa): {response_create.status_code}")
                     logger.info(f"[CREATE_INSTANCE] Resposta (2ª tentativa): {response_create.text}")
                     
@@ -279,11 +319,28 @@ def create_session(request):
             logger.info(f"[CREATE_INSTANCE] ✅ Instância criada com sucesso! Aguardando 10 segundos para Evolution API processar e gerar QR Code...")
             time.sleep(10)  # Aguardar Evolution API processar e iniciar geração do QR Code
             
-        except Exception as e:
-            logger.error(f"[CREATE_INSTANCE] ❌ Exceção: {str(e)}", exc_info=True)
+        except requests.exceptions.Timeout as timeout_error:
+            logger.error(f"[CREATE_INSTANCE] ❌ Timeout ao criar instância: {str(timeout_error)}")
             return JsonResponse({
                 'success': False,
-                'error': f'Erro ao criar instância: {str(e)}'
+                'error': f'Evolution API não está respondendo (timeout ao criar instância). O serviço pode estar sobrecarregado.',
+                'details': str(timeout_error)
+            }, status=503)
+        except requests.exceptions.ConnectionError as conn_error:
+            logger.error(f"[CREATE_INSTANCE] ❌ Erro de conexão: {str(conn_error)}")
+            return JsonResponse({
+                'success': False,
+                'error': f'Não foi possível conectar com Evolution API. Verifique se o serviço está rodando.',
+                'details': str(conn_error)
+            }, status=503)
+        except Exception as e:
+            logger.error(f"[CREATE_INSTANCE] ❌ Exceção: {str(e)}", exc_info=True)
+            error_msg = f'Erro ao criar instância: {str(e)}'
+            if 'timeout' in str(e).lower():
+                error_msg = f'Evolution API não está respondendo (timeout). Tente novamente em alguns instantes.'
+            return JsonResponse({
+                'success': False,
+                'error': error_msg
             }, status=500)
         
         # 2. OBTER QR CODE - ESTRATÉGIA DEFINITIVA
@@ -339,7 +396,7 @@ def create_session(request):
                     logger.info(f"[GET_QRCODE] Headers: {headers}")
                     
                     # Método 1: Tentar /instance/connect/{instanceName} (GET)
-                    response = requests.get(url_connect, headers=headers, timeout=30)
+                    response = requests.get(url_connect, headers=headers, timeout=LONG_TIMEOUT)
                     logger.info(f"[GET_QRCODE] Status code: {response.status_code}")
                     logger.info(f"[GET_QRCODE] Response headers: {dict(response.headers)}")
                     logger.info(f"[GET_QRCODE] Response text (primeiros 1000 chars): {response.text[:1000]}")
@@ -398,7 +455,7 @@ def create_session(request):
                             if attempt % 3 == 0 and not qrcode_base64:
                                 logger.info(f"[GET_QRCODE] Tentando método alternativo: fetchInstances...")
                                 try:
-                                    fetch_response = requests.get(url_fetch, headers=headers, timeout=10)
+                                    fetch_response = requests.get(url_fetch, headers=headers, timeout=SHORT_TIMEOUT)
                                     logger.info(f"[GET_QRCODE] fetchInstances status: {fetch_response.status_code}")
                                     if fetch_response.status_code == 200:
                                         fetch_data = fetch_response.json()
