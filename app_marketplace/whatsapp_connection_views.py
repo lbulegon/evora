@@ -429,6 +429,12 @@ def create_session(request):
                             logger.error(f"[GET_QRCODE] ❌ Erro ao parsear JSON: {str(json_error)}")
                             logger.error(f"[GET_QRCODE] Response text: {response.text[:500]}")
                     
+                    else:
+                        logger.error(f"[GET_QRCODE] ❌ Erro ao obter QR Code: {response.status_code}")
+                        logger.error(f"[GET_QRCODE] Response text: {response.text[:500]}")
+                        if attempt < 19:
+                            time.sleep(5)
+                    
                     # Se ainda não tem QR Code, aguardar antes da próxima tentativa
                     if not qrcode_base64:
                         # Aumentar tempo de espera progressivamente: 3s, 5s, 7s, 10s...
@@ -445,11 +451,6 @@ def create_session(request):
                         time.sleep(wait_time)
                     else:
                         break  # QR Code encontrado, sair do loop
-                else:
-                    logger.error(f"[GET_QRCODE] ❌ Erro ao obter QR Code: {response.status_code}")
-                    logger.error(f"[GET_QRCODE] Response text: {response.text[:500]}")
-                    if attempt < 19:
-                        time.sleep(5)
                 except Exception as e:
                     logger.error(f"[GET_QRCODE] ❌❌❌ Erro ao obter QR Code (tentativa {attempt + 1}): {str(e)}", exc_info=True)
                     if attempt < 19:
