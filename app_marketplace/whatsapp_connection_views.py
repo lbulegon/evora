@@ -344,11 +344,11 @@ def create_session(request):
                     logger.info(f"[GET_QRCODE] Response headers: {dict(response.headers)}")
                     logger.info(f"[GET_QRCODE] Response text (primeiros 1000 chars): {response.text[:1000]}")
                     
-                if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        logger.info(f"[GET_QRCODE] Tipo da resposta: {type(data)}")
-                        logger.info(f"[GET_QRCODE] Dados completos (JSON): {json.dumps(data, indent=2)}")
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            logger.info(f"[GET_QRCODE] Tipo da resposta: {type(data)}")
+                            logger.info(f"[GET_QRCODE] Dados completos (JSON): {json.dumps(data, indent=2)}")
                         
                         # Verificar se retornou qrcode diretamente ou dentro de um objeto
                         if isinstance(data, dict):
