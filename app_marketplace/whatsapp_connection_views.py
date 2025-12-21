@@ -114,6 +114,8 @@ def create_session(request):
     
     try:
         logger.info(f"Iniciando criação de sessão - Evolution API URL: {EVOLUTION_API_URL}")
+        logger.info(f"Request method: {request.method}, Content-Type: {request.content_type}")
+        logger.info(f"Request headers: {dict(request.headers)}")
         
         # 1. Criar instância se não existir
         headers = {
@@ -164,16 +166,20 @@ def create_session(request):
             url_delete = f"{EVOLUTION_API_URL}/instance/delete/{INSTANCE_NAME}"
             try:
                 delete_response = requests.delete(url_delete, headers=headers, timeout=10)
+                logger.info(f"Resposta DELETE: {delete_response.status_code}")
                 if delete_response.status_code in [200, 201]:
                     logger.info(f"Instância {INSTANCE_NAME} deletada com sucesso")
                     instance_exists = False
                 else:
-                    logger.warning(f"Erro ao deletar instância: {delete_response.status_code}")
+                    logger.warning(f"Erro ao deletar instância: {delete_response.status_code} - {delete_response.text}")
             except Exception as e:
                 logger.warning(f"Erro ao deletar instância (continuando): {str(e)}")
         
+        logger.info(f"Estado final: instance_exists={instance_exists}, prosseguindo para criação se necessário...")
+        
         # Criar instância se não existir
         if not instance_exists:
+            logger.info(f"Criando nova instância {INSTANCE_NAME}...")
             url_create = f"{EVOLUTION_API_URL}/instance/create"
             payload_create = {
                 "instanceName": INSTANCE_NAME,
@@ -181,14 +187,20 @@ def create_session(request):
                 "qrcode": True,
                 "integration": "WHATSAPP-BAILEYS"
             }
+            logger.info(f"Enviando POST para criar instância: {url_create}")
             response_create = requests.post(url_create, json=payload_create, headers=headers, timeout=30)
+            logger.info(f"Resposta criação instância: {response_create.status_code}")
             
             if response_create.status_code not in [200, 201]:
                 error_data = response_create.json() if response_create.text else {}
+                error_msg = error_data.get('message', f'Erro ao criar instância: {response_create.status_code}')
+                logger.error(f"Erro ao criar instância: {error_msg}")
                 return JsonResponse({
                     'success': False,
-                    'error': error_data.get('message', f'Erro ao criar instância: {response_create.status_code}'),
+                    'error': error_msg,
                 }, status=response_create.status_code)
+            else:
+                logger.info(f"Instância {INSTANCE_NAME} criada com sucesso!")
         
         # 2. Obter QR Code
         url_connect = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
