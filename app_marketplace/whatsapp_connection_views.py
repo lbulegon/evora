@@ -232,9 +232,9 @@ def create_session(request):
                     'details': error_data if isinstance(error_data, dict) else str(error_data),
                 }, status=response_create.status_code)
             else:
-                logger.info(f"Instância {INSTANCE_NAME} criada com sucesso! Aguardando 3 segundos para processar...")
+                logger.info(f"Instância {INSTANCE_NAME} criada com sucesso! Aguardando 10 segundos para Evolution API gerar QR Code...")
                 import time
-                time.sleep(3)  # Aguardar instância processar completamente
+                time.sleep(10)  # Aguardar Evolution API processar e gerar QR Code
         
         # 2. Obter QR Code (com retry)
         url_connect = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
@@ -243,11 +243,11 @@ def create_session(request):
         qrcode_base64 = None
         qrcode_url = None
         
-        # Tentar obter QR Code até 5 vezes com intervalo maior
-        for attempt in range(5):
+        # Tentar obter QR Code até 10 vezes com intervalo maior (QR Code pode demorar para ser gerado)
+        for attempt in range(10):
             try:
                 response = requests.get(url_connect, headers=headers, timeout=30)
-                logger.info(f"Resposta QR Code (tentativa {attempt + 1}/5): {response.status_code}")
+                logger.info(f"Resposta QR Code (tentativa {attempt + 1}/10): {response.status_code}")
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -272,22 +272,23 @@ def create_session(request):
                             logger.info(f"QR Code obtido com sucesso na tentativa {attempt + 1}!")
                             break
                         else:
-                            logger.info(f"QR Code ainda não disponível (tentativa {attempt + 1}/5). Dados: {data}")
+                            logger.info(f"QR Code ainda não disponível (tentativa {attempt + 1}/10). Dados: {data}")
                     else:
                         logger.info(f"Resposta não é dict: {type(data)}")
                     
-                    if not qrcode_base64 and attempt < 4:
-                        wait_time = 3 if attempt < 2 else 5  # Aguardar mais tempo nas últimas tentativas
+                    if not qrcode_base64 and attempt < 9:
+                        # Aumentar tempo de espera progressivamente: 5s, 5s, 7s, 7s, 10s...
+                        wait_time = 5 if attempt < 2 else (7 if attempt < 5 else 10)
                         logger.info(f"Aguardando {wait_time} segundos antes da próxima tentativa...")
                         time.sleep(wait_time)
                 else:
                     logger.warning(f"Erro ao obter QR Code: {response.status_code}")
-                    if attempt < 4:
-                        time.sleep(3)
+                    if attempt < 9:
+                        time.sleep(5)
             except Exception as e:
                 logger.error(f"Erro ao obter QR Code (tentativa {attempt + 1}): {str(e)}", exc_info=True)
-                if attempt < 4:
-                    time.sleep(3)
+                if attempt < 9:
+                    time.sleep(5)
         
         # Configurar webhook (antes de retornar) - Formato correto da Evolution API
         webhook_url = f"{request.build_absolute_uri('/')[:-1]}/api/whatsapp/webhook/evolution/"
@@ -330,7 +331,7 @@ def create_session(request):
             logger.info(f"JsonResponse criado, retornando...")
             return result
         else:
-            logger.warning(f"QR Code não disponível para {request.user.username} após 5 tentativas")
+            logger.warning(f"QR Code não disponível para {request.user.username} após 10 tentativas")
             return JsonResponse({
                 'success': False,
                 'error': 'QR Code não disponível. A instância pode estar conectada ou ainda processando. Tente novamente em alguns segundos.',
