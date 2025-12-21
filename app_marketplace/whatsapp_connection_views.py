@@ -270,26 +270,24 @@ def create_session(request):
             logger.warning(f"Erro ao configurar webhook (não crítico): {str(e)}")
         
         if qrcode_base64:
-                
-                if qrcode_base64:
-                    logger.info(f"Retornando QR Code com sucesso para {request.user.username}")
-                    result = JsonResponse({
-                        'success': True,
-                        'instance': INSTANCE_NAME,
-                        'status': 'connecting',
-                        'qrCode': qrcode_base64,
-                        'qrCodeUrl': qrcode_url,
-                        'message': 'Instância criada! Escaneie o QR Code.',
-                    })
-                    logger.info(f"JsonResponse criado, retornando...")
-                    return result
-                else:
-                    logger.warning(f"QR Code não disponível para {request.user.username}")
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'QR Code não disponível. Instância pode já estar conectada.',
-                        'status': data.get('status', 'unknown'),
-                    })
+            logger.info(f"Retornando QR Code com sucesso para {request.user.username}")
+            result = JsonResponse({
+                'success': True,
+                'instance': INSTANCE_NAME,
+                'status': 'connecting',
+                'qrCode': qrcode_base64,
+                'qrCodeUrl': qrcode_url,
+                'message': 'Instância criada! Escaneie o QR Code.',
+            })
+            logger.info(f"JsonResponse criado, retornando...")
+            return result
+        else:
+            logger.warning(f"QR Code não disponível para {request.user.username} após 3 tentativas")
+            return JsonResponse({
+                'success': False,
+                'error': 'QR Code não disponível. A instância pode estar conectada ou ainda processando. Tente novamente em alguns segundos.',
+                'status': 'processing',
+            })
             except Exception as e:
                 logger.error(f"Erro ao processar resposta QR Code: {str(e)}", exc_info=True)
                 raise
