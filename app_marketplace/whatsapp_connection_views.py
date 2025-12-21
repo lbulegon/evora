@@ -176,51 +176,75 @@ def create_session(request):
         
         # 2. Obter QR Code
         url_connect = f"{EVOLUTION_API_URL}/instance/connect/{INSTANCE_NAME}"
-        response = requests.get(url_connect, headers=headers, timeout=30)
+        logger.info(f"Obtendo QR Code: {url_connect}")
+        try:
+            response = requests.get(url_connect, headers=headers, timeout=30)
+            logger.info(f"Resposta QR Code: {response.status_code}")
+        except Exception as e:
+            logger.error(f"Erro ao obter QR Code: {str(e)}", exc_info=True)
+            raise
         
         if response.status_code == 200:
-            data = response.json()
-            qrcode_data = data.get('qrcode', {})
-            qrcode_base64 = qrcode_data.get('base64')
-            qrcode_url = qrcode_data.get('url')
-            
-            # Configurar webhook
-            webhook_url = f"{request.build_absolute_uri('/')[:-1]}/api/whatsapp/webhook/evolution/"
-            url_webhook = f"{EVOLUTION_API_URL}/webhook/set/{INSTANCE_NAME}"
-            webhook_payload = {
-                "url": webhook_url,
-                "webhook_by_events": True,
-                "events": [
-                    "MESSAGES_UPSERT",
-                    "MESSAGES_UPDATE",
-                    "MESSAGES_DELETE",
-                    "SEND_MESSAGE",
-                    "CONNECTION_UPDATE",
-                    "QRCODE_UPDATED"
-                ]
-            }
-            requests.post(url_webhook, json=webhook_payload, headers=headers, timeout=10)
-            
-            if qrcode_base64:
-                return JsonResponse({
-                    'success': True,
-                    'instance': INSTANCE_NAME,
-                    'status': 'connecting',
-                    'qrCode': qrcode_base64,
-                    'qrCodeUrl': qrcode_url,
-                    'message': 'Instância criada! Escaneie o QR Code.',
-                })
-            else:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'QR Code não disponível. Instância pode já estar conectada.',
-                    'status': data.get('status', 'unknown'),
-                })
+            try:
+                data = response.json()
+                logger.info(f"Dados QR Code recebidos: {list(data.keys()) if isinstance(data, dict) else 'não é dict'}")
+                qrcode_data = data.get('qrcode', {})
+                qrcode_base64 = qrcode_data.get('base64')
+                qrcode_url = qrcode_data.get('url')
+                
+                logger.info(f"QR Code base64 presente: {bool(qrcode_base64)}")
+                
+                # Configurar webhook
+                webhook_url = f"{request.build_absolute_uri('/')[:-1]}/api/whatsapp/webhook/evolution/"
+                url_webhook = f"{EVOLUTION_API_URL}/webhook/set/{INSTANCE_NAME}"
+                webhook_payload = {
+                    "url": webhook_url,
+                    "webhook_by_events": True,
+                    "events": [
+                        "MESSAGES_UPSERT",
+                        "MESSAGES_UPDATE",
+                        "MESSAGES_DELETE",
+                        "SEND_MESSAGE",
+                        "CONNECTION_UPDATE",
+                        "QRCODE_UPDATED"
+                    ]
+                }
+                logger.info(f"Configurando webhook: {url_webhook}")
+                try:
+                    webhook_response = requests.post(url_webhook, json=webhook_payload, headers=headers, timeout=10)
+                    logger.info(f"Webhook configurado: {webhook_response.status_code}")
+                except Exception as e:
+                    logger.warning(f"Erro ao configurar webhook (não crítico): {str(e)}")
+                
+                if qrcode_base64:
+                    logger.info(f"Retornando QR Code com sucesso para {request.user.username}")
+                    result = JsonResponse({
+                        'success': True,
+                        'instance': INSTANCE_NAME,
+                        'status': 'connecting',
+                        'qrCode': qrcode_base64,
+                        'qrCodeUrl': qrcode_url,
+                        'message': 'Instância criada! Escaneie o QR Code.',
+                    })
+                    logger.info(f"JsonResponse criado, retornando...")
+                    return result
+                else:
+                    logger.warning(f"QR Code não disponível para {request.user.username}")
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'QR Code não disponível. Instância pode já estar conectada.',
+                        'status': data.get('status', 'unknown'),
+                    })
+            except Exception as e:
+                logger.error(f"Erro ao processar resposta QR Code: {str(e)}", exc_info=True)
+                raise
         else:
             error_data = response.json() if response.text else {}
+            error_msg = error_data.get('message', f'Erro ao obter QR Code: {response.status_code}')
+            logger.error(f"Erro ao obter QR Code: {error_msg}")
             return JsonResponse({
                 'success': False,
-                'error': error_data.get('message', f'Erro ao obter QR Code: {response.status_code}'),
+                'error': error_msg,
             }, status=response.status_code)
     
     except requests.exceptions.ConnectionError:
