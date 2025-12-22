@@ -558,63 +558,176 @@
 {% block extra_js %}
 <script>
 // Variáveis globais
+console.log('[CAMERA_INIT] Inicializando variáveis globais...');
 let stream = null;
 let capturedPhotos = [];  // Array de {id, blob, preview}
 let currentStep = 1;
 let produtoJson = null;
 let imageUrls = [];
 let imagePaths = [];
-const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+// Verificar CSRF token
+const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+if (csrfElement) {
+    const csrfToken = csrfElement.value;
+    console.log('[CAMERA_INIT] CSRF token encontrado:', csrfToken ? 'SIM' : 'NÃO');
+} else {
+    console.warn('[CAMERA_INIT] CSRF token não encontrado');
+}
+
 let photoIdCounter = 0;
 
+// Verificar elementos DOM
+console.log('[CAMERA_INIT] Verificando elementos DOM...');
+const permissionPromptEl = document.getElementById('permissionPrompt');
+const cameraPreviewEl = document.getElementById('cameraPreview');
+const cameraControlsEl = document.getElementById('cameraControls');
+
+console.log('[CAMERA_INIT] permissionPrompt:', permissionPromptEl ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+console.log('[CAMERA_INIT] cameraPreview:', cameraPreviewEl ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+console.log('[CAMERA_INIT] cameraControls:', cameraControlsEl ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+
 // Verificar suporte
+console.log('[CAMERA_INIT] Verificando suporte de mídia...');
+console.log('[CAMERA_INIT] navigator.mediaDevices:', navigator.mediaDevices ? 'EXISTE' : 'NÃO EXISTE');
+console.log('[CAMERA_INIT] navigator.mediaDevices.getUserMedia:', navigator.mediaDevices?.getUserMedia ? 'EXISTE' : 'NÃO EXISTE');
+
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    console.error('[CAMERA] API de mídia não suportada');
-    document.getElementById('permissionPrompt').innerHTML = 
-        '<p class="text-danger">Câmera não suportada neste navegador. Use Chrome, Firefox ou Safari atualizado.</p>';
+    console.error('[CAMERA_INIT] ❌ API de mídia não suportada');
+    if (permissionPromptEl) {
+        permissionPromptEl.innerHTML = 
+            '<p class="text-danger">Câmera não suportada neste navegador. Use Chrome, Firefox ou Safari atualizado.</p>';
+    }
+} else {
+    console.log('[CAMERA_INIT] ✅ API de mídia suportada');
 }
 
 // Verificar contexto seguro (HTTPS ou localhost)
+console.log('[CAMERA_INIT] Verificando contexto seguro...');
+console.log('[CAMERA_INIT] window.isSecureContext:', window.isSecureContext);
+console.log('[CAMERA_INIT] location.protocol:', location.protocol);
+console.log('[CAMERA_INIT] location.hostname:', location.hostname);
+
 const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+console.log('[CAMERA_INIT] isSecureContext:', isSecureContext);
+
 if (!isSecureContext) {
-    console.warn('[CAMERA] Contexto não seguro - getUserMedia requer HTTPS');
-    document.getElementById('permissionPrompt').innerHTML = 
-        '<p class="text-warning">⚠️ A câmera requer conexão HTTPS. Certifique-se de estar acessando via HTTPS.</p>';
+    console.warn('[CAMERA_INIT] ⚠️ Contexto não seguro - getUserMedia requer HTTPS');
+    if (permissionPromptEl) {
+        permissionPromptEl.innerHTML = 
+            '<p class="text-warning">⚠️ A câmera requer conexão HTTPS. Certifique-se de estar acessando via HTTPS.</p>';
+    }
+} else {
+    console.log('[CAMERA_INIT] ✅ Contexto seguro detectado');
 }
+
+// Verificar permissões existentes
+if (navigator.permissions && navigator.permissions.query) {
+    console.log('[CAMERA_INIT] Verificando permissões de câmera...');
+    navigator.permissions.query({ name: 'camera' }).then(result => {
+        console.log('[CAMERA_INIT] Status de permissão de câmera:', result.state);
+        if (result.state === 'granted') {
+            console.log('[CAMERA_INIT] ✅ Permissão de câmera já concedida');
+        } else if (result.state === 'denied') {
+            console.warn('[CAMERA_INIT] ⚠️ Permissão de câmera negada');
+        } else {
+            console.log('[CAMERA_INIT] ⏳ Permissão de câmera pendente');
+        }
+    }).catch(err => {
+        console.warn('[CAMERA_INIT] Não foi possível verificar permissões:', err);
+    });
+}
+
+console.log('[CAMERA_INIT] ✅ Inicialização completa');
 
 // ========== ETAPA 1: CAPTURA ==========
 
 // Iniciar câmera
 async function startCamera() {
-    console.log('[CAMERA] Iniciando câmera...');
+    console.log('[CAMERA_START] ========== INICIANDO CÂMERA ==========');
+    console.log('[CAMERA_START] Timestamp:', new Date().toISOString());
     
+    // Verificar elementos DOM
+    console.log('[CAMERA_START] Verificando elementos DOM...');
     const permissionPrompt = document.getElementById('permissionPrompt');
     const cameraPreview = document.getElementById('cameraPreview');
     const cameraControls = document.getElementById('cameraControls');
     
+    console.log('[CAMERA_START] permissionPrompt:', permissionPrompt ? '✅ ENCONTRADO' : '❌ NÃO ENCONTRADO');
+    console.log('[CAMERA_START] cameraPreview:', cameraPreview ? '✅ ENCONTRADO' : '❌ NÃO ENCONTRADO');
+    console.log('[CAMERA_START] cameraControls:', cameraControls ? '✅ ENCONTRADO' : '❌ NÃO ENCONTRADO');
+    
+    if (!permissionPrompt || !cameraPreview || !cameraControls) {
+        console.error('[CAMERA_START] ❌ Elementos DOM não encontrados!');
+        showError('Erro: Elementos da página não encontrados. Recarregue a página.');
+        return;
+    }
+    
     try {
         // Verificar suporte novamente
+        console.log('[CAMERA_START] Verificando suporte de API...');
+        console.log('[CAMERA_START] navigator.mediaDevices:', navigator.mediaDevices ? '✅ EXISTE' : '❌ NÃO EXISTE');
+        console.log('[CAMERA_START] navigator.mediaDevices.getUserMedia:', navigator.mediaDevices?.getUserMedia ? '✅ EXISTE' : '❌ NÃO EXISTE');
+        
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            console.error('[CAMERA_START] ❌ API de mídia não suportada');
             throw new Error('API de mídia não suportada neste navegador');
         }
         
         // Verificar contexto seguro
+        console.log('[CAMERA_START] Verificando contexto seguro...');
+        console.log('[CAMERA_START] isSecureContext:', isSecureContext);
+        
         if (!isSecureContext) {
+            console.error('[CAMERA_START] ❌ Contexto não seguro');
             throw new Error('Conexão não segura. A câmera requer HTTPS.');
         }
         
+        // Verificar stream anterior
+        console.log('[CAMERA_START] Verificando stream anterior...');
+        console.log('[CAMERA_START] stream atual:', stream ? 'EXISTE' : 'NÃO EXISTE');
+        
         // Mostrar indicador de carregamento
+        console.log('[CAMERA_START] Mostrando indicador de carregamento...');
         permissionPrompt.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div><p class="mt-2">Acessando câmera...</p></div>';
         
         // Parar stream anterior se existir
         if (stream) {
-            console.log('[CAMERA] Parando stream anterior...');
-            stream.getTracks().forEach(track => track.stop());
+            console.log('[CAMERA_START] Parando stream anterior...');
+            const tracks = stream.getTracks();
+            console.log('[CAMERA_START] Tracks encontrados:', tracks.length);
+            tracks.forEach((track, index) => {
+                console.log(`[CAMERA_START] Parando track ${index}:`, track.kind, track.label);
+                track.stop();
+            });
             stream = null;
+            console.log('[CAMERA_START] ✅ Stream anterior parado');
+        }
+        
+        // Listar dispositivos disponíveis
+        console.log('[CAMERA_START] Listando dispositivos de mídia disponíveis...');
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            console.log('[CAMERA_START] Dispositivos de vídeo encontrados:', videoDevices.length);
+            videoDevices.forEach((device, index) => {
+                console.log(`[CAMERA_START]   Dispositivo ${index + 1}:`, device.label || 'Sem nome', '- ID:', device.deviceId);
+            });
+        } catch (enumError) {
+            console.warn('[CAMERA_START] Não foi possível listar dispositivos:', enumError);
         }
         
         // Solicitar acesso à câmera
-        console.log('[CAMERA] Solicitando acesso à câmera...');
+        console.log('[CAMERA_START] Solicitando acesso à câmera...');
+        console.log('[CAMERA_START] Configuração solicitada:', {
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            }
+        });
+        
+        const startTime = Date.now();
         stream = await navigator.mediaDevices.getUserMedia({
             video: {
                 facingMode: 'environment', // Câmera traseira
@@ -623,69 +736,151 @@ async function startCamera() {
             }
         });
         
-        console.log('[CAMERA] Acesso concedido, configurando vídeo...');
+        const requestTime = Date.now() - startTime;
+        console.log('[CAMERA_START] ✅ Acesso concedido em', requestTime, 'ms');
+        console.log('[CAMERA_START] Stream recebido:', stream ? '✅ SIM' : '❌ NÃO');
+        
+        if (stream) {
+            const tracks = stream.getTracks();
+            console.log('[CAMERA_START] Tracks no stream:', tracks.length);
+            tracks.forEach((track, index) => {
+                console.log(`[CAMERA_START]   Track ${index + 1}:`, {
+                    kind: track.kind,
+                    label: track.label,
+                    enabled: track.enabled,
+                    readyState: track.readyState,
+                    settings: track.getSettings()
+                });
+            });
+        }
         
         // Configurar preview
+        console.log('[CAMERA_START] Configurando preview de vídeo...');
         cameraPreview.innerHTML = '<video id="cameraVideo" autoplay playsinline muted></video>';
         
         const video = document.getElementById('cameraVideo');
+        console.log('[CAMERA_START] Elemento de vídeo criado:', video ? '✅ SIM' : '❌ NÃO');
+        
+        if (!video) {
+            throw new Error('Não foi possível criar elemento de vídeo');
+        }
+        
+        console.log('[CAMERA_START] Atribuindo stream ao vídeo...');
         video.srcObject = stream;
+        console.log('[CAMERA_START] ✅ Stream atribuído ao vídeo');
+        
+        // Timeout de segurança - se não carregar em 5 segundos, mostrar erro
+        let timeoutId = setTimeout(() => {
+            if (!video.videoWidth && !video.videoHeight) {
+                console.error('[CAMERA_START] ❌ Timeout - vídeo não carregou após 5 segundos');
+                console.error('[CAMERA_START] Estado do vídeo:', {
+                    videoWidth: video.videoWidth,
+                    videoHeight: video.videoHeight,
+                    readyState: video.readyState,
+                    paused: video.paused,
+                    srcObject: video.srcObject ? 'EXISTE' : 'NÃO EXISTE'
+                });
+                showError('A câmera não respondeu. Tente novamente.');
+                stopCamera();
+            } else {
+                console.log('[CAMERA_START] ✅ Vídeo carregou dentro do timeout');
+            }
+        }, 5000);
         
         // Aguardar vídeo carregar
+        console.log('[CAMERA_START] Aguardando carregamento do vídeo...');
         video.onloadedmetadata = () => {
-            console.log('[CAMERA] Vídeo carregado, dimensões:', video.videoWidth, 'x', video.videoHeight);
+            clearTimeout(timeoutId);
+            console.log('[CAMERA_START] ✅ Vídeo carregado!');
+            console.log('[CAMERA_START] Dimensões:', video.videoWidth, 'x', video.videoHeight);
+            console.log('[CAMERA_START] Duração:', video.duration);
+            console.log('[CAMERA_START] srcObject:', video.srcObject ? '✅ EXISTE' : '❌ NÃO EXISTE');
+            console.log('[CAMERA_START] readyState:', video.readyState);
+            
             permissionPrompt.style.display = 'none';
             cameraControls.style.display = 'flex';
+            console.log('[CAMERA_START] ✅ Controles de câmera exibidos');
             hideError();
         };
         
         // Tratamento de erros do vídeo
         video.onerror = (e) => {
-            console.error('[CAMERA] Erro no elemento de vídeo:', e);
+            clearTimeout(timeoutId);
+            console.error('[CAMERA_START] ❌ Erro no elemento de vídeo:', e);
+            console.error('[CAMERA_START] Erro detalhado:', {
+                code: video.error?.code,
+                message: video.error?.message
+            });
             showError('Erro ao exibir vídeo da câmera');
         };
         
-        // Timeout de segurança - se não carregar em 5 segundos, mostrar erro
-        setTimeout(() => {
-            if (!video.videoWidth && !video.videoHeight) {
-                console.error('[CAMERA] Timeout - vídeo não carregou');
-                showError('A câmera não respondeu. Tente novamente.');
-                stopCamera();
-            }
-        }, 5000);
+        // Verificar se vídeo está realmente reproduzindo
+        video.onplay = () => {
+            console.log('[CAMERA_START] ✅ Vídeo começou a reproduzir');
+        };
+        
+        video.onplaying = () => {
+            console.log('[CAMERA_START] ✅ Vídeo está reproduzindo');
+        };
+        
+        video.onpause = () => {
+            console.warn('[CAMERA_START] ⚠️ Vídeo pausado');
+        };
+        
+        video.onstalled = () => {
+            console.warn('[CAMERA_START] ⚠️ Vídeo travado');
+        };
         
     } catch (error) {
-        console.error('[CAMERA] Erro ao acessar câmera:', error);
+        console.error('[CAMERA_START] ========== ERRO AO ACESSAR CÂMERA ==========');
+        console.error('[CAMERA_START] Tipo de erro:', error.name);
+        console.error('[CAMERA_START] Mensagem:', error.message);
+        console.error('[CAMERA_START] Stack:', error.stack);
+        console.error('[CAMERA_START] Erro completo:', error);
         
         let errorMessage = 'Erro ao acessar câmera: ';
         
         // Mensagens de erro mais específicas
         if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+            console.error('[CAMERA_START] ❌ Permissão negada pelo usuário');
             errorMessage = 'Permissão de câmera negada. Por favor, permita o acesso à câmera nas configurações do navegador.';
         } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+            console.error('[CAMERA_START] ❌ Nenhuma câmera encontrada');
             errorMessage = 'Nenhuma câmera encontrada. Verifique se há uma câmera conectada ao dispositivo.';
         } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+            console.error('[CAMERA_START] ❌ Câmera não pode ser lida (provavelmente em uso)');
             errorMessage = 'Câmera está sendo usada por outro aplicativo. Feche outros apps que usam a câmera e tente novamente.';
         } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
+            console.warn('[CAMERA_START] ⚠️ Configuração não suportada, tentando alternativa...');
             errorMessage = 'Configurações da câmera não suportadas. Tentando configuração alternativa...';
             // Tentar com configuração mais simples
             try {
+                console.log('[CAMERA_START] Tentando com configuração simples (video: true)...');
                 stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                console.log('[CAMERA_START] ✅ Configuração alternativa funcionou!');
                 const video = document.getElementById('cameraVideo');
                 if (video) {
                     video.srcObject = stream;
                     permissionPrompt.style.display = 'none';
                     cameraControls.style.display = 'flex';
                     hideError();
+                    console.log('[CAMERA_START] ✅ Câmera iniciada com configuração alternativa');
                     return;
+                } else {
+                    console.error('[CAMERA_START] ❌ Elemento de vídeo não encontrado após retry');
                 }
             } catch (retryError) {
+                console.error('[CAMERA_START] ❌ Retry também falhou:', retryError);
+                console.error('[CAMERA_START] Tipo de erro no retry:', retryError.name);
+                console.error('[CAMERA_START] Mensagem do retry:', retryError.message);
                 errorMessage = 'Erro ao acessar câmera: ' + retryError.message;
             }
         } else {
+            console.error('[CAMERA_START] ❌ Erro desconhecido:', error.name);
             errorMessage += error.message;
         }
         
+        console.error('[CAMERA_START] Exibindo mensagem de erro ao usuário:', errorMessage);
         showError(errorMessage);
         
         // Restaurar botão de iniciar câmera
@@ -707,26 +902,56 @@ async function startCamera() {
 
 // Parar câmera
 function stopCamera() {
-    console.log('[CAMERA] Parando câmera...');
+    console.log('[CAMERA_STOP] ========== PARANDO CÂMERA ==========');
+    console.log('[CAMERA_STOP] Timestamp:', new Date().toISOString());
     
     if (stream) {
-        stream.getTracks().forEach(track => {
+        console.log('[CAMERA_STOP] Stream existe, parando tracks...');
+        const tracks = stream.getTracks();
+        console.log('[CAMERA_STOP] Número de tracks:', tracks.length);
+        tracks.forEach((track, index) => {
+            console.log(`[CAMERA_STOP] Parando track ${index + 1}:`, {
+                kind: track.kind,
+                label: track.label,
+                enabled: track.enabled,
+                readyState: track.readyState
+            });
             track.stop();
-            console.log('[CAMERA] Track parado:', track.kind);
+            console.log(`[CAMERA_STOP] ✅ Track ${index + 1} parado`);
         });
         stream = null;
+        console.log('[CAMERA_STOP] ✅ Stream limpo');
+    } else {
+        console.log('[CAMERA_STOP] Nenhum stream ativo');
     }
     
     const cameraPreview = document.getElementById('cameraPreview');
     const cameraControls = document.getElementById('cameraControls');
     const permissionPrompt = document.getElementById('permissionPrompt');
     
-    cameraPreview.innerHTML = 
-        '<div style="color: white; text-align: center;"><i class="fas fa-camera" style="font-size: 4rem;"></i><p>Inicie a câmera ou escolha uma foto</p></div>';
-    cameraControls.style.display = 'none';
-    permissionPrompt.style.display = 'block';
+    console.log('[CAMERA_STOP] Elementos DOM:', {
+        cameraPreview: cameraPreview ? '✅' : '❌',
+        cameraControls: cameraControls ? '✅' : '❌',
+        permissionPrompt: permissionPrompt ? '✅' : '❌'
+    });
     
-    console.log('[CAMERA] Câmera parada');
+    if (cameraPreview) {
+        cameraPreview.innerHTML = 
+            '<div style="color: white; text-align: center;"><i class="fas fa-camera" style="font-size: 4rem;"></i><p>Inicie a câmera ou escolha uma foto</p></div>';
+        console.log('[CAMERA_STOP] ✅ Preview resetado');
+    }
+    
+    if (cameraControls) {
+        cameraControls.style.display = 'none';
+        console.log('[CAMERA_STOP] ✅ Controles ocultados');
+    }
+    
+    if (permissionPrompt) {
+        permissionPrompt.style.display = 'block';
+        console.log('[CAMERA_STOP] ✅ Prompt de permissão exibido');
+    }
+    
+    console.log('[CAMERA_STOP] ✅ Câmera parada com sucesso');
 }
 
 // Escolher da galeria
