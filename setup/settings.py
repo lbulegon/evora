@@ -31,6 +31,18 @@ SINAPUM_API_KEY = config("SINAPUM_API_KEY", default=None)
 if not SINAPUM_API_KEY:
     SINAPUM_API_KEY = OPENMIND_AI_KEY
 
+# Mapeamento de Prompts do MCP_SinapUm
+# Define qual tipo_servico do PromptTemplate usar para cada funcionalidade
+PROMPT_MAPPING = {
+    # Análise de imagens de produtos
+    'analise_produto_imagem': 'analise_produto_imagem_v1',
+    
+    # Adicione outros mapeamentos aqui conforme necessário
+    # Exemplo:
+    # 'analise_texto': 'analise_texto_v1',
+    # 'geracao_descricao': 'geracao_descricao_v1',
+}
+
 # Evolution API - WhatsApp Integration
 EVOLUTION_API_URL = config("EVOLUTION_API_URL", default="http://69.169.102.84:8004")
 EVOLUTION_API_KEY = config("EVOLUTION_API_KEY", default="GKvy6psn-8HHpBQ4HAHKFOXnwjHR-oSzeGZzCaws0xg")

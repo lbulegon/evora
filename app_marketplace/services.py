@@ -449,24 +449,34 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
             if detected_lang:
                 language = detected_lang
         
-        # Buscar prompt do banco de dados (MCP_SinapUm)
+        # Buscar prompt do banco de dados (MCP_SinapUm) usando mapeamento
         prompt = None
         try:
-            # Tentar importar o modelo Prompt do app_sinapum
+            from django.conf import settings
             from django.apps import apps
+            
+            # Obter tipo_servico do mapeamento
+            prompt_key = 'analise_produto_imagem'  # Chave da funcionalidade
+            tipo_servico = getattr(settings, 'PROMPT_MAPPING', {}).get(
+                prompt_key, 
+                'analise_produto_imagem_v1'  # Fallback padrão
+            )
+            
+            logger.info(f"Buscando prompt com tipo_servico: {tipo_servico} (chave: {prompt_key})")
+            
             try:
                 PromptTemplate = apps.get_model('app_sinapum', 'PromptTemplate')
-                # Buscar prompt ativo para análise de produto
+                # Buscar prompt ativo usando o tipo_servico do mapeamento
                 prompt_obj = PromptTemplate.objects.filter(
-                    tipo_servico='analise_produto_imagem_v1',
+                    tipo_servico=tipo_servico,
                     ativo=True
                 ).first()
                 
                 if prompt_obj:
                     prompt = prompt_obj.conteudo
-                    logger.info(f"Prompt obtido do banco de dados: {prompt_obj.nome} ({len(prompt)} caracteres)")
+                    logger.info(f"✅ Prompt obtido do banco de dados: {prompt_obj.nome} (tipo: {tipo_servico}, {len(prompt)} caracteres)")
                 else:
-                    logger.warning("Nenhum PromptTemplate ativo encontrado para 'analise_produto_imagem_v1'")
+                    logger.warning(f"⚠️ Nenhum PromptTemplate ativo encontrado para tipo_servico '{tipo_servico}' (chave: {prompt_key})")
             except LookupError:
                 logger.warning("App 'app_sinapum' não encontrado ou modelo PromptTemplate não existe")
             except Exception as e:
