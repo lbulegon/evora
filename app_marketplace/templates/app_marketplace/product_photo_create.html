@@ -347,7 +347,7 @@
                 <h5>Permissão de Câmera</h5>
                 <p>Clique em "Iniciar Câmera" para permitir o acesso à câmera do seu dispositivo.</p>
                 <div class="d-flex gap-2 justify-content-center">
-                    <button class="btn btn-primary" onclick="startCamera()">
+                    <button class="btn btn-primary" id="btnStartCamera" onclick="console.log('[BUTTON_CLICK] onclick disparado'); if(typeof window.startCamera === 'function') { window.startCamera(); } else { console.error('[BUTTON_CLICK] window.startCamera não encontrado'); alert('Função não disponível. Verifique o console.'); }">
                         <i class="fas fa-video"></i> Iniciar Câmera
                     </button>
                     <button class="btn btn-outline-primary" onclick="selectFromGallery()">
@@ -663,21 +663,102 @@ function initializeCamera() {
 
     // Adicionar event listeners aos botões como fallback
     console.log('[CAMERA_INIT] Adicionando event listeners aos botões...');
-    const startCameraBtn = document.querySelector('button[onclick*="startCamera"]');
-    if (startCameraBtn) {
-        console.log('[CAMERA_INIT] ✅ Botão de iniciar câmera encontrado');
-        startCameraBtn.addEventListener('click', function(e) {
-            console.log('[CAMERA_INIT] ✅ Event listener do botão disparado');
-            e.preventDefault();
-            if (typeof window.startCamera === 'function') {
-                console.log('[CAMERA_INIT] ✅ Função startCamera encontrada, chamando...');
-                window.startCamera();
-            } else {
-                console.error('[CAMERA_INIT] ❌ Função startCamera não encontrada!');
+    
+    // Procurar botão de várias formas
+    let startCameraBtn = document.querySelector('button[onclick*="startCamera"]');
+    if (!startCameraBtn) {
+        startCameraBtn = document.querySelector('button.btn-primary');
+    }
+    if (!startCameraBtn) {
+        // Procurar pelo texto do botão
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach(btn => {
+            if (btn.textContent.includes('Iniciar Câmera') || btn.textContent.includes('startCamera')) {
+                startCameraBtn = btn;
             }
         });
+    }
+    
+    if (startCameraBtn) {
+        console.log('[CAMERA_INIT] ✅ Botão de iniciar câmera encontrado:', {
+            tagName: startCameraBtn.tagName,
+            className: startCameraBtn.className,
+            onclick: startCameraBtn.getAttribute('onclick'),
+            textContent: startCameraBtn.textContent.trim()
+        });
+        
+        // Remover onclick antigo e adicionar event listener
+        const oldOnclick = startCameraBtn.getAttribute('onclick');
+        startCameraBtn.removeAttribute('onclick');
+        console.log('[CAMERA_INIT] onclick removido:', oldOnclick);
+        
+        startCameraBtn.addEventListener('click', function(e) {
+            console.log('[CAMERA_INIT] ========== BOTÃO CLICADO ==========');
+            console.log('[CAMERA_INIT] Timestamp:', new Date().toISOString());
+            console.log('[CAMERA_INIT] Event:', e);
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('[CAMERA_INIT] Verificando se window.startCamera existe...');
+            console.log('[CAMERA_INIT] typeof window.startCamera:', typeof window.startCamera);
+            console.log('[CAMERA_INIT] window.startCamera:', window.startCamera);
+            
+            if (typeof window.startCamera === 'function') {
+                console.log('[CAMERA_INIT] ✅ Função startCamera encontrada, chamando...');
+                try {
+                    window.startCamera();
+                    console.log('[CAMERA_INIT] ✅ startCamera() chamado com sucesso');
+                } catch (error) {
+                    console.error('[CAMERA_INIT] ❌ Erro ao chamar startCamera():', error);
+                    showError('Erro ao iniciar câmera: ' + error.message);
+                }
+            } else {
+                console.error('[CAMERA_INIT] ❌ Função startCamera não encontrada!');
+                console.error('[CAMERA_INIT] window.startCamera:', window.startCamera);
+                console.error('[CAMERA_INIT] Tentando chamar startCamera diretamente...');
+                try {
+                    if (typeof startCamera === 'function') {
+                        console.log('[CAMERA_INIT] startCamera encontrado sem window, chamando...');
+                        startCamera();
+                    } else {
+                        showError('Função startCamera não está disponível. Recarregue a página.');
+                    }
+                } catch (err) {
+                    console.error('[CAMERA_INIT] Erro ao chamar startCamera diretamente:', err);
+                    showError('Erro: ' + err.message);
+                }
+            }
+        }, { capture: true });
+        
+        console.log('[CAMERA_INIT] ✅ Event listener adicionado ao botão');
     } else {
         console.warn('[CAMERA_INIT] ⚠️ Botão de iniciar câmera não encontrado');
+        console.warn('[CAMERA_INIT] Tentando novamente após 1 segundo...');
+        setTimeout(() => {
+            const btn = document.querySelector('button[onclick*="startCamera"]') || 
+                       document.querySelector('button.btn-primary');
+            if (btn) {
+                console.log('[CAMERA_INIT] ✅ Botão encontrado após delay');
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (typeof window.startCamera === 'function') {
+                        window.startCamera();
+                    }
+                });
+            }
+        }, 1000);
+    }
+    
+    // Verificar se a função está disponível globalmente
+    console.log('[CAMERA_INIT] Verificando disponibilidade global de startCamera...');
+    console.log('[CAMERA_INIT] window.startCamera:', typeof window.startCamera);
+    console.log('[CAMERA_INIT] window.stopCamera:', typeof window.stopCamera);
+    console.log('[CAMERA_INIT] window.selectFromGallery:', typeof window.selectFromGallery);
+    
+    // Tornar função disponível globalmente também sem window (fallback)
+    if (typeof window.startCamera === 'function') {
+        window.startCameraGlobal = window.startCamera;
+        console.log('[CAMERA_INIT] ✅ startCameraGlobal criado como fallback');
     }
 
     console.log('[CAMERA_INIT] ✅ Inicialização completa');
@@ -689,6 +770,7 @@ function initializeCamera() {
 window.startCamera = async function startCamera() {
     console.log('[CAMERA_START] ========== INICIANDO CÂMERA ==========');
     console.log('[CAMERA_START] Timestamp:', new Date().toISOString());
+    console.log('[CAMERA_START] Stack trace:', new Error().stack);
     
     // Verificar elementos DOM
     console.log('[CAMERA_START] Verificando elementos DOM...');
