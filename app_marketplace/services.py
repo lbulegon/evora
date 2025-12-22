@@ -449,6 +449,49 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
             if detected_lang:
                 language = detected_lang
         
+        # Buscar prompt do banco de dados (MCP_SinapUm)
+        prompt = None
+        try:
+            # Tentar importar o modelo Prompt do app_sinapum
+            from django.apps import apps
+            try:
+                PromptTemplate = apps.get_model('app_sinapum', 'PromptTemplate')
+                # Buscar prompt ativo para análise de produto
+                prompt_obj = PromptTemplate.objects.filter(
+                    tipo_servico='analise_produto',
+                    ativo=True
+                ).first()
+                
+                if prompt_obj:
+                    prompt = prompt_obj.conteudo
+                    logger.info(f"Prompt obtido do banco de dados: {prompt_obj.nome} ({len(prompt)} caracteres)")
+                else:
+                    logger.warning("Nenhum PromptTemplate ativo encontrado para 'analise_produto'")
+            except LookupError:
+                logger.warning("App 'app_sinapum' não encontrado ou modelo PromptTemplate não existe")
+            except Exception as e:
+                logger.warning(f"Erro ao buscar prompt do banco: {str(e)}")
+        except Exception as e:
+            logger.error(f"Erro ao importar/buscar prompt: {str(e)}", exc_info=True)
+        
+        # Fallback: prompt padrão se não encontrar no banco
+        if not prompt:
+            logger.info("Usando prompt padrão (fallback)")
+            prompt = """Analise esta imagem de um produto e extraia TODAS as informações visíveis no rótulo, etiqueta ou embalagem.
+
+Extraia as seguintes informações:
+- Nome do produto
+- Marca
+- Categoria (se visível)
+- Código de barras (se visível)
+- Descrição/ingredientes (se visível)
+- Informações nutricionais (se visível)
+- Dimensões da embalagem (se visível)
+- Peso/volume (se visível)
+- Qualquer outra informação relevante visível na imagem
+
+Retorne os dados em formato JSON estruturado compatível com o modelo ÉVORA."""
+        
         url_base, api_key = _get_openmind_config()
         # Construir URL do endpoint - verificar se já inclui /api/v1
         if '/api/v1' in url_base:
@@ -467,8 +510,14 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
             'image': (image_file.name, image_file.read(), image_file.content_type)
         }
         
+        data = {
+            'prompt': prompt,
+            'language': language
+        }
+        
         logger.info(f"Enviando imagem para análise: {image_file.name} (idioma: {language})")
-        response = requests.post(url, files=files, headers=headers, timeout=60)
+        logger.info(f"Prompt incluído: {len(prompt)} caracteres")
+        response = requests.post(url, files=files, data=data, headers=headers, timeout=60)
         
         # Verificar se a resposta é JSON válido
         content_type = response.headers.get('Content-Type', '')
