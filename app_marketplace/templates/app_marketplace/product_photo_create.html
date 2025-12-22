@@ -1127,7 +1127,7 @@ async function analyzeComplete() {
             method: 'POST',
             body: formData,
             headers: {
-                'X-CSRFToken': csrfToken
+                'X-CSRFToken': window.csrfToken
             }
         });
         console.log('[ANALISE_COMPLETA] Resposta recebida, status:', response.status);
@@ -1158,12 +1158,12 @@ async function analyzeComplete() {
             
             // Atualizar URLs se retornadas
             if (data.image_urls && data.image_urls.length > 0) {
-                imageUrls = data.image_urls;
-                console.log('[ANALISE_COMPLETA] imageUrls atualizado:', imageUrls.length);
+                window.imageUrls = data.image_urls;
+                console.log('[ANALISE_COMPLETA] imageUrls atualizado:', window.imageUrls.length);
             }
             if (data.image_paths && data.image_paths.length > 0) {
-                imagePaths = data.image_paths;
-                console.log('[ANALISE_COMPLETA] imagePaths atualizado:', imagePaths.length);
+                window.imagePaths = data.image_paths;
+                console.log('[ANALISE_COMPLETA] imagePaths atualizado:', window.imagePaths.length);
             }
             handleAnalysisResult(data);
         } else {
@@ -1365,14 +1365,14 @@ async function saveProduct() {
     }
     
     console.log('[SAVE_PRODUCT] Estado ANTES de adicionar imagens:');
-    console.log('[SAVE_PRODUCT] - imagePaths disponíveis:', imagePaths);
-    console.log('[SAVE_PRODUCT] - imageUrls disponíveis:', imageUrls);
+    console.log('[SAVE_PRODUCT] - imagePaths disponíveis:', window.imagePaths);
+    console.log('[SAVE_PRODUCT] - imageUrls disponíveis:', window.imageUrls);
     console.log('[SAVE_PRODUCT] - produto.imagens atual:', jsonData.produto.imagens);
     
     // Adicionar imagePaths (caminhos relativos do SinapUm) preferencialmente
-    if (imagePaths && imagePaths.length > 0) {
+    if (window.imagePaths && window.imagePaths.length > 0) {
         console.log('[SAVE_PRODUCT] Adicionando imagePaths ao produto.imagens...');
-        imagePaths.forEach(path => {
+        window.imagePaths.forEach(path => {
             if (path && path.trim()) {
                 // Limpar path se necessário (remover / no início)
                 const cleanPath = path.trim().replace(/^\/+/, '');
@@ -1382,15 +1382,15 @@ async function saveProduct() {
                 }
             }
         });
-        console.log('[SAVE_PRODUCT] ✓ imagePaths processados:', imagePaths);
+        console.log('[SAVE_PRODUCT] ✓ imagePaths processados:', window.imagePaths);
     } else {
         console.warn('[SAVE_PRODUCT] ⚠ imagePaths está vazio ou não disponível');
     }
     
     // Se ainda não tiver imagens, adicionar imageUrls (URLs completas) e extrair paths
-    if (jsonData.produto.imagens.length === 0 && imageUrls && imageUrls.length > 0) {
+    if (jsonData.produto.imagens.length === 0 && window.imageUrls && window.imageUrls.length > 0) {
         console.log('[SAVE_PRODUCT] Adicionando imageUrls e extraindo paths...');
-        imageUrls.forEach(url => {
+        window.imageUrls.forEach(url => {
             if (url && url.trim()) {
                 // Extrair caminho relativo da URL completa se possível
                 let path = url.trim();
@@ -1420,7 +1420,7 @@ async function saveProduct() {
                 }
             }
         });
-        console.log('[SAVE_PRODUCT] ✓ imageUrls processados:', imageUrls);
+        console.log('[SAVE_PRODUCT] ✓ imageUrls processados:', window.imageUrls);
     }
     
     console.log('[SAVE_PRODUCT] Estado FINAL:');
@@ -1475,7 +1475,7 @@ async function saveProduct() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
+                'X-CSRFToken': window.csrfToken
             },
             body: JSON.stringify(saveData)
         });
@@ -1536,7 +1536,7 @@ function validateForm() {
 
 // Navegar entre etapas
 function goToStep(step) {
-    console.log(`[goToStep] Navegando para etapa ${step}, currentStep atual: ${currentStep}`);
+    console.log(`[goToStep] Navegando para etapa ${step}, currentStep atual: ${window.currentStep}`);
     
     // Se for etapa 5 (confirmação), apenas mostrar sem atualizar indicadores
     if (step === 5) {
@@ -1561,8 +1561,8 @@ function goToStep(step) {
         } else {
             console.error('[goToStep] Elemento stepCard5 não encontrado!');
         }
-        currentStep = 5;
-        console.log(`[goToStep] currentStep atualizado para ${currentStep}`);
+        window.currentStep = 5;
+        console.log(`[goToStep] currentStep atualizado para ${window.currentStep}`);
         return;
     }
     
@@ -1601,7 +1601,7 @@ function goToStep(step) {
         }
     }
     
-    currentStep = step;
+    window.currentStep = step;
     
     // Ações específicas por etapa
     if (step === 3) {
@@ -1614,17 +1614,17 @@ function renderImagesPreview() {
     const container = document.getElementById('imagesPreview');
     container.innerHTML = '';
     
-    if (imageUrls.length > 0) {
-        imageUrls.forEach(url => {
+    if (window.imageUrls.length > 0) {
+        window.imageUrls.forEach(url => {
             const img = document.createElement('img');
             img.src = url;
             img.className = 'image-preview';
             img.alt = 'Imagem do produto';
             container.appendChild(img);
         });
-    } else if (imagePaths.length > 0) {
+    } else if (window.imagePaths.length > 0) {
         // Se não tiver URLs completas, usar paths (será construída URL base)
-        imagePaths.forEach(path => {
+        window.imagePaths.forEach(path => {
             const img = document.createElement('img');
             img.src = path.startsWith('http') ? path : `http://69.169.102.84:5000/${path}`;
             img.className = 'image-preview';
@@ -1666,12 +1666,12 @@ function validateJson() {
 
 // Resetar formulário
 function resetForm() {
-    currentStep = 1;
-    capturedPhotos = [];
+    window.currentStep = 1;
+    window.capturedPhotos = [];
     window.produtoJson = null;
-    imageUrls = [];
-    imagePaths = [];
-    photoIdCounter = 0;
+    window.imageUrls = [];
+    window.imagePaths = [];
+    window.photoIdCounter = 0;
     
     document.getElementById('productForm').reset();
     document.getElementById('jsonEditor').value = '';
