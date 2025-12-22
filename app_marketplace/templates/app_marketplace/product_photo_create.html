@@ -350,7 +350,7 @@
                     <button class="btn btn-primary" id="btnStartCamera" onclick="console.log('[BUTTON_CLICK] onclick disparado'); if(typeof window.startCamera === 'function') { window.startCamera(); } else { console.error('[BUTTON_CLICK] window.startCamera não encontrado'); alert('Função não disponível. Verifique o console.'); }">
                         <i class="fas fa-video"></i> Iniciar Câmera
                     </button>
-                    <button class="btn btn-outline-primary" onclick="selectFromGallery()">
+                    <button class="btn btn-outline-primary" onclick="if(typeof window.selectFromGallery === 'function') { window.selectFromGallery(); } else { console.error('window.selectFromGallery não encontrado'); }">
                         <i class="fas fa-images"></i> Escolher da Galeria
                     </button>
                 </div>
@@ -364,10 +364,10 @@
             </div>
             
             <div class="camera-controls" id="cameraControls" style="display: none;">
-                <button class="btn btn-close-camera btn-camera" onclick="stopCamera()" title="Fechar câmera">
+                <button class="btn btn-close-camera btn-camera" onclick="if(typeof window.stopCamera === 'function') { window.stopCamera(); } else { console.error('window.stopCamera não encontrado'); }" title="Fechar câmera">
                     <i class="fas fa-times"></i>
                 </button>
-                <button class="btn btn-capture btn-camera" onclick="capturePhoto()" title="Capturar foto">
+                <button class="btn btn-capture btn-camera" onclick="if(typeof capturePhoto === 'function') { capturePhoto(); } else if(typeof window.capturePhoto === 'function') { window.capturePhoto(); } else { console.error('capturePhoto não encontrado'); }" title="Capturar foto">
                     <i class="fas fa-camera"></i>
                 </button>
             </div>
@@ -380,7 +380,7 @@
                     <button class="btn btn-outline-primary" onclick="selectFromGallery()">
                         <i class="fas fa-plus"></i> Adicionar Mais Fotos
                     </button>
-                    <button class="btn btn-primary" onclick="analyzeComplete()" id="btnAnalyze" disabled>
+                    <button class="btn btn-primary" onclick="if(typeof analyzeComplete === 'function') { analyzeComplete(); } else if(typeof window.analyzeComplete === 'function') { window.analyzeComplete(); } else { console.error('analyzeComplete não encontrado'); }" id="btnAnalyze" disabled>
                         <i class="fas fa-robot"></i> Analisar Produto
                     </button>
                 </div>
@@ -405,10 +405,10 @@
                     <i class="fas fa-check-circle"></i> Análise completa concluída!
                 </div>
                 <div class="d-flex gap-2 justify-content-center mt-4">
-                    <button class="btn btn-secondary" onclick="goToStep(1)">
+                    <button class="btn btn-secondary" onclick="if(typeof window.goToStep === 'function') { window.goToStep(1); }">
                         <i class="fas fa-arrow-left"></i> Voltar
                     </button>
-                    <button class="btn btn-primary" onclick="goToStep(3)">
+                    <button class="btn btn-primary" onclick="if(typeof window.goToStep === 'function') { window.goToStep(3); }">
                         <i class="fas fa-eye"></i> Revisar e Salvar
                     </button>
                 </div>
@@ -515,10 +515,10 @@
                 </div>
                 
                 <div class="d-flex gap-2 justify-content-between">
-                    <button type="button" class="btn btn-secondary" onclick="goToStep(2)">
+                    <button type="button" class="btn btn-secondary" onclick="if(typeof window.goToStep === 'function') { window.goToStep(2); }">
                         <i class="fas fa-arrow-left"></i> Voltar
                     </button>
-                    <button type="button" class="btn btn-primary" onclick="saveProduct()">
+                    <button type="button" class="btn btn-primary" onclick="if(typeof window.saveProduct === 'function') { window.saveProduct(); } else { console.error('window.saveProduct não encontrado'); }">
                         <i class="fas fa-save"></i> Salvar no Banco
                     </button>
                 </div>
@@ -536,7 +536,7 @@
                     <a href="{% url 'shopper_products' %}" class="btn btn-primary">
                         <i class="fas fa-list"></i> Ver Meus Produtos
                     </a>
-                    <button type="button" class="btn btn-outline-primary" onclick="resetForm()">
+                    <button type="button" class="btn btn-outline-primary" onclick="if(typeof window.resetForm === 'function') { window.resetForm(); } else { console.error('window.resetForm não encontrado'); }">
                         <i class="fas fa-plus"></i> Cadastrar Outro
                     </button>
                 </div>
@@ -1081,7 +1081,20 @@ window.stopCamera = function stopCamera() {
 
 // Escolher da galeria - Tornar global
 window.selectFromGallery = function selectFromGallery() {
-    document.getElementById('galleryInput').click();
+    console.log('[SELECT_GALLERY] Função chamada');
+    const galleryInput = document.getElementById('galleryInput');
+    if (galleryInput) {
+        console.log('[SELECT_GALLERY] Input encontrado, clicando...');
+        galleryInput.click();
+    } else {
+        console.error('[SELECT_GALLERY] Input não encontrado!');
+        showError('Erro: Campo de seleção de arquivo não encontrado.');
+    }
+}
+
+// Tornar disponível também sem window (fallback)
+if (typeof selectFromGallery === 'undefined') {
+    window.selectFromGalleryGlobal = window.selectFromGallery;
 }
 
 function handleGallerySelect(event) {
@@ -1105,8 +1118,8 @@ function addPhotoFromFile(file) {
     reader.readAsDataURL(file);
 }
 
-// Capturar foto da câmera
-function capturePhoto() {
+// Capturar foto da câmera - Tornar global
+window.capturePhoto = function capturePhoto() {
     const video = document.getElementById('cameraVideo');
     if (!video) {
         showError('Nenhuma imagem capturada');
@@ -1138,8 +1151,8 @@ function addPhotoToArray(blob, preview) {
     updateAnalyzeButton();
 }
 
-// Remover foto
-function removePhoto(id) {
+// Remover foto - Tornar global
+window.removePhoto = function removePhoto(id) {
     window.capturedPhotos = window.capturedPhotos.filter(p => p.id !== id);
     renderPhotoGrid();
     updateAnalyzeButton();
@@ -1179,8 +1192,8 @@ function updateAnalyzeButton() {
 
 // ========== ETAPA 2: ANÁLISE COMPLETA ==========
 
-// Análise completa
-async function analyzeComplete() {
+// Análise completa - Tornar global
+window.analyzeComplete = async function analyzeComplete() {
     console.log('[ANALISE_COMPLETA] Iniciando análise completa');
     console.log('[ANALISE_COMPLETA] Fotos capturadas:', window.capturedPhotos.length);
     
@@ -1370,8 +1383,8 @@ function handleAnalysisResult(result) {
 
 // ========== ETAPA 4: SALVAMENTO ==========
 
-// Salvar produto
-async function saveProduct() {
+// Salvar produto - Tornar global
+window.saveProduct = async function saveProduct() {
     console.log('saveProduct() chamado');
     
     if (!validateForm()) {
@@ -1614,8 +1627,8 @@ function validateForm() {
 
 // ========== NAVEGAÇÃO ==========
 
-// Navegar entre etapas
-function goToStep(step) {
+// Navegar entre etapas - Tornar global
+window.goToStep = function goToStep(step) {
     console.log(`[goToStep] Navegando para etapa ${step}, currentStep atual: ${window.currentStep}`);
     
     // Se for etapa 5 (confirmação), apenas mostrar sem atualizar indicadores
@@ -1744,8 +1757,8 @@ function validateJson() {
     }
 }
 
-// Resetar formulário
-function resetForm() {
+// Resetar formulário - Tornar global
+window.resetForm = function resetForm() {
     window.currentStep = 1;
     window.capturedPhotos = [];
     window.produtoJson = null;
