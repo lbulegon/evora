@@ -458,7 +458,7 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                 PromptTemplate = apps.get_model('app_sinapum', 'PromptTemplate')
                 # Buscar prompt ativo para análise de produto
                 prompt_obj = PromptTemplate.objects.filter(
-                    tipo_servico='analise_produto',
+                    tipo_servico='analise_produto_imagem_v1',
                     ativo=True
                 ).first()
                 
@@ -466,7 +466,7 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
                     prompt = prompt_obj.conteudo
                     logger.info(f"Prompt obtido do banco de dados: {prompt_obj.nome} ({len(prompt)} caracteres)")
                 else:
-                    logger.warning("Nenhum PromptTemplate ativo encontrado para 'analise_produto'")
+                    logger.warning("Nenhum PromptTemplate ativo encontrado para 'analise_produto_imagem_v1'")
             except LookupError:
                 logger.warning("App 'app_sinapum' não encontrado ou modelo PromptTemplate não existe")
             except Exception as e:
