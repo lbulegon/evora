@@ -557,93 +557,136 @@
 
 {% block extra_js %}
 <script>
-// Variáveis globais
-console.log('[CAMERA_INIT] Inicializando variáveis globais...');
-let stream = null;
-let capturedPhotos = [];  // Array de {id, blob, preview}
-let currentStep = 1;
-let produtoJson = null;
-let imageUrls = [];
-let imagePaths = [];
+console.log('[CAMERA_SCRIPT] ========== SCRIPT CARREGADO ==========');
+console.log('[CAMERA_SCRIPT] Timestamp:', new Date().toISOString());
+console.log('[CAMERA_SCRIPT] URL:', window.location.href);
+console.log('[CAMERA_SCRIPT] User Agent:', navigator.userAgent);
 
-// Verificar CSRF token
-const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
-if (csrfElement) {
-    const csrfToken = csrfElement.value;
-    console.log('[CAMERA_INIT] CSRF token encontrado:', csrfToken ? 'SIM' : 'NÃO');
+// Aguardar DOM estar pronto
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[CAMERA_SCRIPT] ✅ DOM carregado');
+    initializeCamera();
+});
+
+// Fallback para caso DOMContentLoaded já tenha sido disparado
+if (document.readyState === 'loading') {
+    console.log('[CAMERA_SCRIPT] DOM ainda carregando, aguardando DOMContentLoaded...');
 } else {
-    console.warn('[CAMERA_INIT] CSRF token não encontrado');
+    console.log('[CAMERA_SCRIPT] DOM já carregado, inicializando imediatamente...');
+    initializeCamera();
 }
 
-let photoIdCounter = 0;
+function initializeCamera() {
+    console.log('[CAMERA_SCRIPT] ========== INICIALIZANDO CÂMERA ==========');
+    
+    // Variáveis globais
+    console.log('[CAMERA_INIT] Inicializando variáveis globais...');
+    window.stream = null;
+    window.capturedPhotos = [];  // Array de {id, blob, preview}
+    window.currentStep = 1;
+    window.produtoJson = null;
+    window.imageUrls = [];
+    window.imagePaths = [];
 
-// Verificar elementos DOM
-console.log('[CAMERA_INIT] Verificando elementos DOM...');
-const permissionPromptEl = document.getElementById('permissionPrompt');
-const cameraPreviewEl = document.getElementById('cameraPreview');
-const cameraControlsEl = document.getElementById('cameraControls');
-
-console.log('[CAMERA_INIT] permissionPrompt:', permissionPromptEl ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
-console.log('[CAMERA_INIT] cameraPreview:', cameraPreviewEl ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
-console.log('[CAMERA_INIT] cameraControls:', cameraControlsEl ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
-
-// Verificar suporte
-console.log('[CAMERA_INIT] Verificando suporte de mídia...');
-console.log('[CAMERA_INIT] navigator.mediaDevices:', navigator.mediaDevices ? 'EXISTE' : 'NÃO EXISTE');
-console.log('[CAMERA_INIT] navigator.mediaDevices.getUserMedia:', navigator.mediaDevices?.getUserMedia ? 'EXISTE' : 'NÃO EXISTE');
-
-if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    console.error('[CAMERA_INIT] ❌ API de mídia não suportada');
-    if (permissionPromptEl) {
-        permissionPromptEl.innerHTML = 
-            '<p class="text-danger">Câmera não suportada neste navegador. Use Chrome, Firefox ou Safari atualizado.</p>';
+    // Verificar CSRF token
+    const csrfElement = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfElement) {
+        window.csrfToken = csrfElement.value;
+        console.log('[CAMERA_INIT] CSRF token encontrado:', window.csrfToken ? 'SIM' : 'NÃO');
+    } else {
+        console.warn('[CAMERA_INIT] CSRF token não encontrado');
+        window.csrfToken = '';
     }
-} else {
-    console.log('[CAMERA_INIT] ✅ API de mídia suportada');
-}
 
-// Verificar contexto seguro (HTTPS ou localhost)
-console.log('[CAMERA_INIT] Verificando contexto seguro...');
-console.log('[CAMERA_INIT] window.isSecureContext:', window.isSecureContext);
-console.log('[CAMERA_INIT] location.protocol:', location.protocol);
-console.log('[CAMERA_INIT] location.hostname:', location.hostname);
+    window.photoIdCounter = 0;
 
-const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-console.log('[CAMERA_INIT] isSecureContext:', isSecureContext);
+    // Verificar elementos DOM
+    console.log('[CAMERA_INIT] Verificando elementos DOM...');
+    const permissionPromptEl = document.getElementById('permissionPrompt');
+    const cameraPreviewEl = document.getElementById('cameraPreview');
+    const cameraControlsEl = document.getElementById('cameraControls');
 
-if (!isSecureContext) {
-    console.warn('[CAMERA_INIT] ⚠️ Contexto não seguro - getUserMedia requer HTTPS');
-    if (permissionPromptEl) {
-        permissionPromptEl.innerHTML = 
-            '<p class="text-warning">⚠️ A câmera requer conexão HTTPS. Certifique-se de estar acessando via HTTPS.</p>';
-    }
-} else {
-    console.log('[CAMERA_INIT] ✅ Contexto seguro detectado');
-}
+    console.log('[CAMERA_INIT] permissionPrompt:', permissionPromptEl ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+    console.log('[CAMERA_INIT] cameraPreview:', cameraPreviewEl ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+    console.log('[CAMERA_INIT] cameraControls:', cameraControlsEl ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
 
-// Verificar permissões existentes
-if (navigator.permissions && navigator.permissions.query) {
-    console.log('[CAMERA_INIT] Verificando permissões de câmera...');
-    navigator.permissions.query({ name: 'camera' }).then(result => {
-        console.log('[CAMERA_INIT] Status de permissão de câmera:', result.state);
-        if (result.state === 'granted') {
-            console.log('[CAMERA_INIT] ✅ Permissão de câmera já concedida');
-        } else if (result.state === 'denied') {
-            console.warn('[CAMERA_INIT] ⚠️ Permissão de câmera negada');
-        } else {
-            console.log('[CAMERA_INIT] ⏳ Permissão de câmera pendente');
+    // Verificar suporte
+    console.log('[CAMERA_INIT] Verificando suporte de mídia...');
+    console.log('[CAMERA_INIT] navigator.mediaDevices:', navigator.mediaDevices ? 'EXISTE' : 'NÃO EXISTE');
+    console.log('[CAMERA_INIT] navigator.mediaDevices.getUserMedia:', navigator.mediaDevices?.getUserMedia ? 'EXISTE' : 'NÃO EXISTE');
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('[CAMERA_INIT] ❌ API de mídia não suportada');
+        if (permissionPromptEl) {
+            permissionPromptEl.innerHTML = 
+                '<p class="text-danger">Câmera não suportada neste navegador. Use Chrome, Firefox ou Safari atualizado.</p>';
         }
-    }).catch(err => {
-        console.warn('[CAMERA_INIT] Não foi possível verificar permissões:', err);
-    });
-}
+    } else {
+        console.log('[CAMERA_INIT] ✅ API de mídia suportada');
+    }
 
-console.log('[CAMERA_INIT] ✅ Inicialização completa');
+    // Verificar contexto seguro (HTTPS ou localhost)
+    console.log('[CAMERA_INIT] Verificando contexto seguro...');
+    console.log('[CAMERA_INIT] window.isSecureContext:', window.isSecureContext);
+    console.log('[CAMERA_INIT] location.protocol:', location.protocol);
+    console.log('[CAMERA_INIT] location.hostname:', location.hostname);
+
+    window.isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    console.log('[CAMERA_INIT] isSecureContext:', window.isSecureContext);
+
+    if (!window.isSecureContext) {
+        console.warn('[CAMERA_INIT] ⚠️ Contexto não seguro - getUserMedia requer HTTPS');
+        if (permissionPromptEl) {
+            permissionPromptEl.innerHTML = 
+                '<p class="text-warning">⚠️ A câmera requer conexão HTTPS. Certifique-se de estar acessando via HTTPS.</p>';
+        }
+    } else {
+        console.log('[CAMERA_INIT] ✅ Contexto seguro detectado');
+    }
+
+    // Verificar permissões existentes
+    if (navigator.permissions && navigator.permissions.query) {
+        console.log('[CAMERA_INIT] Verificando permissões de câmera...');
+        navigator.permissions.query({ name: 'camera' }).then(result => {
+            console.log('[CAMERA_INIT] Status de permissão de câmera:', result.state);
+            if (result.state === 'granted') {
+                console.log('[CAMERA_INIT] ✅ Permissão de câmera já concedida');
+            } else if (result.state === 'denied') {
+                console.warn('[CAMERA_INIT] ⚠️ Permissão de câmera negada');
+            } else {
+                console.log('[CAMERA_INIT] ⏳ Permissão de câmera pendente');
+            }
+        }).catch(err => {
+            console.warn('[CAMERA_INIT] Não foi possível verificar permissões:', err);
+        });
+    }
+
+    // Adicionar event listeners aos botões como fallback
+    console.log('[CAMERA_INIT] Adicionando event listeners aos botões...');
+    const startCameraBtn = document.querySelector('button[onclick*="startCamera"]');
+    if (startCameraBtn) {
+        console.log('[CAMERA_INIT] ✅ Botão de iniciar câmera encontrado');
+        startCameraBtn.addEventListener('click', function(e) {
+            console.log('[CAMERA_INIT] ✅ Event listener do botão disparado');
+            e.preventDefault();
+            if (typeof window.startCamera === 'function') {
+                console.log('[CAMERA_INIT] ✅ Função startCamera encontrada, chamando...');
+                window.startCamera();
+            } else {
+                console.error('[CAMERA_INIT] ❌ Função startCamera não encontrada!');
+            }
+        });
+    } else {
+        console.warn('[CAMERA_INIT] ⚠️ Botão de iniciar câmera não encontrado');
+    }
+
+    console.log('[CAMERA_INIT] ✅ Inicialização completa');
+}
 
 // ========== ETAPA 1: CAPTURA ==========
 
-// Iniciar câmera
-async function startCamera() {
+// Iniciar câmera - Tornar global
+window.startCamera = async function startCamera() {
     console.log('[CAMERA_START] ========== INICIANDO CÂMERA ==========');
     console.log('[CAMERA_START] Timestamp:', new Date().toISOString());
     
@@ -676,31 +719,31 @@ async function startCamera() {
         
         // Verificar contexto seguro
         console.log('[CAMERA_START] Verificando contexto seguro...');
-        console.log('[CAMERA_START] isSecureContext:', isSecureContext);
+        console.log('[CAMERA_START] isSecureContext:', window.isSecureContext);
         
-        if (!isSecureContext) {
+        if (!window.isSecureContext) {
             console.error('[CAMERA_START] ❌ Contexto não seguro');
             throw new Error('Conexão não segura. A câmera requer HTTPS.');
         }
         
         // Verificar stream anterior
         console.log('[CAMERA_START] Verificando stream anterior...');
-        console.log('[CAMERA_START] stream atual:', stream ? 'EXISTE' : 'NÃO EXISTE');
+        console.log('[CAMERA_START] stream atual:', window.stream ? 'EXISTE' : 'NÃO EXISTE');
         
         // Mostrar indicador de carregamento
         console.log('[CAMERA_START] Mostrando indicador de carregamento...');
         permissionPrompt.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div><p class="mt-2">Acessando câmera...</p></div>';
         
         // Parar stream anterior se existir
-        if (stream) {
+        if (window.stream) {
             console.log('[CAMERA_START] Parando stream anterior...');
-            const tracks = stream.getTracks();
+            const tracks = window.stream.getTracks();
             console.log('[CAMERA_START] Tracks encontrados:', tracks.length);
             tracks.forEach((track, index) => {
                 console.log(`[CAMERA_START] Parando track ${index}:`, track.kind, track.label);
                 track.stop();
             });
-            stream = null;
+            window.stream = null;
             console.log('[CAMERA_START] ✅ Stream anterior parado');
         }
         
@@ -728,7 +771,7 @@ async function startCamera() {
         });
         
         const startTime = Date.now();
-        stream = await navigator.mediaDevices.getUserMedia({
+        window.stream = await navigator.mediaDevices.getUserMedia({
             video: {
                 facingMode: 'environment', // Câmera traseira
                 width: { ideal: 1920 },
@@ -738,10 +781,10 @@ async function startCamera() {
         
         const requestTime = Date.now() - startTime;
         console.log('[CAMERA_START] ✅ Acesso concedido em', requestTime, 'ms');
-        console.log('[CAMERA_START] Stream recebido:', stream ? '✅ SIM' : '❌ NÃO');
+        console.log('[CAMERA_START] Stream recebido:', window.stream ? '✅ SIM' : '❌ NÃO');
         
-        if (stream) {
-            const tracks = stream.getTracks();
+        if (window.stream) {
+            const tracks = window.stream.getTracks();
             console.log('[CAMERA_START] Tracks no stream:', tracks.length);
             tracks.forEach((track, index) => {
                 console.log(`[CAMERA_START]   Track ${index + 1}:`, {
@@ -766,7 +809,7 @@ async function startCamera() {
         }
         
         console.log('[CAMERA_START] Atribuindo stream ao vídeo...');
-        video.srcObject = stream;
+        video.srcObject = window.stream;
         console.log('[CAMERA_START] ✅ Stream atribuído ao vídeo');
         
         // Timeout de segurança - se não carregar em 5 segundos, mostrar erro
@@ -856,11 +899,11 @@ async function startCamera() {
             // Tentar com configuração mais simples
             try {
                 console.log('[CAMERA_START] Tentando com configuração simples (video: true)...');
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                window.stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 console.log('[CAMERA_START] ✅ Configuração alternativa funcionou!');
                 const video = document.getElementById('cameraVideo');
                 if (video) {
-                    video.srcObject = stream;
+                    video.srcObject = window.stream;
                     permissionPrompt.style.display = 'none';
                     cameraControls.style.display = 'flex';
                     hideError();
@@ -900,14 +943,14 @@ async function startCamera() {
     }
 }
 
-// Parar câmera
-function stopCamera() {
+// Parar câmera - Tornar global
+window.stopCamera = function stopCamera() {
     console.log('[CAMERA_STOP] ========== PARANDO CÂMERA ==========');
     console.log('[CAMERA_STOP] Timestamp:', new Date().toISOString());
     
-    if (stream) {
+    if (window.stream) {
         console.log('[CAMERA_STOP] Stream existe, parando tracks...');
-        const tracks = stream.getTracks();
+        const tracks = window.stream.getTracks();
         console.log('[CAMERA_STOP] Número de tracks:', tracks.length);
         tracks.forEach((track, index) => {
             console.log(`[CAMERA_STOP] Parando track ${index + 1}:`, {
@@ -918,9 +961,9 @@ function stopCamera() {
             });
             track.stop();
             console.log(`[CAMERA_STOP] ✅ Track ${index + 1} parado`);
-        });
-        stream = null;
-        console.log('[CAMERA_STOP] ✅ Stream limpo');
+            });
+            window.stream = null;
+            console.log('[CAMERA_STOP] ✅ Stream limpo');
     } else {
         console.log('[CAMERA_STOP] Nenhum stream ativo');
     }
@@ -954,8 +997,8 @@ function stopCamera() {
     console.log('[CAMERA_STOP] ✅ Câmera parada com sucesso');
 }
 
-// Escolher da galeria
-function selectFromGallery() {
+// Escolher da galeria - Tornar global
+window.selectFromGallery = function selectFromGallery() {
     document.getElementById('galleryInput').click();
 }
 
@@ -1004,18 +1047,18 @@ function capturePhoto() {
 // Adicionar foto ao array
 function addPhotoToArray(blob, preview) {
     const photo = {
-        id: photoIdCounter++,
+        id: window.photoIdCounter++,
         blob: blob,
         preview: preview
     };
-    capturedPhotos.push(photo);
+    window.capturedPhotos.push(photo);
     renderPhotoGrid();
     updateAnalyzeButton();
 }
 
 // Remover foto
 function removePhoto(id) {
-    capturedPhotos = capturedPhotos.filter(p => p.id !== id);
+    window.capturedPhotos = window.capturedPhotos.filter(p => p.id !== id);
     renderPhotoGrid();
     updateAnalyzeButton();
 }
@@ -1026,15 +1069,15 @@ function renderPhotoGrid() {
     const container = document.getElementById('photosGridContainer');
     const count = document.getElementById('photoCount');
     
-    if (capturedPhotos.length === 0) {
+    if (window.capturedPhotos.length === 0) {
         container.style.display = 'none';
         return;
     }
     
     container.style.display = 'block';
-    count.textContent = capturedPhotos.length;
+    count.textContent = window.capturedPhotos.length;
     
-    grid.innerHTML = capturedPhotos.map(photo => `
+    grid.innerHTML = window.capturedPhotos.map(photo => `
         <div class="photo-item">
             <img src="${photo.preview}" alt="Foto ${photo.id}">
             <button class="remove-btn" onclick="removePhoto(${photo.id})" title="Remover foto">
@@ -1048,7 +1091,7 @@ function renderPhotoGrid() {
 function updateAnalyzeButton() {
     const btn = document.getElementById('btnAnalyze');
     if (btn) {
-        btn.disabled = capturedPhotos.length === 0;
+        btn.disabled = window.capturedPhotos.length === 0;
     }
 }
 
@@ -1057,9 +1100,9 @@ function updateAnalyzeButton() {
 // Análise completa
 async function analyzeComplete() {
     console.log('[ANALISE_COMPLETA] Iniciando análise completa');
-    console.log('[ANALISE_COMPLETA] Fotos capturadas:', capturedPhotos.length);
+    console.log('[ANALISE_COMPLETA] Fotos capturadas:', window.capturedPhotos.length);
     
-    if (capturedPhotos.length === 0) {
+    if (window.capturedPhotos.length === 0) {
         console.error('[ANALISE_COMPLETA] Nenhuma foto capturada');
         showError('Capture pelo menos uma foto antes de analisar');
         return;
@@ -1071,10 +1114,10 @@ async function analyzeComplete() {
     
     // Fazer upload das fotos diretamente
     const formData = new FormData();
-    capturedPhotos.forEach((photo, index) => {
+    window.capturedPhotos.forEach((photo, index) => {
         const file = new File([photo.blob], `photo_${photo.id}.jpg`, { type: 'image/jpeg' });
         formData.append('images', file);
-        console.log(`[ANALISE_COMPLETA] Adicionando foto ${index + 1}/${capturedPhotos.length}: photo_${photo.id}.jpg`);
+        console.log(`[ANALISE_COMPLETA] Adicionando foto ${index + 1}/${window.capturedPhotos.length}: photo_${photo.id}.jpg`);
     });
     
     console.log('[ANALISE_COMPLETA] Enviando requisição para análise completa...');
@@ -1107,10 +1150,10 @@ async function analyzeComplete() {
         hideLoading();
         
         if (data.success) {
-            produtoJson = data.produto_json;
+            window.produtoJson = data.produto_json;
             console.log('[ANALISE_COMPLETA] produtoJson definido:', {
-                has_produto: !!produtoJson?.produto,
-                produto_nome: produtoJson?.produto?.nome
+                has_produto: !!window.produtoJson?.produto,
+                produto_nome: window.produtoJson?.produto?.nome
             });
             
             // Atualizar URLs se retornadas
@@ -1198,7 +1241,7 @@ function handleAnalysisResult(result) {
         console.log('[HANDLE_ANALYSIS] ✓ produto.imagens final:', result.produto_json.produto.imagens);
         
         // Atualizar produtoJson global
-        produtoJson = result.produto_json;
+        window.produtoJson = result.produto_json;
     }
     
     // Preencher formulário com dados extraídos
@@ -1258,7 +1301,7 @@ async function saveProduct() {
     hideError();
     
     // Verificar se produtoJson existe
-    if (!produtoJson) {
+    if (!window.produtoJson) {
         console.error('produtoJson está vazio ou undefined');
         showError('Erro: Dados do produto não encontrados. Por favor, faça a análise novamente.');
         hideLoading();
@@ -1266,14 +1309,14 @@ async function saveProduct() {
     }
     
     // Obter JSON editado
-    let jsonData = produtoJson;
+    let jsonData = window.produtoJson;
     try {
         const jsonEditorValue = document.getElementById('jsonEditor').value;
         if (jsonEditorValue && jsonEditorValue.trim()) {
             console.log('[SAVE_PRODUCT] Usando JSON do editor');
             jsonData = JSON.parse(jsonEditorValue);
         } else {
-            console.log('[SAVE_PRODUCT] Usando produtoJson original');
+            console.log('[SAVE_PRODUCT] Usando window.produtoJson original');
         }
     } catch (e) {
         console.error('[SAVE_PRODUCT] Erro ao parsear JSON:', e);
@@ -1625,7 +1668,7 @@ function validateJson() {
 function resetForm() {
     currentStep = 1;
     capturedPhotos = [];
-    produtoJson = null;
+    window.produtoJson = null;
     imageUrls = [];
     imagePaths = [];
     photoIdCounter = 0;
