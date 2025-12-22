@@ -21,6 +21,61 @@ from .utils import transform_evora_to_modelo_json
 logger = logging.getLogger(__name__)
 
 # ============================================================================
+# PROMPT SERVICES - Mapeamento de Prompts do MCP_SinapUm
+# ============================================================================
+
+def get_prompt_from_database(prompt_key, fallback_prompt=None):
+    """
+    Busca um prompt do banco de dados (MCP_SinapUm) usando o mapeamento configurado.
+    
+    Args:
+        prompt_key: Chave do mapeamento (ex: 'analise_produto_imagem')
+        fallback_prompt: Prompt padrão caso não encontre no banco (opcional)
+    
+    Returns:
+        str: Conteúdo do prompt ou fallback_prompt se não encontrar
+    """
+    from django.conf import settings
+    from django.apps import apps
+    
+    try:
+        # Obter tipo_servico do mapeamento
+        prompt_mapping = getattr(settings, 'PROMPT_MAPPING', {})
+        tipo_servico = prompt_mapping.get(prompt_key)
+        
+        if not tipo_servico:
+            logger.warning(f"Chave '{prompt_key}' não encontrada no PROMPT_MAPPING, usando fallback")
+            return fallback_prompt
+        
+        logger.info(f"Buscando prompt: chave='{prompt_key}', tipo_servico='{tipo_servico}'")
+        
+        try:
+            PromptTemplate = apps.get_model('app_sinapum', 'PromptTemplate')
+            prompt_obj = PromptTemplate.objects.filter(
+                tipo_servico=tipo_servico,
+                ativo=True
+            ).first()
+            
+            if prompt_obj:
+                logger.info(f"✅ Prompt obtido: {prompt_obj.nome} (tipo: {tipo_servico}, {len(prompt_obj.conteudo)} caracteres)")
+                return prompt_obj.conteudo
+            else:
+                logger.warning(f"⚠️ Nenhum PromptTemplate ativo encontrado para '{tipo_servico}'")
+        except LookupError:
+            logger.warning("App 'app_sinapum' não encontrado ou modelo PromptTemplate não existe")
+        except Exception as e:
+            logger.warning(f"Erro ao buscar prompt do banco: {str(e)}")
+    except Exception as e:
+        logger.error(f"Erro ao buscar prompt: {str(e)}", exc_info=True)
+    
+    # Retornar fallback se não encontrou
+    if fallback_prompt:
+        logger.info("Usando prompt padrão (fallback)")
+        return fallback_prompt
+    
+    return None
+
+# ============================================================================
 # KMN SERVICES
 # ============================================================================
 
@@ -449,45 +504,8 @@ def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
             if detected_lang:
                 language = detected_lang
         
-        # Buscar prompt do banco de dados (MCP_SinapUm) usando mapeamento
-        prompt = None
-        try:
-            from django.conf import settings
-            from django.apps import apps
-            
-            # Obter tipo_servico do mapeamento
-            prompt_key = 'analise_produto_imagem'  # Chave da funcionalidade
-            tipo_servico = getattr(settings, 'PROMPT_MAPPING', {}).get(
-                prompt_key, 
-                'analise_produto_imagem_v1'  # Fallback padrão
-            )
-            
-            logger.info(f"Buscando prompt com tipo_servico: {tipo_servico} (chave: {prompt_key})")
-            
-            try:
-                PromptTemplate = apps.get_model('app_sinapum', 'PromptTemplate')
-                # Buscar prompt ativo usando o tipo_servico do mapeamento
-                prompt_obj = PromptTemplate.objects.filter(
-                    tipo_servico=tipo_servico,
-                    ativo=True
-                ).first()
-                
-                if prompt_obj:
-                    prompt = prompt_obj.conteudo
-                    logger.info(f"✅ Prompt obtido do banco de dados: {prompt_obj.nome} (tipo: {tipo_servico}, {len(prompt)} caracteres)")
-                else:
-                    logger.warning(f"⚠️ Nenhum PromptTemplate ativo encontrado para tipo_servico '{tipo_servico}' (chave: {prompt_key})")
-            except LookupError:
-                logger.warning("App 'app_sinapum' não encontrado ou modelo PromptTemplate não existe")
-            except Exception as e:
-                logger.warning(f"Erro ao buscar prompt do banco: {str(e)}")
-        except Exception as e:
-            logger.error(f"Erro ao importar/buscar prompt: {str(e)}", exc_info=True)
-        
-        # Fallback: prompt padrão se não encontrar no banco
-        if not prompt:
-            logger.info("Usando prompt padrão (fallback)")
-            prompt = """Analise esta imagem de um produto e extraia TODAS as informações visíveis no rótulo, etiqueta ou embalagem.
+        # Buscar prompt do banco de dados usando mapeamento configurável
+        fallback_prompt = """Analise esta imagem de um produto e extraia TODAS as informações visíveis no rótulo, etiqueta ou embalagem.
 
 Extraia as seguintes informações:
 - Nome do produto
@@ -501,6 +519,11 @@ Extraia as seguintes informações:
 - Qualquer outra informação relevante visível na imagem
 
 Retorne os dados em formato JSON estruturado compatível com o modelo ÉVORA."""
+        
+        prompt = get_prompt_from_database(
+            prompt_key='analise_produto_imagem',
+            fallback_prompt=fallback_prompt
+        )
         
         url_base, api_key = _get_openmind_config()
         # Construir URL do endpoint - verificar se já inclui /api/v1
