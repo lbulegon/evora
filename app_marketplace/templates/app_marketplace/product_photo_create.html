@@ -569,54 +569,164 @@ let photoIdCounter = 0;
 
 // Verificar suporte
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    console.error('[CAMERA] API de mídia não suportada');
     document.getElementById('permissionPrompt').innerHTML = 
-        '<p class="text-danger">Câmera não suportada neste navegador</p>';
+        '<p class="text-danger">Câmera não suportada neste navegador. Use Chrome, Firefox ou Safari atualizado.</p>';
+}
+
+// Verificar contexto seguro (HTTPS ou localhost)
+const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+if (!isSecureContext) {
+    console.warn('[CAMERA] Contexto não seguro - getUserMedia requer HTTPS');
+    document.getElementById('permissionPrompt').innerHTML = 
+        '<p class="text-warning">⚠️ A câmera requer conexão HTTPS. Certifique-se de estar acessando via HTTPS.</p>';
 }
 
 // ========== ETAPA 1: CAPTURA ==========
 
 // Iniciar câmera
 async function startCamera() {
+    console.log('[CAMERA] Iniciando câmera...');
+    
+    const permissionPrompt = document.getElementById('permissionPrompt');
+    const cameraPreview = document.getElementById('cameraPreview');
+    const cameraControls = document.getElementById('cameraControls');
+    
     try {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+        // Verificar suporte novamente
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('API de mídia não suportada neste navegador');
         }
         
+        // Verificar contexto seguro
+        if (!isSecureContext) {
+            throw new Error('Conexão não segura. A câmera requer HTTPS.');
+        }
+        
+        // Mostrar indicador de carregamento
+        permissionPrompt.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div><p class="mt-2">Acessando câmera...</p></div>';
+        
+        // Parar stream anterior se existir
+        if (stream) {
+            console.log('[CAMERA] Parando stream anterior...');
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+        
+        // Solicitar acesso à câmera
+        console.log('[CAMERA] Solicitando acesso à câmera...');
         stream = await navigator.mediaDevices.getUserMedia({
             video: {
-                facingMode: 'environment',
+                facingMode: 'environment', // Câmera traseira
                 width: { ideal: 1920 },
                 height: { ideal: 1080 }
             }
         });
         
-        const preview = document.getElementById('cameraPreview');
-        preview.innerHTML = '<video id="cameraVideo" autoplay playsinline></video>';
+        console.log('[CAMERA] Acesso concedido, configurando vídeo...');
+        
+        // Configurar preview
+        cameraPreview.innerHTML = '<video id="cameraVideo" autoplay playsinline muted></video>';
         
         const video = document.getElementById('cameraVideo');
         video.srcObject = stream;
         
+        // Aguardar vídeo carregar
         video.onloadedmetadata = () => {
-            document.getElementById('permissionPrompt').style.display = 'none';
-            document.getElementById('cameraControls').style.display = 'flex';
+            console.log('[CAMERA] Vídeo carregado, dimensões:', video.videoWidth, 'x', video.videoHeight);
+            permissionPrompt.style.display = 'none';
+            cameraControls.style.display = 'flex';
+            hideError();
         };
         
-        hideError();
+        // Tratamento de erros do vídeo
+        video.onerror = (e) => {
+            console.error('[CAMERA] Erro no elemento de vídeo:', e);
+            showError('Erro ao exibir vídeo da câmera');
+        };
+        
+        // Timeout de segurança - se não carregar em 5 segundos, mostrar erro
+        setTimeout(() => {
+            if (!video.videoWidth && !video.videoHeight) {
+                console.error('[CAMERA] Timeout - vídeo não carregou');
+                showError('A câmera não respondeu. Tente novamente.');
+                stopCamera();
+            }
+        }, 5000);
+        
     } catch (error) {
-        showError('Erro ao acessar câmera: ' + error.message);
+        console.error('[CAMERA] Erro ao acessar câmera:', error);
+        
+        let errorMessage = 'Erro ao acessar câmera: ';
+        
+        // Mensagens de erro mais específicas
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+            errorMessage = 'Permissão de câmera negada. Por favor, permita o acesso à câmera nas configurações do navegador.';
+        } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+            errorMessage = 'Nenhuma câmera encontrada. Verifique se há uma câmera conectada ao dispositivo.';
+        } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+            errorMessage = 'Câmera está sendo usada por outro aplicativo. Feche outros apps que usam a câmera e tente novamente.';
+        } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
+            errorMessage = 'Configurações da câmera não suportadas. Tentando configuração alternativa...';
+            // Tentar com configuração mais simples
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('cameraVideo');
+                if (video) {
+                    video.srcObject = stream;
+                    permissionPrompt.style.display = 'none';
+                    cameraControls.style.display = 'flex';
+                    hideError();
+                    return;
+                }
+            } catch (retryError) {
+                errorMessage = 'Erro ao acessar câmera: ' + retryError.message;
+            }
+        } else {
+            errorMessage += error.message;
+        }
+        
+        showError(errorMessage);
+        
+        // Restaurar botão de iniciar câmera
+        permissionPrompt.innerHTML = `
+            <i class="fas fa-camera" style="font-size: 3rem; color: #ffc107;"></i>
+            <h5>Permissão de Câmera</h5>
+            <p>Clique em "Iniciar Câmera" para permitir o acesso à câmera do seu dispositivo.</p>
+            <div class="d-flex gap-2 justify-content-center">
+                <button class="btn btn-primary" onclick="startCamera()">
+                    <i class="fas fa-video"></i> Iniciar Câmera
+                </button>
+                <button class="btn btn-outline-primary" onclick="selectFromGallery()">
+                    <i class="fas fa-images"></i> Escolher da Galeria
+                </button>
+            </div>
+        `;
     }
 }
 
 // Parar câmera
 function stopCamera() {
+    console.log('[CAMERA] Parando câmera...');
+    
     if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach(track => {
+            track.stop();
+            console.log('[CAMERA] Track parado:', track.kind);
+        });
         stream = null;
     }
-    document.getElementById('cameraPreview').innerHTML = 
+    
+    const cameraPreview = document.getElementById('cameraPreview');
+    const cameraControls = document.getElementById('cameraControls');
+    const permissionPrompt = document.getElementById('permissionPrompt');
+    
+    cameraPreview.innerHTML = 
         '<div style="color: white; text-align: center;"><i class="fas fa-camera" style="font-size: 4rem;"></i><p>Inicie a câmera ou escolha uma foto</p></div>';
-    document.getElementById('cameraControls').style.display = 'none';
-    document.getElementById('permissionPrompt').style.display = 'block';
+    cameraControls.style.display = 'none';
+    permissionPrompt.style.display = 'block';
+    
+    console.log('[CAMERA] Câmera parada');
 }
 
 // Escolher da galeria

@@ -265,7 +265,9 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para Railway
 
 # Static files directories (para desenvolvimento)
-STATICFILES_DIRS = [BASE_DIR / "app_marketplace" / "static"]
+# Nota: Não é necessário incluir app_marketplace/static aqui porque o Django
+# automaticamente procura arquivos estáticos em app_name/static/ para cada app instalado
+STATICFILES_DIRS = []
 
 # Media files (uploads de imagens)
 MEDIA_URL = '/media/'
