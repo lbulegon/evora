@@ -1522,9 +1522,7 @@ async function saveProduct() {
         }
     }
     
-    // Obter preço e estoque do formulário
-    const priceInput = document.getElementById('inputPrice');
-    const estoqueInput = document.getElementById('inputEstoque');
+    // Obter preço e estoque do formulário (já declarados acima, reutilizar)
     const price = priceInput && priceInput.value ? priceInput.value : null;
     const estoque = estoqueInput && estoqueInput.value ? estoqueInput.value : null;
     
