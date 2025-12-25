@@ -31,7 +31,7 @@ SINAPUM_API_KEY = config("SINAPUM_API_KEY", default=None)
 if not SINAPUM_API_KEY:
     SINAPUM_API_KEY = OPENMIND_AI_KEY
 
-# Mapeamento de Prompts do MCP_SinapUm
+# Mapeamento de Prompts do Core_SinapUm
 # Define qual tipo_servico do PromptTemplate usar para cada funcionalidade
 PROMPT_MAPPING = {
     # Análise de imagens de produtos

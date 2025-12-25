@@ -21,12 +21,12 @@ from .utils import transform_evora_to_modelo_json
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# PROMPT SERVICES - Mapeamento de Prompts do MCP_SinapUm
+# PROMPT SERVICES - Mapeamento de Prompts do Core_SinapUm
 # ============================================================================
 
 def get_prompt_from_database(prompt_key, fallback_prompt=None):
     """
-    Busca um prompt do banco de dados (MCP_SinapUm) usando o mapeamento configurado.
+    Busca um prompt do banco de dados (Core_SinapUm) usando o mapeamento configurado.
     
     Args:
         prompt_key: Chave do mapeamento (ex: 'analise_produto_imagem')
@@ -51,14 +51,15 @@ def get_prompt_from_database(prompt_key, fallback_prompt=None):
         
         try:
             PromptTemplate = apps.get_model('app_sinapum', 'PromptTemplate')
+            # Buscar por tipo_prompt (campo correto do modelo)
             prompt_obj = PromptTemplate.objects.filter(
-                tipo_servico=tipo_servico,
+                tipo_prompt=tipo_servico,  # tipo_servico aqui é na verdade o tipo_prompt
                 ativo=True
             ).first()
             
             if prompt_obj:
-                logger.info(f"✅ Prompt obtido: {prompt_obj.nome} (tipo: {tipo_servico}, {len(prompt_obj.conteudo)} caracteres)")
-                return prompt_obj.conteudo
+                logger.info(f"✅ Prompt obtido: {prompt_obj.nome} (tipo: {tipo_servico}, {len(prompt_obj.prompt_text)} caracteres)")
+                return prompt_obj.prompt_text
             else:
                 logger.warning(f"⚠️ Nenhum PromptTemplate ativo encontrado para '{tipo_servico}'")
         except LookupError:
@@ -437,7 +438,29 @@ class CatalogoService:
 
 
 # ============================================================================
-# OPENMIND AI SERVICES
+# MCP SERVICES - Análise de Imagens via MCP
+# ============================================================================
+
+MCP_SERVICE_URL = None
+MCP_API_KEY = None
+
+def _get_mcp_config():
+    """Obtém configurações do MCP Service do Django settings"""
+    global MCP_SERVICE_URL, MCP_API_KEY
+    if MCP_SERVICE_URL is None:
+        from django.conf import settings
+        # URL padrão do MCP Service
+        default_url = 'http://69.169.102.84:7010'
+        MCP_SERVICE_URL = getattr(settings, 'MCP_SERVICE_URL', default_url)
+        MCP_API_KEY = getattr(settings, 'MCP_API_KEY', None)
+        # Fallback: usar SINAPUM_API_KEY se MCP_API_KEY não estiver configurado
+        if not MCP_API_KEY:
+            MCP_API_KEY = getattr(settings, 'SINAPUM_API_KEY', None)
+    return MCP_SERVICE_URL, MCP_API_KEY
+
+
+# ============================================================================
+# OPENMIND AI SERVICES (Legado - mantido para compatibilidade)
 # ============================================================================
 
 OPENMIND_AI_URL = None
@@ -483,6 +506,203 @@ def _detect_user_language(user):
         pass
     
     return None
+
+
+def analyze_image_with_mcp(image_file, language='pt-BR', user=None, context_pack=None):
+    """
+    Analisa uma imagem usando o MCP Service (Model Context Protocol).
+    
+    Esta é a função recomendada para análise de imagens, usando a arquitetura MCP-aware
+    com Context Pack para rastreamento completo e contexto enriquecido.
+    
+    Args:
+        image_file: Arquivo de imagem (Django UploadedFile)
+        language: Código do idioma (ex: 'pt-BR', 'en-US', 'es-ES'). Padrão: 'pt-BR'
+        user: Usuário Django (opcional) - para detectar idioma do perfil e enriquecer Context Pack
+        context_pack: Context Pack MCP-aware (opcional) - se não fornecido, será gerado automaticamente
+    
+    Returns:
+        dict: Resposta da tool MCP com dados extraídos
+    """
+    import uuid
+    import base64
+    from datetime import datetime
+    
+    try:
+        # Detectar idioma do usuário se fornecido
+        if user:
+            detected_lang = _detect_user_language(user)
+            if detected_lang:
+                language = detected_lang
+        
+        # Obter configurações do MCP Service
+        mcp_url, mcp_api_key = _get_mcp_config()
+        
+        if not mcp_api_key:
+            logger.warning("MCP_API_KEY não configurada, tentando usar método legado")
+            return analyze_image_with_openmind(image_file, language, user)
+        
+        # Preparar imagem para envio
+        image_file.seek(0)
+        image_data = image_file.read()
+        image_filename = image_file.name or "product_image.jpg"
+        
+        # Converter imagem para base64 (MCP aceita base64 ou URL)
+        image_base64 = base64.b64encode(image_data).decode('utf-8')
+        
+        # Gerar Context Pack se não fornecido
+        if context_pack is None:
+            request_id = str(uuid.uuid4())
+            trace_id = str(uuid.uuid4())
+            
+            # Enriquecer com informações do usuário se disponível
+            actor = {"type": "service", "id": "evora_marketplace"}
+            source = {"channel": "web", "conversation_id": None}
+            
+            if user and user.is_authenticated:
+                actor = {
+                    "type": "user",
+                    "id": str(user.id),
+                    "username": user.username
+                }
+                source["conversation_id"] = f"user_{user.id}"
+            
+            context_pack = {
+                "meta": {
+                    "request_id": request_id,
+                    "trace_id": trace_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "actor": actor,
+                    "source": source
+                },
+                "task": {
+                    "name": "analisar_produto_imagem",
+                    "goal": "Extrair informações estruturadas de produto a partir de imagem",
+                    "constraints": [
+                        "Não inventar informações",
+                        "Extrair apenas dados visíveis na imagem",
+                        f"Responder em {language}"
+                    ]
+                },
+                "context": {
+                    "user_profile": {
+                        "language": language,
+                        "user_id": str(user.id) if user and user.is_authenticated else None
+                    },
+                    "domain_profile": {
+                        "business_type": "marketplace",
+                        "region": "BR"
+                    }
+                },
+                "response_contract": {
+                    "mode": "json",
+                    "language": language
+                }
+            }
+        
+        # Preparar input da tool
+        tool_input = {
+            "image_base64": f"data:image/jpeg;base64,{image_base64}",
+            "prompt_params": {
+                "language": language
+            }
+        }
+        
+        # Preparar requisição para MCP Service
+        mcp_request = {
+            "tool": "vitrinezap.analisar_produto",
+            "version": "1.0",  # Usar versão atual
+            "context_pack": context_pack,
+            "input": tool_input
+        }
+        
+        # Fazer requisição ao MCP Service
+        mcp_endpoint = f"{mcp_url.rstrip('/')}/mcp/call"
+        headers = {
+            "Content-Type": "application/json",
+            "X-SINAPUM-KEY": mcp_api_key
+        }
+        
+        logger.info(f"[MCP] Enviando requisição para MCP Service: {mcp_endpoint}")
+        logger.info(f"[MCP] Request ID: {context_pack['meta']['request_id']}")
+        logger.info(f"[MCP] Trace ID: {context_pack['meta']['trace_id']}")
+        
+        response = requests.post(
+            mcp_endpoint,
+            json=mcp_request,
+            headers=headers,
+            timeout=90  # Timeout maior para análise de IA
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            # Verificar se a tool foi executada com sucesso
+            if result.get('ok'):
+                output = result.get('output', {})
+                
+                # Extrair dados da resposta
+                data = output.get('data', {})
+                image_url = output.get('image_url')
+                image_path = output.get('image_path')
+                saved_filename = output.get('saved_filename')
+                
+                # Formatar resposta no formato esperado pelo Evora
+                return {
+                    'success': True,
+                    'data': data,
+                    'image_url': image_url,
+                    'image_path': image_path,
+                    'saved_filename': saved_filename,
+                    'request_id': result.get('request_id'),
+                    'trace_id': result.get('trace_id'),
+                    'latency_ms': result.get('latency_ms', 0)
+                }
+            else:
+                # Tool retornou erro
+                error = result.get('error', {})
+                error_message = error.get('message', 'Erro desconhecido na análise')
+                error_code = error.get('code', 'TOOL_ERROR')
+                
+                logger.error(f"[MCP] Erro na tool: {error_message}")
+                
+                return {
+                    'success': False,
+                    'error': error_message,
+                    'error_code': error_code,
+                    'request_id': result.get('request_id'),
+                    'trace_id': result.get('trace_id')
+                }
+        else:
+            # Erro HTTP
+            error_text = response.text
+            logger.error(f"[MCP] Erro HTTP {response.status_code}: {error_text}")
+            
+            try:
+                error_json = response.json()
+                error_message = error_json.get('detail', error_text)
+            except:
+                error_message = error_text
+            
+            return {
+                'success': False,
+                'error': f"Erro ao chamar MCP Service: {error_message}",
+                'error_code': 'MCP_SERVICE_ERROR',
+                'status_code': response.status_code
+            }
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Erro de conexão com MCP Service: {str(e)}"
+        logger.error(error_msg)
+        # Fallback para método legado
+        logger.info("Tentando fallback para método legado (OpenMind direto)")
+        return analyze_image_with_openmind(image_file, language, user)
+    except Exception as e:
+        error_msg = f"Erro inesperado ao usar MCP: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        # Fallback para método legado
+        logger.info("Tentando fallback para método legado (OpenMind direto)")
+        return analyze_image_with_openmind(image_file, language, user)
 
 
 def analyze_image_with_openmind(image_file, language='pt-BR', user=None):
