@@ -48,7 +48,7 @@ WEBHOOK_URL=http://localhost:8000/webhooks/whatsapp/
 OPENAI_API_KEY=sk-sua-chave-aqui
 
 # =============================================================================
-# OPENMIND AI - Servidor MCP_SinapUm (Opcional - para substituir OpenAI)
+# OPENMIND AI - Servidor Core_SinapUm (Opcional - para substituir OpenAI)
 # =============================================================================
 # Configuração Unificada - Use estas mesmas variáveis no Railway!
 AI_SERVICE=openmind
@@ -68,7 +68,7 @@ SINAPUM_API_KEY=om1_live_7d4102a1bf72cc497d7651beb6a98292764b1f77df947c82d086506
 # SINAPUM_API_KEY=
 
 # =============================================================================
-# SERVIDOR MCP_SINAPUM - SSH (Para deploy/manutenção)
+# SERVIDOR CORE_SINAPUM - SSH (Para deploy/manutenção)
 # =============================================================================
 SINAPUM_SSH_HOST=69.169.102.84
 SINAPUM_SSH_USER=root

@@ -386,11 +386,23 @@ def capture_lead(request):
             hashlib.sha256
         ).hexdigest()
         
+        # Log detalhado para debug
+        logger.info(
+            f"🔐 Gerando HMAC para Core_SinapUm:\n"
+            f"   Project Key: {PROJECT_KEY}\n"
+            f"   Timestamp: {timestamp}\n"
+            f"   Email: {email}\n"
+            f"   WhatsApp: {whatsapp}\n"
+            f"   Message: {message}\n"
+            f"   Signature: {signature[:40]}..."
+        )
+        
         # Headers de autenticação
         headers = {
             'X-Project-Key': PROJECT_KEY,
             'X-Signature': signature,
             'X-Timestamp': timestamp,
+            'X-Requested-With': 'XMLHttpRequest',  # Indica que é uma chamada AJAX
             'Content-Type': 'application/x-www-form-urlencoded',
         }
         
@@ -423,12 +435,21 @@ def capture_lead(request):
         # Enviar para o Core_SinapUm
         api_url = f"{CORE_URL}/api/leads/capture"
         
+        logger.info(f"📤 Enviando lead para Core_SinapUm: {api_url}")
+        logger.debug(f"   Headers: {headers}")
+        logger.debug(f"   Data: {data}")
+        
         try:
             response = requests.post(
                 api_url,
                 data=data,
                 headers=headers,
                 timeout=10
+            )
+            
+            logger.info(
+                f"📥 Resposta do Core_SinapUm: Status {response.status_code} | "
+                f"Headers: {dict(response.headers)}"
             )
             
             if response.status_code == 200:

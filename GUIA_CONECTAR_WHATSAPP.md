@@ -10,7 +10,7 @@ Conectar seu celular WhatsApp ao sistema Évora para receber e enviar mensagens 
 
 1. **Evolution API rodando**
    ```bash
-   cd /root/MCP_SinapUm/services/evolution_api
+   cd /root/Core_SinapUm/services/evolution_api_service
    docker compose ps  # Verificar se está rodando
    docker compose up -d  # Se não estiver, subir
    ```
@@ -129,7 +129,7 @@ Se o WhatsApp desconectar:
 ### Evolution API não está rodando
 
 ```bash
-cd /root/MCP_SinapUm/services/evolution_api
+cd /root/Core_SinapUm/services/evolution_api_service
 docker compose up -d
 docker compose logs -f evolution_api
 ```
@@ -155,7 +155,7 @@ docker compose logs -f evolution_api
 
 3. Verifique logs da Evolution API:
    ```bash
-   cd /root/MCP_SinapUm/services/evolution_api
+   cd /root/Core_SinapUm/services/evolution_api_service
    docker compose logs evolution_api | grep webhook
    ```
 

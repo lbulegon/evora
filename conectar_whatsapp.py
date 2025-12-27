@@ -284,7 +284,7 @@ def main():
     # 1. Verificar Evolution API
     if not verificar_evolution_api():
         print("\n❌ Evolution API não está disponível!")
-        print("   Execute: cd /root/MCP_SinapUm/services/evolution_api && docker compose up -d")
+        print("   Execute: cd /root/Core_SinapUm/services/evolution_api_service && docker compose up -d")
         return
     
     # 2. Listar instâncias

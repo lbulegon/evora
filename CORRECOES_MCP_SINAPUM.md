@@ -1,8 +1,8 @@
-# Correções de Endereços - MCP_SinapUm
+# Correções de Endereços - Core_SinapUm
 
 ## Resumo das Alterações
 
-Após a reorganização do projeto SinapUm para MCP_SinapUm e mudança da porta de `80` para `5000`, foram corrigidos todos os endereços e referências no projeto ÉVORA.
+Após a reorganização do projeto SinapUm para Core_SinapUm (anteriormente MCP_SinapUm) e mudança da porta de `80` para `5000`, foram corrigidos todos os endereços e referências no projeto ÉVORA.
 
 ## Mudanças Realizadas
 
@@ -25,7 +25,7 @@ Após a reorganização do projeto SinapUm para MCP_SinapUm e mudança da porta 
 
 #### Arquivos de Configuração
 - ✅ `environment_variables.example` - OPENMIND_AI_URL atualizado para porta 5000
-- ✅ Comentários atualizados de "SinapUm" para "MCP_SinapUm" onde apropriado
+- ✅ Comentários atualizados de "SinapUm" para "Core_SinapUm" onde apropriado
 
 ### 3. URLs Atualizadas
 
@@ -62,7 +62,7 @@ OPENMIND_AI_URL=http://69.169.102.84:5000/api/v1
 
 1. **Arquivos de Documentação:** Os arquivos em `_doc/` e `openmind-ai-server/` ainda contêm referências à porta 8000, mas são apenas documentação. O código funcional está correto.
 
-2. **Testes Locais:** Os testes que usam `localhost:8000` referem-se ao servidor Django do próprio projeto ÉVORA, não ao MCP_SinapUm, então não precisam ser alterados.
+2. **Testes Locais:** Os testes que usam `localhost:8000` referem-se ao servidor Django do próprio projeto ÉVORA, não ao Core_SinapUm, então não precisam ser alterados.
 
 3. **Railway/Produção:** Certifique-se de atualizar a variável de ambiente `OPENMIND_AI_URL` no Railway para apontar para a porta 5000.
 

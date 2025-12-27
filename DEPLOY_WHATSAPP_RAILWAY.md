@@ -4,7 +4,7 @@
 
 **O projeto `/evora` roda no Railway, não no servidor SinapUm.**
 
-- **Servidor SinapUm (porta 5000)**: MCP_SinapUm - Análise de imagens
+- **Servidor SinapUm (porta 5000)**: Core_SinapUm - Análise de imagens
 - **Railway (Évora)**: Projeto Django - Marketplace e WhatsApp Integration
 
 ## 🔧 O que foi implementado

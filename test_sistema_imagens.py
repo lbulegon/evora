@@ -21,7 +21,7 @@ def test_build_image_url():
     print("TESTE: build_image_url")
     print("=" * 80)
     
-    # Configurar URL do MCP_SinapUm
+    # Configurar URL do Core_SinapUm
     openmind_url = getattr(settings, 'OPENMIND_AI_URL', 'http://69.169.102.84:5000/api/v1')
     
     test_cases = [
