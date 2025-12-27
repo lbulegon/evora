@@ -13,6 +13,8 @@ VitrineZap é o aplicativo da **ÉVORA** - uma **rede de comércio distribuído*
 
 ## 🚀 Quick Start
 
+
+
 ```bash
 # Clone o repositório
 git clone https://github.com/seu-usuario/vitrinezap.git
