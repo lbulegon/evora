@@ -48,6 +48,11 @@ EVOLUTION_API_URL = config("EVOLUTION_API_URL", default="http://69.169.102.84:80
 EVOLUTION_API_KEY = config("EVOLUTION_API_KEY", default="GKvy6psn-8HHpBQ4HAHKFOXnwjHR-oSzeGZzCaws0xg")
 EVOLUTION_INSTANCE_NAME = config("EVOLUTION_INSTANCE_NAME", default="default")
 
+# Lead Registry - Core_SinapUm Integration
+CORE_LEAD_URL = config("CORE_LEAD_URL", default="http://69.169.102.84:5000")
+VITRINEZAP_LEAD_PROJECT_KEY = config("VITRINEZAP_LEAD_PROJECT_KEY", default="vitrinezap")
+VITRINEZAP_LEAD_SECRET = config("VITRINEZAP_LEAD_SECRET", default="eedd77ee8313b691a7498ae0e4ae7809725e24727225f739caf45770d9548aed")
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

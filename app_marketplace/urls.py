@@ -14,6 +14,7 @@ from . import image_proxy_views
 
 urlpatterns = [
     path('', views.index, name='index'),
+    path('api/leads/capture/', views.capture_lead, name='capture_lead'),
     path('cadastro/', views.cadastro, name='cadastro'),
     path('login/', views.login_view, name='login'),  # nova rota
     path('home/', views.home_view, name='home'),

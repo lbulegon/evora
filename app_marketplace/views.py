@@ -5,7 +5,15 @@ from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
+from django.conf import settings
 import logging
+import hmac
+import hashlib
+import time
+import requests
 from .models import (
     Evento,
     Cliente,
@@ -336,3 +344,135 @@ def pedidos(request):
         
         messages.error(request, 'Ocorreu um erro ao carregar seus pedidos. Por favor, tente novamente.')
         return redirect('home')
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def capture_lead(request):
+    """
+    View que recebe o form do frontend e publica o lead no Core_SinapUm.
+    Integração com Lead Registry usando autenticação HMAC.
+    """
+    try:
+        # Validar honeypot (anti-bot)
+        if request.POST.get('website'):
+            logger.warning("Tentativa de captura de lead detectada como bot (honeypot preenchido)")
+            return JsonResponse({'ok': False, 'error': 'invalid_request'}, status=400)
+        
+        # Validar campos obrigatórios
+        nome = request.POST.get('nome', '').strip()
+        email = request.POST.get('email', '').strip()
+        whatsapp = request.POST.get('whatsapp', '').strip()
+        cidade = request.POST.get('cidade', '').strip()
+        
+        if not (nome and email and whatsapp):
+            return JsonResponse({
+                'ok': False,
+                'error': 'missing_fields',
+                'message': 'Por favor, preencha todos os campos obrigatórios.'
+            }, status=400)
+        
+        # Configurações do Lead Registry
+        PROJECT_KEY = settings.VITRINEZAP_LEAD_PROJECT_KEY
+        PROJECT_SECRET = settings.VITRINEZAP_LEAD_SECRET
+        CORE_URL = settings.CORE_LEAD_URL
+        
+        # Gerar assinatura HMAC
+        timestamp = str(int(time.time()))
+        message = f"{PROJECT_KEY}{timestamp}{email}{whatsapp}"
+        signature = hmac.new(
+            PROJECT_SECRET.encode('utf-8'),
+            message.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        
+        # Headers de autenticação
+        headers = {
+            'X-Project-Key': PROJECT_KEY,
+            'X-Signature': signature,
+            'X-Timestamp': timestamp,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        }
+        
+        # Dados do lead
+        data = {
+            'nome': nome,
+            'email': email,
+            'whatsapp': whatsapp,
+            'cidade': cidade,
+            'source_system': request.POST.get('source_system', 'vitrinezap'),
+            'source_entrypoint': request.POST.get('source_entrypoint', 'home'),
+            'source_context': request.POST.get('source_context', 'lista_antecipada'),
+        }
+        
+        # UTM parameters (se houver)
+        utm_source = request.POST.get('utm_source', '')
+        utm_campaign = request.POST.get('utm_campaign', '')
+        utm_medium = request.POST.get('utm_medium', '')
+        utm_content = request.POST.get('utm_content', '')
+        
+        if utm_source:
+            data['utm_source'] = utm_source
+        if utm_campaign:
+            data['utm_campaign'] = utm_campaign
+        if utm_medium:
+            data['utm_medium'] = utm_medium
+        if utm_content:
+            data['utm_content'] = utm_content
+        
+        # Enviar para o Core_SinapUm
+        api_url = f"{CORE_URL}/api/leads/capture"
+        
+        try:
+            response = requests.post(
+                api_url,
+                data=data,
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('ok'):
+                    logger.info(f"Lead capturado com sucesso: {email}")
+                    return JsonResponse({
+                        'ok': True,
+                        'message': 'Cadastro realizado com sucesso! Em breve você receberá vitrines no WhatsApp.'
+                    })
+                else:
+                    logger.error(f"Erro ao capturar lead: {result.get('error')}")
+                    return JsonResponse({
+                        'ok': False,
+                        'error': result.get('error', 'unknown_error'),
+                        'message': 'Erro ao processar seu cadastro. Por favor, tente novamente.'
+                    }, status=400)
+            else:
+                logger.error(f"Erro HTTP ao capturar lead: {response.status_code} - {response.text}")
+                return JsonResponse({
+                    'ok': False,
+                    'error': 'server_error',
+                    'message': 'Erro ao processar seu cadastro. Por favor, tente novamente.'
+                }, status=500)
+                
+        except requests.exceptions.Timeout:
+            logger.error("Timeout ao enviar lead para Core_SinapUm")
+            return JsonResponse({
+                'ok': False,
+                'error': 'timeout',
+                'message': 'Tempo de resposta excedido. Por favor, tente novamente.'
+            }, status=504)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Erro de conexão ao enviar lead: {str(e)}")
+            return JsonResponse({
+                'ok': False,
+                'error': 'connection_error',
+                'message': 'Erro de conexão. Por favor, verifique sua internet e tente novamente.'
+            }, status=503)
+            
+    except Exception as e:
+        logger.error(f"Erro inesperado na captura de lead: {str(e)}", exc_info=True)
+        return JsonResponse({
+            'ok': False,
+            'error': 'unexpected_error',
+            'message': 'Ocorreu um erro inesperado. Por favor, tente novamente.'
+        }, status=500)
